@@ -11,7 +11,7 @@ const userStore = create<UserStore>((set) => ({
   setUser: (user: User | null) => set({ user })
 }))
 
-const useUser = () => userStore(state => state.user)
+const useUser    = () => userStore(state => state.user)
 const useSetUser = () => userStore(state => state.setUser)
 
 export { useUser, useSetUser }
