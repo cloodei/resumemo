@@ -182,7 +182,7 @@
   --spacing: 0.25rem;
 }
 
-@layer base {
+/* @layer base {
   * {
     @apply border-border outline-ring/50;
   }
@@ -191,6 +191,11 @@
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
+} */
+
+* {
+  border-color: var(--border);
+  outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
 }
 
 ::-moz-selection {
@@ -203,7 +208,7 @@
   background: var(--foreground);
 }
 
-.head-text-lg {
+/* .head-text-lg {
   @apply text-3xl md:text-5xl lg:text-6xl font-bold font-heading tracking-tight leading-[1.5];
 }
 
@@ -213,7 +218,7 @@
 
 .head-text-sm {
   @apply text-lg md:text-xl lg:text-2xl font-bold font-heading tracking-tight leading-[1.5];
-}
+} */
 
 ::view-transition-group(root) {
   animation-duration: 0.7s;

@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation"
 import {
   ArrowUpRight,
   BarChart3,
@@ -10,25 +9,11 @@ import {
   UserRound,
 } from "lucide-react"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 
 const job = {
   id: "JOB-2409",
@@ -76,11 +61,7 @@ const candidates = [
   },
 ]
 
-export default function JobResultsPage({ params }: { params: { id: string } }) {
-  if (!params.id) {
-    notFound()
-  }
-
+export default async function JobResultsPage() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
@@ -295,11 +276,7 @@ definition
   )
 }
 
-function SummaryTile({
-  label,
-  value,
-  subtext,
-}: {
+function SummaryTile({ label, value, subtext }: {
   label: string
   value: string | number
   subtext: string

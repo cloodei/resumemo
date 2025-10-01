@@ -1,6 +1,16 @@
 {
   "name": "resumemo",
   "scripts": {
-    
+    "dev": "bun run frontend && bun run backend",
+    "frontend": "cd frontend && bun run dev",
+    "backend": "cd backend && bun run dev",
+
+    "start": "bun run frontend:start && bun run backend:start",
+    "frontend:start": "cd frontend && bun run start",
+    "backend:start": "cd backend && bun run start",
+
+    "build": "bun run frontend:build && bun run backend:build",
+    "frontend:build": "cd frontend && bun run build",
+    "backend:build": "cd backend && bun run build"
   }
 }
