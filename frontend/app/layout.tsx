@@ -2,6 +2,7 @@ import "./globals.css"
 import localFont from "next/font/local"
 import { type Metadata } from "next"
 import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Providers } from "@/components/providers"
 
 const fontSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${fontSans.variable} ${fontMono.variable} ${fontHeading.variable} ${fontProximaVara.variable} bg-background text-foreground font-sans antialiased`}
         style={{ fontFamily: 'var(--font-proxima-vara)' }}
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
