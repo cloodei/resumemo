@@ -1,16 +1,11 @@
 import "./globals.css"
 import localFont from "next/font/local"
 import { type Metadata } from "next"
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist, Inter } from "next/font/google"
 import { Providers } from "@/components/providers"
 
 const fontSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-})
-
-const fontMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 })
 
@@ -33,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} ${fontHeading.variable} ${fontProximaVara.variable} bg-background text-foreground font-sans antialiased`}
+        className={`${fontSans.variable} ${fontHeading.variable} ${fontProximaVara.variable} bg-background text-foreground antialiased`}
         style={{ fontFamily: 'var(--font-proxima-vara)' }}
       >
         <Providers>{children}</Providers>

@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 const recentJobs = [
   {
@@ -106,7 +107,13 @@ export default function Page() {
               <CardTitle className="text-lg">Recent ranking jobs</CardTitle>
               <CardDescription>Track status and jump back into jobs that need attention.</CardDescription>
             </div>
-            <Link href="/jobs/new" className={buttonVariants({ size: "sm" })}>
+            <Link
+              href="/jobs/new"
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-gradient-to-b before:opacity-80 before:transition-opacity before:duration-300 before:ease-[cubic-bezier(0.4,0.36,0,1)] after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:rounded-md after:bg-gradient-to-b after:to-transparent after:mix-blend-overlay"
+              )}
+            >
               New job
             </Link>
           </CardHeader>
@@ -121,6 +128,7 @@ export default function Page() {
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {recentJobs.map((job) => (
                   <TableRow key={job.id} className="cursor-pointer">

@@ -72,9 +72,9 @@
 }
 
 :root {
-  --background: oklch(0.9818 0.0054 95.0986);
-  --foreground: oklch(0.3438 0.0269 95.7226);
-  --card: oklch(0.9818 0.0054 95.0986);
+  --background: oklch(0.995 0.002 95.0986);
+  --foreground: oklch(0.25 0.03 95.7226);
+  --card: oklch(0.995 0.002 95.0986);
   --card-foreground: oklch(0.1908 0.0020 106.5859);
   --popover: oklch(1.0000 0 0);
   --popover-foreground: oklch(0.2671 0.0196 98.9390);
@@ -128,15 +128,15 @@
 }
 
 .dark {
-  --background: oklch(0.2679 0.0036 106.6427);
+  --background: oklch(0.216 0.006 56.043);
   --foreground: oklch(0.8074 0.0142 93.0137);
   --card: oklch(0.2679 0.0036 106.6427);
-  --card-foreground: oklch(0.9818 0.0054 95.0986);
+  --card-foreground: oklch(0.995 0.002 95.0986);
   --popover: oklch(0.3085 0.0035 106.6039);
   --popover-foreground: oklch(0.9211 0.0040 106.4781);
   --primary: oklch(0.6724 0.1308 38.7559);
   --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.9818 0.0054 95.0986);
+  --secondary: oklch(0.995 0.002 95.0986);
   --secondary-foreground: oklch(0.3085 0.0035 106.6039);
   --muted: oklch(0.2213 0.0038 106.7070);
   --muted-foreground: oklch(0.7713 0.0169 99.0657);
@@ -414,3 +414,25 @@ html {
 .login-btn:hover::before {
   left: 100%;
 }
+
+/* Multi-layered depth utilities */
+.card-depth {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.card-depth-hover:hover {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.08), 0 2px 4px 0 rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.inset-shadow {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+.layered-shadow {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 4px 8px 0 rgba(0, 0, 0, 0.04), 0 8px 16px 0 rgba(0, 0, 0, 0.03);
+}
+
+.elevated-shadow {
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.06), 0 8px 16px 0 rgba(0, 0, 0, 0.08), 0 16px 32px 0 rgba(0, 0, 0, 0.06);
+}
+
