@@ -74,7 +74,7 @@ export default function NewJobPage() {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Badge className="w-fit bg-gradient-to-r from-sky-500 to-violet-500 text-background">
+          <Badge className="w-fit bg-gradient-to-br from-sky-500/80 to-violet-500/90 text-neutral-100">
             Orchestrate a new ranking job
           </Badge>
           <h1 className="head-text-md text-foreground">Upload, orchestrate, and launch</h1>
@@ -85,23 +85,19 @@ export default function NewJobPage() {
 
         <div className="grid gap-3 sm:grid-cols-3">
           {steps.map((step) => (
-            <Card key={step.id} className="relative overflow-hidden border-dashed">
+            <Card 
+              key={step.id} 
+              className="group relative overflow-hidden transition-all border-dashed dark:hover:border-transparent shadow-m hover:shadow-l hover:border-primary/30 hover:-translate-y-0.5"
+            >
               <CardHeader className="gap-2">
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <span className="flex size-7 items-center justify-center rounded-full bg-muted font-medium">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-muted shadow-m font-medium group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                     {step.id}
                   </span>
                   {step.title}
                 </CardTitle>
                 <CardDescription>{step.description}</CardDescription>
               </CardHeader>
-              <motion.div
-                className="absolute inset-0 -z-10 opacity-0"
-                whileHover={{ opacity: 0.2 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="h-full bg-gradient-to-br from-sky-500/30 to-violet-500/30" />
-              </motion.div>
             </Card>
           ))}
         </div>
@@ -109,15 +105,19 @@ export default function NewJobPage() {
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <Card className="shadow-x border-none">
+            <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
               <div>
-                <CardTitle className="text-lg">Job description</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Job description</CardTitle>
+                <CardDescription className="text-sm mt-1">
                   Paste your JD or choose from existing templates to auto-fill fields.
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="shadow-m hover:shadow-l transition-all"
+              >
                 Import from JD library
               </Button>
             </CardHeader>
@@ -143,16 +143,16 @@ export default function NewJobPage() {
               </div>
               <Tabs defaultValue="templates" className="pt-2">
                 <TabsList>
-                  <TabsTrigger value="templates">Templates</TabsTrigger>
-                  <TabsTrigger value="history">Recent jobs</TabsTrigger>
+                  <TabsTrigger className="border-none cursor-pointer" value="templates">Templates</TabsTrigger>
+                  <TabsTrigger className="border-none cursor-pointer" value="history">Recent jobs</TabsTrigger>
                 </TabsList>
                 <TabsContent value="templates" className="mt-4 grid gap-3 md:grid-cols-2">
                   {jdTemplates.map((template) => (
                     <div
                       key={template.title}
-                      className="rounded-lg border bg-muted/40 p-4 transition hover:border-primary/50 hover:bg-primary/10"
+                      className="group rounded-lg border border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-l hover:-translate-y-0.5 cursor-pointer"
                     >
-                      <p className="font-medium text-foreground">{template.title}</p>
+                      <p className="font-semibold text-foreground group-hover:text-primary transition-colors">{template.title}</p>
                       <p className="mt-2 text-xs leading-5 text-muted-foreground">{template.summary}</p>
                       <Button size="sm" variant="ghost" className="mt-4 h-9 px-3">
                         Use template
@@ -170,11 +170,11 @@ export default function NewJobPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-dashed">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-dashed shadow-x">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border/30 pb-4">
               <div>
-                <CardTitle className="text-lg">Resume upload</CardTitle>
-                <CardDescription>Drop resumes to request S3 URLs and start uploading.</CardDescription>
+                <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Resume upload</CardTitle>
+                <CardDescription className="text-sm mt-1">Drop resumes to request S3 URLs and start uploading.</CardDescription>
               </div>
               <Badge variant="outline" className="flex items-center gap-1 text-xs">
                 <UploadCloud className="size-3.5" /> Direct S3
@@ -230,11 +230,11 @@ export default function NewJobPage() {
           </Card>
         </div>
 
-        <Card className="h-full">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <Card className="h-full shadow-x border-none">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg">Upload queue</CardTitle>
-              <CardDescription>Track local progress vs backend confirmations.</CardDescription>
+              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Upload queue</CardTitle>
+              <CardDescription className="text-sm mt-1">Track local progress vs backend confirmations.</CardDescription>
             </div>
             <Badge variant="secondary" className="flex items-center gap-1 text-xs">
               <Loader2 className="size-3 animate-spin" /> Polling 3s
@@ -245,7 +245,7 @@ export default function NewJobPage() {
               <motion.div
                 key={file.name}
                 layout
-                className="rounded-lg border bg-muted/30 p-4"
+                className="rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-shadow"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}

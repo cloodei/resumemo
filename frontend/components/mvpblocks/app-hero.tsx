@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { easeInOut, motion, spring } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,32 +15,31 @@ import {
 export default function AppHero() {
   // State for animated counters
   const [stats, setStats] = useState({
-    users: 0,
-    transactions: 0,
-    networks: 0,
+    resumes: 0,
+    companies: 0,
+    timeSaved: 0,
   });
 
   // Animation to count up numbers
   useEffect(() => {
     const interval = setInterval(() => {
       setStats((prev) => {
-        const newUsers = prev.users >= 20000 ? 20000 : prev.users + 500;
-        const newTransactions =
-          prev.transactions >= 1500000 ? 1500000 : prev.transactions + 37500;
-        const newNetworks = prev.networks >= 40 ? 40 : prev.networks + 1;
+        const newResumes = prev.resumes >= 10000 ? 10000 : prev.resumes + 250;
+        const newCompanies = prev.companies >= 500 ? 500 : prev.companies + 12;
+        const newTimeSaved = prev.timeSaved >= 90 ? 90 : prev.timeSaved + 2;
 
         if (
-          newUsers === 20000 &&
-          newTransactions === 1500000 &&
-          newNetworks === 40
+          newResumes === 10000 &&
+          newCompanies === 500 &&
+          newTimeSaved === 90
         ) {
           clearInterval(interval);
         }
 
         return {
-          users: newUsers,
-          transactions: newTransactions,
-          networks: newNetworks,
+          resumes: newResumes,
+          companies: newCompanies,
+          timeSaved: newTimeSaved,
         };
       });
     }, 50);
@@ -192,34 +192,40 @@ export default function AppHero() {
       <div className="fadein-blur relative z-0 mx-auto mb-10 h-[300px] w-[300px] lg:absolute lg:top-1/2 lg:right-1/2 lg:mx-0 lg:mb-0 lg:h-[500px] lg:w-[500px] lg:translate-x-1/2 lg:-translate-y-2/3">
         <img
           src="https://i.postimg.cc/fLptvwMg/nexus.webp"
-          alt="Nexus Platform 3D Visualization"
+          alt="AI Resume Ranking Visualization"
           className="h-full w-full object-contain drop-shadow-[0_0_35px_#3358ea85] transition-all duration-1000 hover:scale-110"
         />
         <motion.div
+          initial="hidden"
+          animate="visible"
           variants={tooltipVariants}
           className="absolute top-4 -left-4 rounded-lg border border-purple-500/30 bg-black/80 p-2 backdrop-blur-md lg:top-1/4 lg:-left-20"
         >
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-purple-400" />
             <span className="text-xs font-medium text-purple-200">
-              High Performance
+              Lightning Fast
             </span>
           </div>
         </motion.div>
 
         <motion.div
+          initial="hidden"
+          animate="visible"
           variants={tooltipVariants}
           className="absolute top-1/2 -right-4 rounded-lg border border-blue-500/30 bg-black/80 p-2 backdrop-blur-md lg:-right-24"
         >
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-blue-400" />
             <span className="text-xs font-medium text-blue-200">
-              Decentralized Storage
+              Precise Matching
             </span>
           </div>
         </motion.div>
 
         <motion.div
+          initial="hidden"
+          animate="visible"
           variants={tooltipVariants}
           className="absolute bottom-4 left-4 rounded-lg border border-indigo-500/30 bg-black/80 p-2 backdrop-blur-md lg:bottom-1/4 lg:left-8"
         >
@@ -248,16 +254,16 @@ export default function AppHero() {
               <span className="mr-2 rounded-full bg-purple-500 px-2 py-0.5 text-xs font-semibold text-white">
                 New
               </span>
-              Introducing Nexus Platform
+              AI-Powered Resume Ranking
             </motion.div>
 
             <motion.h1
               variants={itemVariants}
               className="mb-6 bg-gradient-to-r from-white/70 via-white to-slate-500/80 bg-clip-text text-3xl leading-tight text-transparent sm:text-4xl md:text-5xl lg:text-6xl"
             >
-              The Bridge Between <br className="hidden sm:inline" />
+              Find the Perfect Candidate <br className="hidden sm:inline" />
               <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                AI and Web3
+                10x Faster
               </span>
             </motion.h1>
 
@@ -268,21 +274,21 @@ export default function AppHero() {
             >
               <div className="rounded-lg border border-purple-500/20 bg-black/40 px-4 py-2 backdrop-blur-sm">
                 <p className="text-2xl font-bold text-white">
-                  {stats.users.toLocaleString()}+
+                  {stats.resumes.toLocaleString()}+
                 </p>
-                <p className="text-xs text-gray-400">Active Users</p>
+                <p className="text-xs text-gray-400">Resumes Ranked</p>
               </div>
               <div className="rounded-lg border border-blue-500/20 bg-black/40 px-4 py-2 backdrop-blur-sm">
                 <p className="text-2xl font-bold text-white">
-                  {stats.transactions.toLocaleString()}+
+                  {stats.companies}+
                 </p>
-                <p className="text-xs text-gray-400">Transactions</p>
+                <p className="text-xs text-gray-400">Companies</p>
               </div>
               <div className="rounded-lg border border-indigo-500/20 bg-black/40 px-4 py-2 backdrop-blur-sm">
                 <p className="text-2xl font-bold text-white">
-                  {stats.networks}+
+                  {stats.timeSaved}%
                 </p>
-                <p className="text-xs text-gray-400">Networks</p>
+                <p className="text-xs text-gray-400">Time Saved</p>
               </div>
             </motion.div>
 
@@ -292,23 +298,23 @@ export default function AppHero() {
               className="mb-8 flex flex-wrap items-center justify-center gap-2 lg:justify-start"
             >
               <span className="text-xs font-medium text-gray-400">
-                Integrates with:
+                Powered by:
               </span>
               <div className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-2 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-purple-950">
                 <div className="h-2 w-2 rounded-full bg-blue-400"></div>
-                Ethereum
+                GPT-4
               </div>
               <div className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-2 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-purple-950">
                 <div className="h-2 w-2 rounded-full bg-purple-400"></div>
-                Solana
+                Claude
               </div>
               <div className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-2 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-purple-950">
                 <div className="h-2 w-2 rounded-full bg-green-400"></div>
-                OpenAI
+                AWS S3
               </div>
               <div className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-2 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-purple-950">
                 <div className="h-2 w-2 rounded-full bg-yellow-400"></div>
-                +5 more
+                +3 more
               </div>
             </motion.div>
           </div>
@@ -318,28 +324,30 @@ export default function AppHero() {
               variants={itemVariants}
               className="mb-8 max-w-md px-6 text-center text-lg leading-relaxed text-slate-300/90 lg:text-end"
             >
-              Nexus connects AI tools with Web3 infrastructure, giving
-              developers the power to build beyond limits. One platform. Endless
-              potential.
+              Transform your hiring process with AI-driven resume analysis. Upload resumes, define your job requirements, and get ranked candidates instantly.
             </motion.p>
             <motion.div
               variants={itemVariants}
               className="mb-8 flex flex-col flex-wrap gap-4 sm:flex-row lg:justify-end"
             >
               <Button
+                asChild
                 className="group rounded-full border-t border-purple-400 bg-gradient-to-b from-purple-700 to-slate-950/80 px-6 py-6 text-white shadow-lg shadow-purple-600/20 transition-all hover:shadow-purple-600/40"
                 size="lg"
               >
-                Start Building
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                <Link href="/dashboard">
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </Link>
               </Button>
 
               <Button
+                asChild
                 variant="outline"
                 className="rounded-full border-purple-500/30 bg-transparent text-white hover:bg-purple-500/10 hover:text-white"
                 size="lg"
               >
-                View Demo
+                <Link href="/jobs/new">Try Demo</Link>
               </Button>
             </motion.div>
 
@@ -360,7 +368,7 @@ export default function AppHero() {
               </div>
               <span className="text-xs text-slate-300">
                 <span className="font-semibold text-white">500+</span>{' '}
-                developers already building
+                companies already using
               </span>
               <ArrowUpRight className="h-3 w-3 text-purple-400" />
             </motion.div>

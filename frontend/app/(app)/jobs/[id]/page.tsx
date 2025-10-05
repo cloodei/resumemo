@@ -95,18 +95,18 @@ definition
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Card className="h-full">
-          <CardHeader className="flex flex-row items-center justify-between gap-6">
+        <Card className="h-full shadow-x border-none">
+          <CardHeader className="flex flex-row items-center justify-between gap-6 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg">Ranking summary</CardTitle>
-              <CardDescription>Overall health of this job run and key status indicators.</CardDescription>
+              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Ranking summary</CardTitle>
+              <CardDescription className="text-sm mt-1">Overall health of this job run and key status indicators.</CardDescription>
             </div>
             <Badge variant="secondary" className="flex items-center gap-1 text-xs">
               <BarChart3 className="size-3" /> View analytics
             </Badge>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <CardContent className="px-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryTile label="Resumes processed" value={job.summary.resumes} subtext="Across all sources" />
               <SummaryTile label="Shortlisted" value={job.summary.shortlisted} subtext="Above threshold" />
               <SummaryTile label="Average score" value={`${job.summary.avgScore}/100`} subtext="Top 20% candidates" />
@@ -123,17 +123,17 @@ definition
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filters</CardTitle>
-            <CardDescription>Adjust scoring thresholds, locations, and tags to refine results.</CardDescription>
+        <Card className="border-none shadow-x">
+          <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
+            <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Filters</CardTitle>
+            <CardDescription className="text-sm mt-1">Adjust scoring thresholds, locations, and tags to refine results.</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="scores">
               <TabsList>
-                <TabsTrigger value="scores">Scores</TabsTrigger>
-                <TabsTrigger value="location">Location</TabsTrigger>
-                <TabsTrigger value="tags">Tags</TabsTrigger>
+                <TabsTrigger className="border-none cursor-pointer" value="scores">Scores</TabsTrigger>
+                <TabsTrigger className="border-none cursor-pointer" value="location">Location</TabsTrigger>
+                <TabsTrigger className="border-none cursor-pointer" value="tags">Tags</TabsTrigger>
               </TabsList>
               <TabsContent value="scores" className="mt-4 space-y-3 text-sm text-muted-foreground">
                 <p>Focus on candidates above a certain match score to build your shortlist.</p>
@@ -162,11 +162,11 @@ definition
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Card className="xl:col-span-2">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+        <Card className="xl:col-span-2 shadow-m border-border/60 dark:border-border/40">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg">Ranked candidates</CardTitle>
-              <CardDescription>Sort and filter to build interview-ready slates.</CardDescription>
+              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Ranked candidates</CardTitle>
+              <CardDescription className="text-sm mt-1">Sort and filter to build interview-ready slates.</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>Scoring model: Default similarity</span>
@@ -186,14 +186,17 @@ definition
               </TableHeader>
               <TableBody>
                 {candidates.map((candidate) => (
-                  <TableRow key={candidate.rank} className="align-top">
+                  <TableRow 
+                    key={candidate.rank} 
+                    className="group align-top transition-all hover:bg-muted/55 cursor-pointer"
+                  >
                     <TableCell>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs shadow-sm">
                         #{candidate.rank}
                       </Badge>
                     </TableCell>
                     <TableCell className="space-y-1">
-                      <p className="font-semibold text-foreground">{candidate.name}</p>
+                      <p className="font-semibold text-foreground group-hover:text-primary transition-colors">{candidate.name}</p>
                       <p className="text-xs text-muted-foreground">Score {candidate.score}/100</p>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
@@ -206,8 +209,8 @@ definition
                       </span>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="gap-1">
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="sm" variant="outline" className="gap-1 shadow-sm hover:shadow-md transition-shadow">
                           <Mail className="size-3.5" />
                           Reach out
                         </Button>
@@ -235,13 +238,13 @@ definition
           </CardFooter>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Candidate spotlight</CardTitle>
-            <CardDescription>Dig into resume insights for top candidates.</CardDescription>
+        <Card className="shadow-m border-none">
+          <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
+            <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
+            <CardDescription className="text-sm mt-1">Dig into resume insights for top candidates.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="rounded-lg border bg-muted/30 p-4">
+          <CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
+            <div className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer">
               <p className="text-sm font-semibold text-foreground">Laura Chen</p>
               <p className="mt-1 text-xs">Score 94/100 • 6 years experience</p>
               <ul className="mt-3 space-y-2">
@@ -254,7 +257,7 @@ definition
                 <ArrowUpRight className="size-4" />
               </Button>
             </div>
-            <div className="rounded-lg border bg-muted/30 p-4">
+            <div className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:-translate-y-0.5 cursor-pointer">
               <p className="text-sm font-semibold text-foreground">Priya Patel</p>
               <p className="mt-1 text-xs">Score 89/100 • 8 years experience</p>
               <ul className="mt-3 space-y-2">
@@ -282,9 +285,9 @@ function SummaryTile({ label, value, subtext }: {
   subtext: string
 }) {
   return (
-    <div className="rounded-xl border bg-muted/30 p-4">
+    <div className="rounded-xl border-none shadow-m bg-muted/55 py-4 pl-3 pr-5 transition-all hover:-translate-y-0.5 grid">
       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-foreground bg-gradient-to-br from-foreground to-foreground/80 bg-clip-text">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
     </div>
   )
