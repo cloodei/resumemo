@@ -186,11 +186,6 @@
   --spacing: 0.25rem;
 }
 
-* {
-  border-color: var(--border);
-  outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
-}
-
 ::-moz-selection {
   color: var(--background);
   background: var(--foreground);

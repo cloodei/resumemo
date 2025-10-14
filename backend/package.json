@@ -6,10 +6,15 @@
     "build": "bun build --compile --minify --outfile main index.ts"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.4.0",
+    "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.11",
-    "elysia": "latest"
+    "drizzle-orm": "^0.44.6",
+    "elysia": "latest",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "drizzle-kit": "^0.31.5"
   }
 }
