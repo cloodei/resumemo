@@ -9,12 +9,12 @@
     "@elysiajs/cors": "^1.4.0",
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.11",
-    "drizzle-orm": "^0.44.6",
+    "drizzle-orm": "^0.44.7",
     "elysia": "latest",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "bun-types": "latest",
-    "drizzle-kit": "^0.31.5"
+    "drizzle-kit": "^0.31.6"
   }
 }

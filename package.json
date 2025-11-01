@@ -1,16 +1,27 @@
 {
   "name": "resumemo",
   "scripts": {
-    "dev": "bun run frontend && bun run backend",
+    "dev": "concurrently \"bun run frontend\" \"bun run backend\"",
     "frontend": "cd frontend && bun run dev",
     "backend": "cd backend && bun run dev",
 
-    "start": "bun run frontend:start && bun run backend:start",
+    "start": "concurrently \"bun run frontend:start\" \"bun run backend:start\"",
     "frontend:start": "cd frontend && bun run start",
     "backend:start": "cd backend && bun run start",
 
-    "build": "bun run frontend:build && bun run backend:build",
+    "build": "concurrently \"bun run frontend:build\" \"bun run backend:build\"",
     "frontend:build": "cd frontend && bun run build",
-    "backend:build": "cd backend && bun run build"
+    "backend:build": "cd backend && bun run build",
+
+    "install": "concurrently \"bun run frontend:install\" \"bun run backend:install\"",
+    "frontend:install": "cd frontend && bun install",
+    "backend:install": "cd backend && bun install",
+
+    "update": "concurrently \"bun run frontend:update\" \"bun run backend:update\"",
+    "frontend:update": "cd frontend && bun update",
+    "backend:update": "cd backend && bun update"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

@@ -1,3 +1,6 @@
+import Link from "next/link"
+
+import { cn } from "@/lib/utils"
 import {
   Card,
   CardContent,
@@ -17,8 +20,6 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
 
 const recentJobs = [
   {

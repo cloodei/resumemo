@@ -6,4 +6,4 @@ const app = new Elysia({ precompile: true })
   .get("/", () => "Hello Elysia")
   .listen({ hostname: "0.0.0.0", port: 8080 });
 
-console.log(`🦊 Elysia is running at http://${app.server?.hostname}:${app.server?.port}`);
+console.log(`🦊 Elysia is running at http://localhost:${app.server?.port}`);

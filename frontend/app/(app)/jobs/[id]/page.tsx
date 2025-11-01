@@ -84,7 +84,6 @@ export default async function JobResultsPage() {
           </Button>
           <Button size="sm" variant="outline" className="gap-2">
             Share
-definition
             <Mail className="size-4" />
           </Button>
           <Button size="sm" variant="ghost" className="gap-2">
@@ -225,6 +224,7 @@ definition
               </TableBody>
             </Table>
           </CardContent>
+
           <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 py-4 text-xs text-muted-foreground">
             <span>Export full CSV or sync shortlist to ATS.</span>
             <div className="flex gap-2">
@@ -243,6 +243,7 @@ definition
             <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
             <CardDescription className="text-sm mt-1">Dig into resume insights for top candidates.</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
             <div className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer">
               <p className="text-sm font-semibold text-foreground">Laura Chen</p>
