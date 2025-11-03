@@ -35,7 +35,7 @@ export default function LoginPage() {
         </div>
 
         <Card className="relative border-accent overflow-hidden shadow-[0_3px_15px_rgba(0,0,0,0.07)]">
-          <div className="absolute left-0 right-0 top-0 h-0.5 bg-gradient-to-r from-sky-500/40 via-violet-500/40 to-pink-500/40" />
+          <div className="absolute left-0 right-0 top-0 h-0.5 bg-linear-to-r from-sky-500/40 via-violet-500/40 to-pink-500/40" />
 
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-center text-xl">Get started</CardTitle>
@@ -64,7 +64,7 @@ export default function LoginPage() {
               AI-powered resume ranking for smarter hiring
             </p>
           </CardFooter>
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-pink-500/40 via-violet-500/40 to-sky-500/40" />
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-pink-500/40 via-violet-500/40 to-sky-500/40" />
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
