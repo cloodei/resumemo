@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { motion, easeInOut, spring } from 'motion/react';
+import { motion, spring, easeInOut } from 'motion/react';
+import Image from 'next/image';
+import Link from 'next/link';
 import {
   ArrowRight,
   Database,
@@ -18,33 +18,40 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-
+// Modern animation variants with refined timing
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.2,
+      staggerChildren: 0.06,
+      delayChildren: 0.15,
     },
   },
 };
 
 const itemVariants = {
   hidden: {
-    y: 30,
+    y: 24,
     opacity: 0,
+    filter: 'blur(4px)',
   },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: spring, stiffness: 80, damping: 15 },
+    filter: 'blur(0px)',
+    transition: { 
+      type: spring, 
+      stiffness: 100, 
+      damping: 12,
+      mass: 0.8
+    },
   },
 };
 
 const glowAnimation = {
-  opacity: [0.4, 0.7, 0.4],
-  scale: [1, 1.1, 1],
+  opacity: [0.3, 0.6, 0.3],
+  scale: [1, 1.15, 1],
   transition: {
     duration: 4,
     repeat: Infinity,
@@ -53,28 +60,29 @@ const glowAnimation = {
 };
 
 const tooltipVariants = {
-  hidden: { opacity: 0, scale: 0.9, y: 10 },
+  hidden: { opacity: 0, scale: 0.95, y: 8, filter: 'blur(2px)' },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
+    filter: 'blur(0px)',
     transition: {
       type: spring,
-      stiffness: 150,
-      delay: 1.5,
+      stiffness: 200,
+      damping: 15,
+      delay: 1.2,
     },
   },
 };
 
 const floatingAnimation = {
-  y: [-10, 10, -10],
+  y: [-8, 8, -8],
   transition: {
-    duration: 6,
+    duration: 5,
     repeat: Infinity,
     ease: easeInOut,
   },
 };
-
 
 const quickLinks = [
   {
@@ -147,6 +155,7 @@ const testimonials = [
 ];
 
 export function HeroAnimations() {
+  const [randomArr, setRandomArr] = useState<number[]>([]);
   const [stats, setStats] = useState({
     resumes: 0,
     companies: 0,
@@ -154,6 +163,8 @@ export function HeroAnimations() {
   });
 
   useEffect(() => {
+    setRandomArr(Array.from({ length: 20 }).map(() => Math.random()));
+
     const interval = setInterval(() => {
       setStats((prev) => {
         const newResumes = prev.resumes >= 15000 ? 15000 : prev.resumes + 350;
@@ -181,14 +192,14 @@ export function HeroAnimations() {
   return (
     <>
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-indigo-900/30 via-black/70 to-gray-950 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-indigo-900/20 via-black/80 to-gray-950 blur-3xl" />
       
-        <div className="absolute inset-0 opacity-10">
-          <div className="size-full bg-[linear-gradient(to_right,rgba(255,255,255,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.2)_1px,transparent_1px)] bg-size-[4rem_4rem]"></div>
+        <div className="absolute inset-0 opacity-5">
+          <div className="size-full bg-[linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-size-[4rem_4rem]" />
         </div>
         
-        <div className="absolute top-20 -left-20 size-72 rounded-full bg-purple-600/20 blur-[120px]" />
-        <div className="absolute -right-20 bottom-20 size-72 rounded-full bg-blue-600/20 blur-[120px]" />
+        <div className="absolute top-20 -left-20 size-96 rounded-full bg-linear-to-br from-purple-600/15 to-transparent blur-[150px]" />
+        <div className="absolute -right-20 bottom-20 size-96 rounded-full bg-linear-to-tl from-blue-600/15 to-transparent blur-[150px]" />
         <motion.div
           animate={glowAnimation}
           className="absolute top-1/3 left-1/4 size-48 rounded-full bg-indigo-500/15 blur-[100px]"
@@ -199,14 +210,14 @@ export function HeroAnimations() {
           style={{ animationDelay: '2s' }}
         />
         
-        <div className="absolute inset-0 opacity-30">
-          {randomArr.map((rand, i) => (
+        <div className="absolute inset-0 opacity-20">
+          {randomArr.map((rand: number, i: number) => (
             <motion.div
               key={i}
               className="absolute size-1 rounded-full bg-white"
               style={{
                 top: `${rand * 100}%`,
-                left: `${randomArr[(i + 5) % 30] * 100}%`,
+                left: `${randomArr[(i + 5) % 20] * 100}%`,
               }}
               animate={{
                 opacity: [0.1, 0.9, 0.1],
@@ -225,19 +236,19 @@ export function HeroAnimations() {
 
       <motion.div 
         animate={floatingAnimation}
-        className="fadein-blur relative z-0 mx-auto mb-10 size-[300px] lg:absolute lg:top-1/2 lg:right-1/2 lg:mx-0 lg:mb-0 lg:size-[500px] lg:translate-x-1/2 lg:-translate-y-2/3"
+        className="fadein-blur relative z-0 mx-auto mb-10 size-[300px] lg:absolute lg:top-1/2 lg:right-1/2 lg:mx-0 lg:mb-0 lg:size-[480px] lg:translate-x-1/2 lg:-translate-y-2/3"
       >
         <Image
           src="https://i.postimg.cc/fLptvwMg/nexus.webp"
           alt="AI Resume Ranking Visualization"
           fill
-          className="drop-shadow-[0_0_45px_#3358ea95] object-contain transition-all duration-1000 hover:scale-110"
+          className="drop-shadow-[0_0_60px_rgba(99,102,241,0.4)] object-contain transition-all duration-700 hover:scale-105 hover:drop-shadow-[0_0_80px_rgba(99,102,241,0.5)]"
         />
         <motion.div
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute top-4 -left-4 rounded-lg border border-purple-500/30 bg-black/90 p-3 backdrop-blur-md lg:top-1/4 lg:-left-24"
+          className="absolute top-4 -left-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:top-1/4 lg:-left-24"
         >
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-purple-400 animate-pulse" />
@@ -251,7 +262,7 @@ export function HeroAnimations() {
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute top-1/2 -right-4 rounded-lg border border-blue-500/30 bg-black/90 p-3 backdrop-blur-md lg:-right-28"
+          className="absolute top-1/2 -right-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:-right-28"
           style={{ animationDelay: '0.2s' }}
         >
           <div className="flex items-center gap-2">
@@ -266,7 +277,7 @@ export function HeroAnimations() {
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute bottom-4 left-4 rounded-lg border border-indigo-500/30 bg-black/90 p-3 backdrop-blur-md lg:bottom-1/4 lg:left-12"
+          className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:bottom-1/4 lg:left-12"
           style={{ animationDelay: '0.4s' }}
         >
           <div className="flex items-center gap-2">
@@ -546,7 +557,7 @@ export function HeroAnimations() {
               <motion.div 
                 key={label} 
                 whileHover={{ scale: 1.05 }}
-                className="rounded-2xl border border-white/10 bg-black/30 p-5 text-center backdrop-blur-sm transition-all hover:border-purple-400/30"
+                className="rounded-xl bg-linear-to-br from-white/10 to-white/5 p-4 backdrop-blur-xl border border-white/10 transition-all hover:border-purple-400/30"
               >
                 <motion.span 
                   className="text-3xl font-bold text-white"
@@ -581,7 +592,7 @@ export function HeroAnimations() {
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
                 <Button
                   asChild
-                  className="rounded-full border-t border-white/40 bg-white/20 px-6 py-6 text-white backdrop-blur-sm transition-all hover:bg-white/30"
+                  className="rounded-full bg-white px-6 py-3 text-sm text-black transition-all hover:bg-white/90"
                   size="lg"
                 >
                   <Link href="/dashboard">Launch workspace</Link>

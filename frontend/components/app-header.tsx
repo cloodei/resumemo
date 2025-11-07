@@ -19,11 +19,11 @@ export function AppHeader() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-50 bg-background backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <header className="sticky top-0 z-50 bg-background backdrop-blur supports-backdrop-filter:bg-background/80 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
       <div className="mx-auto flex h-12 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="group flex items-center transition-transform">
           <Logo className="size-8 mr-2" />
-          <span className="bg-gradient-to-r font-semibold tracking-tight text-transparent from-primary to-primary/25 bg-clip-text text-sm">
+          <span className="bg-linear-to-r font-semibold tracking-tight text-transparent from-primary to-primary/25 bg-clip-text text-sm">
             Résumé Ranker
           </span>
         </Link>
