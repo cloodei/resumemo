@@ -97,7 +97,7 @@ export default async function JobResultsPage() {
         <Card className="h-full shadow-x border-none">
           <CardHeader className="flex flex-row items-center justify-between gap-6 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Ranking summary</CardTitle>
+              <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Ranking summary</CardTitle>
               <CardDescription className="text-sm mt-1">Overall health of this job run and key status indicators.</CardDescription>
             </div>
             <Badge variant="secondary" className="flex items-center gap-1 text-xs">
@@ -124,7 +124,7 @@ export default async function JobResultsPage() {
 
         <Card className="border-none shadow-x">
           <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
-            <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Filters</CardTitle>
+            <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Filters</CardTitle>
             <CardDescription className="text-sm mt-1">Adjust scoring thresholds, locations, and tags to refine results.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,7 +164,7 @@ export default async function JobResultsPage() {
         <Card className="xl:col-span-2 shadow-m border-border/60 dark:border-border/40">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Ranked candidates</CardTitle>
+              <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Ranked candidates</CardTitle>
               <CardDescription className="text-sm mt-1">Sort and filter to build interview-ready slates.</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -240,7 +240,7 @@ export default async function JobResultsPage() {
 
         <Card className="shadow-m border-none">
           <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
-            <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
+            <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
             <CardDescription className="text-sm mt-1">Dig into resume insights for top candidates.</CardDescription>
           </CardHeader>
 
@@ -288,7 +288,7 @@ function SummaryTile({ label, value, subtext }: {
   return (
     <div className="rounded-xl border-none shadow-m bg-muted/55 py-4 pl-3 pr-5 transition-all hover:-translate-y-0.5 grid">
       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-foreground bg-gradient-to-br from-foreground to-foreground/80 bg-clip-text">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-foreground bg-linear-to-br from-foreground to-foreground/80 bg-clip-text">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
     </div>
   )

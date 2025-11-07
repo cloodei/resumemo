@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
+import { DashboardPageWrapper } from "./dashboard-wrapper"
 
 const recentJobs = [
   {
@@ -70,7 +71,8 @@ const metrics = [
 
 export default function Page() {
   return (
-    <div className="flex flex-col gap-8">
+    <DashboardPageWrapper>
+      <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
@@ -88,7 +90,7 @@ export default function Page() {
               key={metric.label} 
               className="group relative overflow-hidden transition-all duration-300 shadow-x border-none hover:-translate-y-1"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-linear-to-br from-primary/2 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <CardHeader className="relative">
                 <CardTitle className="text-base font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                   {metric.label}
@@ -96,7 +98,7 @@ export default function Page() {
                 <CardDescription className="text-xs">{metric.change}</CardDescription>
               </CardHeader>
               <CardContent className="relative">
-                <p className="text-3xl font-bold tracking-tight text-foreground bg-gradient-to-br from-foreground to-foreground/80 bg-clip-text">
+                <p className="text-3xl font-bold tracking-tight text-foreground bg-linear-to-br from-foreground to-foreground/80 bg-clip-text">
                   {metric.value}
                 </p>
               </CardContent>
@@ -109,14 +111,14 @@ export default function Page() {
         <Card className="h-full border-none shadow-md">
           <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/30 pb-4">
             <div>
-              <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Recent ranking jobs</CardTitle>
+              <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Recent ranking jobs</CardTitle>
               <CardDescription className="text-sm mt-1">Track status and jump back into jobs that need attention.</CardDescription>
             </div>
             <Link
               href="/jobs/new"
               className={cn(
                 buttonVariants({ size: "sm" }),
-                "relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_1px_2px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_4px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.15)] dark:hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.3),0_3px_6px_rgba(0,0,0,0.4)] transition-all before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-gradient-to-b before:from-primary/5 before:to-primary/10 before:opacity-80 before:transition-opacity before:duration-300"
+                "relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_1px_2px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_4px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.15)] dark:hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.3),0_3px_6px_rgba(0,0,0,0.4)] transition-all before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-linear-to-b before:from-primary/5 before:to-primary/10 before:opacity-80 before:transition-opacity before:duration-300"
               )}
             >
               New job
@@ -173,7 +175,7 @@ export default function Page() {
 
         <Card className="flex h-full flex-col border-none shadow-md">
           <CardHeader className="border-b border-border/30 pb-4">
-            <CardTitle className="text-lg font-semibold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">Workflows</CardTitle>
+            <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Workflows</CardTitle>
             <CardDescription className="text-sm mt-1">Select a view to explore automation and insights.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-6">
@@ -207,5 +209,6 @@ export default function Page() {
         </Card>
       </section>
     </div>
+    </DashboardPageWrapper>
   )
 }

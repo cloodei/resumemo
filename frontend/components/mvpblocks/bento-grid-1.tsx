@@ -3,14 +3,6 @@ import { motion, type Variants } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface BentoGridItemProps {
-  title: string;
-  description: React.ReactNode;
-  icon: React.ReactNode;
-  content?: React.ReactNode;
-  className?: string;
-}
-
 const variants: Variants = {
   hidden: {
     opacity: 0,
@@ -26,6 +18,14 @@ const variants: Variants = {
   }
 }
 
+interface BentoGridItemProps {
+  title: string;
+  description: React.ReactNode;
+  icon: React.ReactNode;
+  content?: React.ReactNode;
+  className?: string;
+}
+
 export const BentoGridItem = ({
   title,
   description,
@@ -36,12 +36,14 @@ export const BentoGridItem = ({
   return (
     <motion.div
       variants={variants}
+      initial="hidden"
+      animate="visible"
       className={cn(
         "group border-primary/10 bg-background hover:border-primary/30 relative flex h-full cursor-pointer flex-col justify-between overflow-hidden rounded-xl border px-6 pt-6 pb-10 shadow-md transition-all duration-300",
         className,
       )}
     >
-      <div className="absolute top-0 -right-1/2 z-0 size-full cursor-pointer bg-[linear-gradient(to_right,#3d16165e_1px,transparent_1px),linear-gradient(to_bottom,#3d16165e_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] bg-[size:24px_24px]" />
+      <div className="absolute top-0 -right-1/2 z-0 size-full cursor-pointer bg-[linear-gradient(to_right,#3d1616_1px,transparent_1px),linear-gradient(to_bottom,#3d1616_1px,transparent_1px)] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] bg-size-[24px_24px]" />
 
       <div className="text-primary/5 group-hover:text-primary/10 absolute right-1 bottom-3 scale-[6] transition-all duration-500 group-hover:scale-[6.2]">
         {icon}
@@ -63,7 +65,7 @@ export const BentoGridItem = ({
         </div>
       </div>
 
-      <div className="from-primary to-primary/30 absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r blur-2xl transition-all duration-300 group-hover:blur-lg" />
+      <div className="from-primary to-primary/30 absolute bottom-0 left-0 h-1 w-full bg-linear-to-r blur-2xl transition-all duration-300 group-hover:blur-lg" />
     </motion.div>
   );
 }
