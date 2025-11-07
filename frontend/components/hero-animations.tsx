@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { motion, spring, easeInOut } from 'motion/react';
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { motion, easeInOut, spring } from 'motion/react';
 import {
   ArrowRight,
   Database,
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -74,30 +75,78 @@ const floatingAnimation = {
   },
 };
 
-interface HeroAnimationsProps {
-  quickLinks: Array<{
-    title: string;
-    description: string;
-    href: string;
-    icon: any;
-  }>;
-  features: Array<{
-    title: string;
-    description: string;
-    icon: any;
-  }>;
-  steps: Array<{
-    title: string;
-    description: string;
-  }>;
-  testimonials: Array<{
-    value: string;
-    label: string;
-  }>;
-}
 
-export function HeroAnimations({ quickLinks, features, steps, testimonials }: HeroAnimationsProps) {
-  const [randomArr, setRandomArr] = useState<number[]>([]);
+const quickLinks = [
+  {
+    title: 'Dashboard',
+    description: 'Review searches, shortlists, and insights in one view.',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Create a job',
+    description: 'Spin up a new role and invite your hiring partners.',
+    href: '/jobs/new',
+    icon: FilePlus,
+  },
+  {
+    title: 'Pricing',
+    description: 'Choose a plan that scales with your hiring volume.',
+    href: '/pricing',
+    icon: BookOpen,
+  },
+  {
+    title: 'Support',
+    description: 'Browse guides or reach our team any time you need help.',
+    href: '/support',
+    icon: LifeBuoy,
+  },
+];
+
+const features = [
+  {
+    title: 'Precise shortlists',
+    description: 'Our ranking engine surfaces the clearest fit with full reasoning.',
+    icon: Database,
+  },
+  {
+    title: 'Human-friendly AI',
+    description: 'Readable summaries help recruiters align quickly with hiring managers.',
+    icon: Sparkles,
+  },
+  {
+    title: 'Confident decisions',
+    description: 'Risk signals and compliance checks keep your pipeline clean.',
+    icon: ShieldCheck,
+  },
+];
+
+const steps = [
+  {
+    title: 'Upload resumes',
+    description: 'Bulk import or sync directly from your ATS in seconds.',
+  },
+  {
+    title: 'Set criteria',
+    description: 'Define must-haves, culture fit signals, and ideal experience.',
+  },
+  {
+    title: 'Review matches',
+    description: 'Compare candidates with side-by-side insights tailored to your team.',
+  },
+  {
+    title: 'Share and decide',
+    description: 'Send curated shortlists to stakeholders and move faster together.',
+  },
+];
+
+const testimonials = [
+  { value: '78%', label: 'Less time screening' },
+  { value: '40%', label: 'Higher interview-to-offer' },
+  { value: '24h', label: 'Avg. time to shortlist' },
+];
+
+export function HeroAnimations() {
   const [stats, setStats] = useState({
     resumes: 0,
     companies: 0,
@@ -105,8 +154,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
   });
 
   useEffect(() => {
-    setRandomArr(Array.from({ length: 30 }).map(() => Math.random()));
-
     const interval = setInterval(() => {
       setStats((prev) => {
         const newResumes = prev.resumes >= 15000 ? 15000 : prev.resumes + 350;
@@ -133,16 +180,13 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
 
   return (
     <>
-      {/* Animated Background */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-indigo-900/30 via-black/70 to-gray-950 blur-3xl" />
-        
-        {/* Animated Grid */}
+      
         <div className="absolute inset-0 opacity-10">
           <div className="size-full bg-[linear-gradient(to_right,rgba(255,255,255,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.2)_1px,transparent_1px)] bg-size-[4rem_4rem]"></div>
         </div>
         
-        {/* Dynamic Glowing Orbs */}
         <div className="absolute top-20 -left-20 size-72 rounded-full bg-purple-600/20 blur-[120px]" />
         <div className="absolute -right-20 bottom-20 size-72 rounded-full bg-blue-600/20 blur-[120px]" />
         <motion.div
@@ -155,7 +199,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           style={{ animationDelay: '2s' }}
         />
         
-        {/* Floating Particles */}
         <div className="absolute inset-0 opacity-30">
           {randomArr.map((rand, i) => (
             <motion.div
@@ -180,7 +223,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
         </div>
       </div>
 
-      {/* Hero Image with Tooltips */}
       <motion.div 
         animate={floatingAnimation}
         className="fadein-blur relative z-0 mx-auto mb-10 size-[300px] lg:absolute lg:top-1/2 lg:right-1/2 lg:mx-0 lg:mb-0 lg:size-[500px] lg:translate-x-1/2 lg:-translate-y-2/3"
@@ -189,8 +231,7 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           src="https://i.postimg.cc/fLptvwMg/nexus.webp"
           alt="AI Resume Ranking Visualization"
           fill
-          objectFit="contain"
-          className="drop-shadow-[0_0_45px_#3358ea95] transition-all duration-1000 hover:scale-110"
+          className="drop-shadow-[0_0_45px_#3358ea95] object-contain transition-all duration-1000 hover:scale-110"
         />
         <motion.div
           initial="hidden"
@@ -237,7 +278,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
         </motion.div>
       </motion.div>
 
-      {/* Main Content */}
       <motion.main
         variants={containerVariants}
         initial="hidden"
@@ -384,7 +424,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
         </motion.div>
       </motion.main>
 
-      {/* Features Grid */}
       <motion.div 
         initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -420,7 +459,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           ))}
         </div>
 
-        {/* Features Section */}
         <motion.section 
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -453,7 +491,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           </div>
         </motion.section>
 
-        {/* How it Works */}
         <motion.section 
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -490,7 +527,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           </div>
         </motion.section>
 
-        {/* Testimonials */}
         <motion.section 
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -527,7 +563,6 @@ export function HeroAnimations({ quickLinks, features, steps, testimonials }: He
           </div>
         </motion.section>
 
-        {/* Final CTA */}
         <motion.section 
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}

@@ -59,8 +59,8 @@ export default function LoginPage() {
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4 border-t pt-6">
-            <p className="text-center text-xs text-muted-foreground">
+          <CardFooter className="pt-3">
+            <p className="m-auto text-xs text-muted-foreground">
               AI-powered resume ranking for smarter hiring
             </p>
           </CardFooter>

@@ -1,10 +1,9 @@
 'use client';
 
 import { PageTransition, AnimatedSection } from '@/components/page-transitions';
-import { ReactNode } from 'react';
 
 interface JobPageWrapperProps {
-  children: ReactNode;
+  children: React.ReactNode;
   variant?: 'fade' | 'slide' | 'scale' | 'slideUp';
 }
 
@@ -16,7 +15,7 @@ export function JobPageWrapper({ children, variant = 'slide' }: JobPageWrapperPr
   );
 }
 
-export function JobSection({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+export function JobSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
     <AnimatedSection delay={delay} className="w-full">
       {children}
