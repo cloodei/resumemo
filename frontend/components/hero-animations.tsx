@@ -50,10 +50,10 @@ const itemVariants = {
 };
 
 const glowAnimation = {
-  opacity: [0.3, 0.6, 0.3],
-  scale: [1, 1.15, 1],
+  opacity: [0.2, 0.4, 0.2],
+  scale: [1, 1.08, 1],
   transition: {
-    duration: 4,
+    duration: 6,
     repeat: Infinity,
     ease: easeInOut,
   },
@@ -192,39 +192,33 @@ export function HeroAnimations() {
   return (
     <>
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-indigo-900/20 via-black/80 to-gray-950 blur-3xl" />
+        {/* Subtle mesh gradient */}
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-0 left-1/4 h-96 w-96 rounded-full bg-purple-600/10 blur-[128px]" />
+          <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-indigo-600/10 blur-[128px]" />
+        </div>
       
-        <div className="absolute inset-0 opacity-5">
-          <div className="size-full bg-[linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-size-[4rem_4rem]" />
+        {/* Subtle grid */}
+        <div className="absolute inset-0 opacity-[0.02]">
+          <div className="size-full bg-[linear-gradient(to_right,rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:4rem_4rem]"></div>
         </div>
         
-        <div className="absolute top-20 -left-20 size-96 rounded-full bg-linear-to-br from-purple-600/15 to-transparent blur-[150px]" />
-        <div className="absolute -right-20 bottom-20 size-96 rounded-full bg-linear-to-tl from-blue-600/15 to-transparent blur-[150px]" />
-        <motion.div
-          animate={glowAnimation}
-          className="absolute top-1/3 left-1/4 size-48 rounded-full bg-indigo-500/15 blur-[100px]"
-        />
-        <motion.div
-          animate={glowAnimation}
-          className="absolute right-1/4 bottom-1/3 size-48 rounded-full bg-purple-500/15 blur-[100px]"
-          style={{ animationDelay: '2s' }}
-        />
-        
-        <div className="absolute inset-0 opacity-20">
+        {/* Floating particles - more subtle */}
+        <div className="absolute inset-0 opacity-10">
           {randomArr.map((rand: number, i: number) => (
             <motion.div
               key={i}
-              className="absolute size-1 rounded-full bg-white"
+              className="absolute size-0.5 rounded-full bg-purple-400/50"
               style={{
                 top: `${rand * 100}%`,
                 left: `${randomArr[(i + 5) % 20] * 100}%`,
               }}
               animate={{
-                opacity: [0.1, 0.9, 0.1],
-                scale: [0.5, 1.5, 0.5],
+                opacity: [0.2, 0.8, 0.2],
+                scale: [0.8, 1.2, 0.8],
               }}
               transition={{
-                duration: 4 + rand * 3,
+                duration: 5 + rand * 4,
                 repeat: Infinity,
                 ease: 'easeInOut',
                 delay: rand * 3,
@@ -248,11 +242,11 @@ export function HeroAnimations() {
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute top-4 -left-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:top-1/4 lg:-left-24"
+          className="absolute top-4 -left-4 rounded-lg border border-purple-500/20 bg-black/40 p-3 backdrop-blur-md lg:top-1/4 lg:-left-24"
         >
           <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-purple-400 animate-pulse" />
-            <span className="text-xs font-semibold text-purple-200">
+            <Zap className="h-4 w-4 text-purple-400" />
+            <span className="text-xs font-medium text-gray-300">
               Lightning Fast Analysis
             </span>
           </div>
@@ -262,12 +256,12 @@ export function HeroAnimations() {
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute top-1/2 -right-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:-right-28"
+          className="absolute top-1/2 -right-4 rounded-lg border border-indigo-500/20 bg-black/40 p-3 backdrop-blur-md lg:-right-28"
           style={{ animationDelay: '0.2s' }}
         >
           <div className="flex items-center gap-2">
-            <Database className="h-4 w-4 text-blue-400 animate-pulse" />
-            <span className="text-xs font-semibold text-blue-200">
+            <Database className="h-4 w-4 text-indigo-400" />
+            <span className="text-xs font-medium text-gray-300">
               Smart Matching Engine
             </span>
           </div>
@@ -277,12 +271,12 @@ export function HeroAnimations() {
           initial="hidden"
           animate="visible"
           variants={tooltipVariants}
-          className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-3 backdrop-blur-xl lg:bottom-1/4 lg:left-12"
+          className="absolute bottom-4 left-4 rounded-lg border border-blue-500/20 bg-black/40 p-3 backdrop-blur-md lg:bottom-1/4 lg:left-12"
           style={{ animationDelay: '0.4s' }}
         >
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-indigo-400 animate-pulse" />
-            <span className="text-xs font-semibold text-indigo-200">
+            <Sparkles className="h-4 w-4 text-blue-400" />
+            <span className="text-xs font-medium text-gray-300">
               AI-Powered Insights
             </span>
           </div>
@@ -317,31 +311,36 @@ export function HeroAnimations() {
               </span>
             </motion.h1>
 
-            <motion.div
+            <motion.div 
               variants={itemVariants}
-              className="mb-6 flex flex-wrap justify-center gap-4 md:gap-6 lg:justify-start"
-            >
-              <div className="group relative overflow-hidden rounded-xl border border-purple-500/20 bg-black/60 px-5 py-3 backdrop-blur-sm transition-all hover:border-purple-500/40 hover:bg-black/80">
-                <div className="absolute inset-0 bg-linear-to-r from-purple-600/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                <p className="relative text-3xl font-bold text-white">
-                  {stats.resumes.toLocaleString()}+
-                </p>
-                <p className="relative text-xs text-gray-400">Resumes Analyzed</p>
-              </div>
-              <div className="group relative overflow-hidden rounded-xl border border-blue-500/20 bg-black/60 px-5 py-3 backdrop-blur-sm transition-all hover:border-blue-500/40 hover:bg-black/80">
-                <div className="absolute inset-0 bg-linear-to-r from-blue-600/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                <p className="relative text-3xl font-bold text-white">
-                  {stats.companies}+
-                </p>
-                <p className="relative text-xs text-gray-400">Companies Trust Us</p>
-              </div>
-              <div className="group relative overflow-hidden rounded-xl border border-indigo-500/20 bg-black/60 px-5 py-3 backdrop-blur-sm transition-all hover:border-indigo-500/40 hover:bg-black/80">
-                <div className="absolute inset-0 bg-linear-to-r from-indigo-600/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                <p className="relative text-3xl font-bold text-white">
-                  {stats.timeSaved}%
-                </p>
-                <p className="relative text-xs text-gray-400">Time Saved</p>
-              </div>
+              className="mt-12 grid grid-cols-3 gap-8 border-t border-white/5 pt-8">
+                <div className="text-center">
+                  <motion.span
+                    variants={itemVariants}
+                    className="text-3xl font-semibold bg-linear-to-br from-purple-400 to-indigo-400 bg-clip-text text-transparent"
+                  >
+                    {stats.resumes.toLocaleString()}+
+                  </motion.span>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">Resumes Ranked</p>
+                </div>
+                <div className="text-center">
+                  <motion.span
+                    variants={itemVariants}
+                    className="text-3xl font-semibold bg-linear-to-br from-purple-400 to-indigo-400 bg-clip-text text-transparent"
+                  >
+                    {stats.companies}+
+                  </motion.span>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">Companies</p>
+                </div>
+                <div className="text-center">
+                  <motion.span
+                    variants={itemVariants}
+                    className="text-3xl font-semibold bg-linear-to-br from-purple-400 to-indigo-400 bg-clip-text text-transparent"
+                  >
+                    {stats.timeSaved}%
+                  </motion.span>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">Time Saved</p>
+                </div>
             </motion.div>
 
             <motion.div
@@ -372,9 +371,13 @@ export function HeroAnimations() {
           <div className="mt-6 flex flex-col items-center lg:mt-0 lg:items-end">
             <motion.p
               variants={itemVariants}
-              className="mb-8 max-w-md px-6 text-center text-lg leading-relaxed text-slate-300/90 lg:text-end"
+              className="mt-4 max-w-2xl text-center text-base text-gray-400"
             >
-              Transform your hiring process with AI-driven resume analysis. Upload resumes, define your requirements, and get perfectly ranked candidates in seconds.
+              Transform your hiring process with AI-powered resume analysis.
+              <br className="hidden sm:inline" />
+              <span className="text-purple-400">
+                Upload, analyze, and rank candidates in seconds.
+              </span>
             </motion.p>
             
             <motion.div
@@ -384,11 +387,11 @@ export function HeroAnimations() {
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
                 <Button
                   asChild
-                  className="group relative overflow-hidden rounded-full border-t border-purple-400 bg-linear-to-b from-purple-700 to-slate-950/80 px-8 py-6 text-white shadow-2xl shadow-purple-600/30 transition-all hover:shadow-purple-600/50"
+                  className="group relative inline-flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-600/90 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-purple-600 hover:border-purple-500/40"
                   size="lg"
                 >
                   <Link href="/dashboard">
-                    <span className="relative z-10">Get Started Free</span>
+                    <span>Get Started Free</span>
                     <ArrowRight className="relative z-10 ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                     <div className="absolute inset-0 bg-linear-to-r from-purple-600 to-blue-600 opacity-0 transition-opacity group-hover:opacity-20" />
                   </Link>
@@ -399,7 +402,7 @@ export function HeroAnimations() {
                 <Button
                   asChild
                   variant="outline"
-                  className="rounded-full border-purple-500/30 bg-transparent text-white backdrop-blur-sm hover:border-purple-500/60 hover:bg-purple-500/10 hover:text-white"
+                  className="group relative inline-flex items-center gap-2 rounded-lg border border-purple-500/20 bg-transparent px-6 py-2.5 text-sm font-medium text-gray-300 transition-all hover:border-purple-500/40 hover:bg-purple-500/10"
                   size="lg"
                 >
                   <Link href="/jobs/new">
@@ -412,17 +415,14 @@ export function HeroAnimations() {
 
             <motion.div
               variants={itemVariants}
-              className="group mx-auto flex items-center gap-3 rounded-full border border-slate-800 bg-slate-900/60 px-4 py-2 backdrop-blur-sm transition-all hover:border-purple-500/30 hover:bg-slate-900/80 lg:mx-0 lg:ml-auto"
+              className="group relative inline-flex items-center gap-2 rounded-lg border border-purple-500/20 bg-transparent px-6 py-2.5 text-sm font-medium text-gray-300 transition-all hover:border-purple-500/40 hover:bg-purple-500/10"
             >
               <div className="flex -space-x-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <motion.div
                     key={i}
-                    className="size-7 overflow-hidden rounded-full border-2 border-slate-900 bg-slate-800"
-                    whileHover={{ y: -3 }}
-                  >
-                    <div className="size-full bg-linear-to-br from-purple-500 to-blue-600 opacity-90"></div>
-                  </motion.div>
+                    className="size-2 rounded-full animate-pulse bg-purple-400"
+                  ></motion.div>
                 ))}
               </div>
               <span className="text-xs text-slate-300">
@@ -459,11 +459,11 @@ export function HeroAnimations() {
                 <Icon className="relative mb-6 h-8 w-8 text-purple-300 transition-all group-hover:text-purple-200 group-hover:scale-110" />
                 <div className="relative">
                   <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
-                  <p className="text-sm text-slate-300/80">{description}</p>
+                  <p className="text-sm text-gray-500">{description}</p>
                 </div>
                 <span className="relative mt-6 inline-flex items-center gap-1 text-sm font-medium text-purple-300">
                   Explore
-                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  <ArrowUpRight className="mt-2 h-3 w-3 text-purple-500/50 transition-all group-hover:text-purple-400 group-hover:translate-x-1 group-hover:-translate-y-1" />
                 </span>
               </Link>
             </motion.div>
@@ -494,7 +494,7 @@ export function HeroAnimations() {
                 whileHover={{ y: -5 }}
                 className="group rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-sm transition-all hover:border-purple-400/40 hover:bg-black/60"
               >
-                <Icon className="mb-4 h-7 w-7 text-purple-300 transition-all group-hover:text-purple-200 group-hover:scale-110" />
+                <Icon className="mb-4 h-7 w-7 text-purple-500/70 transition-colors group-hover:text-purple-400" />
                 <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
                 <p className="text-sm text-slate-300/80">{description}</p>
               </motion.div>
@@ -525,10 +525,10 @@ export function HeroAnimations() {
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-sm transition-all hover:border-purple-400/30 hover:bg-black/60"
+                className="group relative block overflow-hidden rounded-lg border border-white/5 bg-black/30 p-5 backdrop-blur-sm transition-all hover:border-purple-500/20 hover:bg-black/50"
               >
                 <div className="absolute inset-0 bg-linear-to-br from-purple-600/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                <span className="relative inline-flex size-10 items-center justify-center rounded-full bg-purple-500/20 text-sm font-bold text-purple-200 transition-all group-hover:bg-purple-500/30">
+                <span className="group relative inline-flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-600/90 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-purple-600 hover:border-purple-500/40">
                   0{index + 1}
                 </span>
                 <h3 className="relative text-lg font-semibold text-white">{title}</h3>
@@ -557,10 +557,10 @@ export function HeroAnimations() {
               <motion.div 
                 key={label} 
                 whileHover={{ scale: 1.05 }}
-                className="rounded-xl bg-linear-to-br from-white/10 to-white/5 p-4 backdrop-blur-xl border border-white/10 transition-all hover:border-purple-400/30"
+                className="rounded-lg border border-white/5 bg-black/40 p-4 backdrop-blur-sm transition-all hover:border-purple-500/30 hover:bg-black/60"
               >
                 <motion.span 
-                  className="text-3xl font-bold text-white"
+                  className="text-3xl font-semibold bg-linear-to-br from-purple-400 to-indigo-400 bg-clip-text text-transparent"
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   transition={{ delay: i * 0.1 }}
@@ -568,7 +568,7 @@ export function HeroAnimations() {
                 >
                   {value}
                 </motion.span>
-                <p className="mt-2 text-xs uppercase tracking-wide text-slate-300/70">{label}</p>
+                <p className="mt-2 text-xs uppercase tracking-wider text-gray-500">{label}</p>
               </motion.div>
             ))}
           </div>
@@ -579,12 +579,12 @@ export function HeroAnimations() {
           whileInView={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          className="mt-16 overflow-hidden rounded-3xl border border-purple-400/20 bg-linear-to-r from-purple-600/40 via-indigo-600/30 to-blue-600/30 p-8 backdrop-blur-sm sm:p-12"
+          className="group relative mx-auto w-full max-w-4xl overflow-hidden rounded-xl border border-purple-500/10 bg-black/50 p-10 backdrop-blur-md sm:p-12"
         >
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-xl">
-              <h2 className="text-3xl font-bold text-white sm:text-4xl">Bring clarity to every hiring decision</h2>
-              <p className="mt-3 text-base text-purple-50/90">
+              <h2 className="text-2xl font-medium text-gray-100 sm:text-3xl">Bring clarity to every hiring decision</h2>
+              <p className="mt-3 text-sm text-gray-400">
                 Start with a guided workspace tailored to your roles and give your team the edge in finding top talent sooner.
               </p>
             </div>
@@ -592,7 +592,7 @@ export function HeroAnimations() {
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
                 <Button
                   asChild
-                  className="rounded-full bg-white px-6 py-3 text-sm text-black transition-all hover:bg-white/90"
+                  className="rounded-lg border border-purple-500/20 bg-purple-600/90 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-purple-600 hover:border-purple-500/40"
                   size="lg"
                 >
                   <Link href="/dashboard">Launch workspace</Link>
@@ -602,7 +602,7 @@ export function HeroAnimations() {
                 <Button
                   asChild
                   variant="outline"
-                  className="rounded-full border-white/40 bg-transparent text-white hover:bg-white/10"
+                  className="rounded-lg border-purple-500/20 bg-transparent text-gray-300 hover:border-purple-500/40 hover:bg-purple-500/10"
                   size="lg"
                 >
                   <Link href="/book-demo">Book a walkthrough</Link>

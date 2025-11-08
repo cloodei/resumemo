@@ -28,38 +28,40 @@ export function AppHeader() {
           </span>
         </Link>
 
-        <nav className="hidden gap-3 md:flex">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link key={item.href} href={isActive ? "#" : item.href}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "relative font-medium transition-all",
-                    isActive
-                      ? "disabled:opacity-100 text-primary shadow-[inset_0_-2px_0_0_currentColor] after:absolute after:bottom-0 after:left-1/2 after:h-0.5 after:w-3/4 after:-translate-x-1/2 after:rounded-full after:bg-primary after:shadow-[0_0_8px_rgba(var(--primary),0.5)]"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:shadow-m"
-                  )}
-                  disabled={isActive}
-                >
-                  {item.label}
-                </Button>
-              </Link>
-            )
-          })}
-        </nav>
-
         <div className="flex items-center gap-2">
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            className="shadow-sm transition-all hover:shadow-md md:hidden"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <ThemeToggler />
+          <nav className="hidden gap-3 md:flex">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link key={item.href} href={isActive ? "#" : item.href}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "relative font-medium transition-all",
+                      isActive
+                        ? "disabled:opacity-100 text-primary shadow-[inset_0_-2px_0_0_currentColor] after:absolute after:bottom-0 after:left-1/2 after:h-0.5 after:w-3/4 after:-translate-x-1/2 after:rounded-full after:bg-primary after:shadow-[0_0_8px_rgba(var(--primary),0.5)]"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:shadow-m"
+                    )}
+                    disabled={isActive}
+                  >
+                    {item.label}
+                  </Button>
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="shadow-sm transition-all hover:shadow-md md:hidden"
+            >
+              <Menu className="size-4" />
+            </Button>
+            <ThemeToggler />
+          </div>
         </div>
       </div>
     </header>

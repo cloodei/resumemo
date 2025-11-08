@@ -88,9 +88,9 @@ const glowVariants = {
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden border-t border-white/5 bg-linear-to-b from-gray-950/95 via-black to-black">
+    <footer className="relative overflow-hidden border-t border-white/5 bg-[#0a0a0f]">
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-indigo-900/5 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-purple-900/10 via-transparent to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
       </div>
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -131,7 +131,7 @@ export function Footer() {
           {/* Links Sections */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <motion.div key={category} variants={itemVariants}>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-300">
+              <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-purple-400/70">
                 {category}
               </h3>
               <ul className="space-y-2">
@@ -188,7 +188,7 @@ export function Footer() {
           className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 text-center lg:flex-row lg:text-left"
         >
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500 lg:justify-start">
-            <span>© 2025 Resumemo. All rights reserved.</span>
+            <span> 2025 Resumemo. All rights reserved.</span>
             <span className="hidden lg:inline">•</span>
             <Link href="/sitemap" className="hover:text-gray-300 transition-colors">
               Sitemap
@@ -202,16 +202,9 @@ export function Footer() {
               Changelog
             </Link>
           </div>
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <span>Made with</span>
-            <motion.div
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              <Heart className="h-3 w-3 fill-red-500 text-red-500" />
-            </motion.div>
-            <span>by the Resumemo team</span>
-          </div>
+          <p className="flex items-center gap-1 text-xs text-gray-500">
+            Made with <Heart className="h-3 w-3 fill-purple-400 text-purple-400" /> by Resumemo Team
+          </p>
         </motion.div>
       </div>
     </footer>
