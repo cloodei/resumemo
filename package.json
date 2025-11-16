@@ -4,6 +4,8 @@
     "dev": "concurrently \"bun run frontend\" \"bun run backend\"",
     "frontend": "cd frontend && bun run dev",
     "backend": "cd backend && bun run dev",
+    "frontend:dev": "cd frontend && bun run dev",
+    "backend:dev": "cd backend && bun run dev",
 
     "start": "concurrently \"bun run frontend:start\" \"bun run backend:start\"",
     "frontend:start": "cd frontend && bun run start",
@@ -13,11 +15,12 @@
     "frontend:build": "cd frontend && bun run build",
     "backend:build": "cd backend && bun run build",
 
+    "down": "bun run install",
     "install": "concurrently \"bun run frontend:install\" \"bun run backend:install\"",
     "frontend:install": "cd frontend && bun install",
     "backend:install": "cd backend && bun install",
 
-    "update": "concurrently \"bun run frontend:update\" \"bun run backend:update\"",
+    "update": "bun update && concurrently \"bun run frontend:update\" \"bun run backend:update\"",
     "frontend:update": "cd frontend && bun update",
     "backend:update": "cd backend && bun update"
   },
