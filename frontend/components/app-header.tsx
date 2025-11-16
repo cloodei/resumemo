@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { Menu } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
+import { Logo } from "./tlg"
 import { Button } from "./ui/button"
 import { ThemeToggler } from "./theme-toggle"
 
@@ -22,7 +22,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 bg-background backdrop-blur supports-backdrop-filter:bg-background/80 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
       <div className="mx-auto flex h-12 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="group flex gap-2 items-center transition-transform">
-          <Image src="/group1.svg" alt="Logo" width={26} height={26} />
+          <Logo className="size-6" />
           <span className="bg-linear-to-r font-semibold tracking-tight text-transparent from-primary to-primary/25 bg-clip-text text-sm">
             Résumé Ranker
           </span>
