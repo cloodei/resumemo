@@ -88,10 +88,11 @@ const glowVariants = {
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden border-t border-white/5 bg-[#0a0a0f]">
+    <footer className="relative overflow-hidden border-t border-white/5 bg-[#05050a]">
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-purple-900/10 via-transparent to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-32 w-[90%] rounded-full bg-purple-500/10 blur-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
       </div>
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
@@ -99,17 +100,33 @@ export function Footer() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-100px' }}
-          className="grid gap-8 lg:grid-cols-5"
+          className="grid gap-10 lg:grid-cols-12"
         >
           {/* Brand Section */}
-          <motion.div variants={itemVariants} className="lg:col-span-2">
-            <div className="mb-4 flex items-center gap-3">
-              <Logo className="size-10 rounded-full" />
-              <p className="text-xl font-bold text-white">Resumemo</p>
+          <motion.div variants={itemVariants} className="space-y-6 rounded-3xl border border-white/5 bg-white/5/10 p-6 backdrop-blur lg:col-span-4">
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <Logo className="size-11 rounded-2xl" />
+                <div>
+                  <p className="text-base font-semibold uppercase tracking-[0.28em] text-gray-500">Resumemo</p>
+                  <p className="text-2xl font-semibold text-white">AI Talent Suite</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400">
+                Precision-grade resume intelligence for ambitious talent teams. Discover, assess, and hire with confidence.
+              </p>
             </div>
-            <p className="mb-6 max-w-xs text-sm text-gray-400">
-              Transform your hiring process with AI-powered resume analysis. Find the perfect candidate 10x faster.
-            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                { label: 'Teams onboarded', value: '280+' },
+                { label: 'Avg. time saved', value: '32 hrs/wk' },
+              ].map((metric) => (
+                <div key={metric.label} className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-gray-400">
+                  <p className="text-xs uppercase tracking-widest text-gray-500">{metric.label}</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{metric.value}</p>
+                </div>
+              ))}
+            </div>
             <div className="flex gap-3">
               {socialLinks.map(({ icon: Icon, href, label }) => (
                 <motion.a
@@ -117,11 +134,11 @@ export function Footer() {
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-all hover:border-purple-500/30 hover:bg-purple-500/10"
+                  className="group relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-all hover:border-purple-400/40 hover:bg-purple-500/20"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <Icon className="h-4 w-4 text-gray-400 transition-colors group-hover:text-purple-400" />
+                  <Icon className="h-4 w-4 text-gray-400 transition-colors group-hover:text-white" />
                   <span className="sr-only">{label}</span>
                 </motion.a>
               ))}
@@ -129,54 +146,57 @@ export function Footer() {
           </motion.div>
 
           {/* Links Sections */}
-          {Object.entries(footerLinks).map(([category, links]) => (
-            <motion.div key={category} variants={itemVariants}>
-              <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-purple-400/70">
-                {category}
-              </h3>
-              <ul className="space-y-2">
-                {links.map(({ title, href, icon: Icon }) => (
-                  <li key={title}>
-                    <Link
-                      href={href}
-                      className="group relative flex items-center gap-2 text-sm text-gray-400 transition-all hover:text-white"
-                    >
-                      <Icon className="h-3 w-3 text-gray-600 transition-colors group-hover:text-purple-400" />
-                      <span>{title}</span>
-                      <ArrowUpRight className="ml-auto h-3 w-3 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          ))}
-        </motion.div>
+          <motion.div variants={itemVariants} className="lg:col-span-5">
+            <div className="grid gap-8 sm:grid-cols-2">
+              {Object.entries(footerLinks).map(([category, links]) => (
+                <div key={category}>
+                  <h3 className="mb-4 text-xs font-medium uppercase tracking-[0.3em] text-purple-300/70">
+                    {category}
+                  </h3>
+                  <ul className="space-y-2">
+                    {links.map(({ title, href, icon: Icon }) => (
+                      <li key={title}>
+                        <Link
+                          href={href}
+                          className="group relative flex items-center gap-2 rounded-xl px-2 py-1 text-sm text-gray-400 transition-all hover:bg-white/5 hover:text-white"
+                        >
+                          <Icon className="h-3.5 w-3.5 text-gray-600 transition-colors group-hover:text-purple-300" />
+                          <span>{title}</span>
+                          <ArrowUpRight className="ml-auto h-3 w-3 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
-        {/* Simplified Newsletter Section */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="border-t border-white/5 py-8"
-        >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col items-center justify-between gap-6 lg:flex-row">
-              <div className="text-center lg:text-left">
-                <h3 className="text-lg font-medium text-white">Join our newsletter</h3>
-                <p className="mt-1 text-sm text-gray-400">AI recruiting insights delivered monthly.</p>
-              </div>
-              <form className="flex w-full max-w-md gap-3">
+          {/* CTA Section */}
+          <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-purple-500/20 bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.3),transparent_55%)] p-6 lg:col-span-3">
+            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+            <div className="relative space-y-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.4em] text-purple-200">newsletter</p>
+              <h3 className="text-2xl font-semibold text-white">Signal over noise hiring intel</h3>
+              <p className="text-sm text-gray-400">
+                Monthly drops on AI sourcing playbooks, ethical automation, and changelog-first product updates.
+              </p>
+              <form className="flex flex-col gap-3">
                 <input
                   type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none backdrop-blur-sm transition-all focus:border-white/20 focus:bg-white/10"
+                  placeholder="work@email.com"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-all focus:border-purple-400/60 focus:bg-white/10"
                 />
-                <Button type="submit" className="rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition-colors hover:bg-white/90">
-                  Subscribe
+                <Button type="submit" className="rounded-2xl bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-white/90">
+                  Stay in the loop
                 </Button>
               </form>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Shield className="h-3.5 w-3.5 text-purple-300" />
+                Zero spam — unsubscribe anytime.
+              </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* Bottom Bar */}
@@ -185,24 +205,24 @@ export function Footer() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 text-center lg:flex-row lg:text-left"
+          className="mt-14 flex flex-col gap-6 border-t border-white/5 py-8 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left"
         >
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500 lg:justify-start">
-            <span> 2025 Resumemo. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Resumemo. All rights reserved.</span>
             <span className="hidden lg:inline">•</span>
-            <Link href="/sitemap" className="hover:text-gray-300 transition-colors">
+            <Link href="/sitemap" className="transition-colors hover:text-gray-300">
               Sitemap
             </Link>
             <span>•</span>
-            <Link href="/accessibility" className="hover:text-gray-300 transition-colors">
+            <Link href="/accessibility" className="transition-colors hover:text-gray-300">
               Accessibility
             </Link>
             <span>•</span>
-            <Link href="/changelog" className="hover:text-gray-300 transition-colors">
+            <Link href="/changelog" className="transition-colors hover:text-gray-300">
               Changelog
             </Link>
           </div>
-          <p className="flex items-center gap-1 text-xs text-gray-500">
+          <p className="flex items-center justify-center gap-2 text-xs text-gray-500">
             Made with <Heart className="h-3 w-3 fill-purple-400 text-purple-400" /> by Resumemo Team
           </p>
         </motion.div>

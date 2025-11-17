@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, Compass, Layers, PenTool, ShieldCheck, Sparkl
 
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/tlg';
 
 const METRICS = [
   { value: '18k+', label: 'Resumes refined' },
@@ -107,13 +108,12 @@ export default function AppHero() {
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-16 sm:px-6 lg:px-8">
           <section className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div className="space-y-8">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/5 px-4 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.6em] text-[#f5dec1]/80">
-                <Sparkles className="size-4 text-amber-200" />
-                Resumemo
+              <div className="w-fit rounded-full border border-white/15 bg-white/5 pl-5 pr-4 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.6em] text-[#f5dec1]/80">
+                Résumémo
               </div>
 
               <div className="space-y-4">
-                <h1 className="font-serif text-4xl font-semibold leading-tight text-slate-50 sm:text-5xl lg:text-6xl">
+                <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight text-slate-50 sm:text-5xl">
                   A modern main stage for <span className="text-[#f4c06d]">resumes</span> that feel cinematic,
                   confident, and ready for scrutiny.
                 </h1>
@@ -212,7 +212,7 @@ export default function AppHero() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.4em] text-amber-200/70">Capabilities</p>
-                <h2 className="mt-2 font-serif text-3xl font-semibold text-white sm:text-4xl">Built for teams that obsess over craft.</h2>
+                <h2 className="mt-2 font-mono text-3xl font-semibold text-white sm:text-4xl">Built for teams that obsess over craft.</h2>
               </div>
               <Link href="/features" className="text-sm text-[#f4c06d] hover:text-white">
                 Explore full spec →
@@ -232,7 +232,7 @@ export default function AppHero() {
           <section className="mt-16 rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
             <div className="flex flex-col gap-4 text-left">
               <p className="text-sm uppercase tracking-[0.4em] text-amber-200/70">Workflow</p>
-              <h2 className="font-serif text-3xl font-semibold text-white">A calm four-step path from prompt to presentation.</h2>
+              <h2 className="font-mono text-3xl font-semibold text-white">A calm four-step path from prompt to presentation.</h2>
             </div>
             <div className="mt-8 grid gap-6 lg:grid-cols-4">
               {WORKFLOW_STEPS.map(({ icon: Icon, title, description }, index) => (
@@ -251,7 +251,7 @@ export default function AppHero() {
           <section className="mt-16 grid gap-8 rounded-3xl border border-white/10 bg-linear-to-r from-white/10 via-[#0f2a2f]/30 to-transparent p-8 sm:p-10 lg:grid-cols-2">
             <div className="space-y-6">
               <p className="text-sm uppercase tracking-[0.4em] text-amber-200/70">Testimonial</p>
-              <p className="font-serif text-2xl font-semibold text-white sm:text-3xl">
+              <p className="font-mono text-2xl font-semibold text-white sm:text-3xl">
                 “Resumemo gives us the polish of a creative studio with the rigor of an operations team. Every draft feels deliberate,
                 modern, and ready for our executive slate.”
               </p>
