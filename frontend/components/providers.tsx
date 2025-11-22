@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ThemeProvider as NextThemeProvider } from "next-themes"
 
+import { Toaster } from "@/components/ui/sonner"
+
 const queryClient = new QueryClient()
 
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemeProvider>) {
@@ -19,6 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
       >
         {children}
+        <Toaster richColors position="top-center" closeButton />
       </ThemeProvider>
     </QueryClientProvider>
   )

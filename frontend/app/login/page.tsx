@@ -14,6 +14,7 @@ import { Logo } from "@/components/tlg"
 import { ThemeToggler } from "@/components/theme-toggle"
 import { SignInForm } from "./signin"
 import { SignUpForm } from "./signup"
+import { EmailVerificationCard } from "./email-verification-card"
 
 export const metadata: Metadata = {
   title: "Sign In - Résumé Ranker",
@@ -58,6 +59,7 @@ export default function LoginPage() {
                 <SignUpForm />
               </TabsContent>
             </Tabs>
+            <EmailVerificationCard />
           </CardContent>
           <CardFooter className="pt-3">
             <p className="m-auto text-xs text-muted-foreground">
