@@ -5,7 +5,7 @@ import { emailOTP } from "better-auth/plugins";
 import { db } from "./db";
 import * as schema from "./schema";
 
-const sendOtpEmail = async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+const sendVerificationOTP = async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM ?? "no-reply@resumemo.app";
 
@@ -62,9 +62,7 @@ export const auth = betterAuth({
   },
   plugins: [
     emailOTP({
-      async sendVerificationOTP(payload) {
-        await sendOtpEmail(payload);
-      },
+      sendVerificationOTP,
     }),
   ],
 })
