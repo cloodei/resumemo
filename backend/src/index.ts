@@ -1,17 +1,7 @@
-import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { openapi } from "@elysiajs/openapi";
 
 import { auth } from "./lib/auth";
-
-// type SessionResult = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
-
-// declare module "elysia" {
-//   interface Context {
-//     user: SessionResult["user"];
-//     session: SessionResult["session"];
-//   }
-// }
 
 const betterAuth = new Elysia({ name: "better-auth" })
   .mount(auth.handler)
@@ -42,7 +32,7 @@ const app = new Elysia({ precompile: true })
   // )
   .use(openapi())
   .use(betterAuth)
-  .get("/", "OK")
+  .get("/", () => ({ status: "ok" }))
   .get(
     "/api/me",
     ({ user, session }) => ({

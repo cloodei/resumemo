@@ -12,6 +12,7 @@
     "better-auth": "^1.4.1",
     "drizzle-orm": "^0.44.7",
     "elysia": "^1.4.16",
+    "resend": "^6.5.2",
     "zod": "^4.1.12"
   },
   "devDependencies": {
