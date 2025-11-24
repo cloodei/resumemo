@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { toast } from "sonner"
 import { Menu, Sparkles } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Logo } from "./tlg"
