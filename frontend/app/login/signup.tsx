@@ -11,13 +11,13 @@ import { Eye, EyeOff, Lock, Mail, ShieldCheck, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { SocialButtons } from "./social-buttons";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const detailsSchema = z
   .object({
     name: z.string().min(2, "Tell us your name"),
-    email: z.string().email("Use a valid email"),
+    email: z.email("Use a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(8, "Confirm your password"),
   })
