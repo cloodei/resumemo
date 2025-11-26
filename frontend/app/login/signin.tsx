@@ -107,10 +107,10 @@ export function SignInForm() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t dark:border-neutral-300/80 border-neutral-700/50" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+          <div className="relative flex justify-center text-[11px] uppercase">
+            <span className="bg-background rounded-sm px-[6px] text-muted-foreground">Or continue with</span>
           </div>
         </div>
 

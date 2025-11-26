@@ -31,9 +31,10 @@ const providers = [
 type SocialButtonsProps = {
   callbackURL?: string
   className?: string
+  buttonClassName?: string
 }
 
-export function SocialButtons({ callbackURL = "/dashboard", className }: SocialButtonsProps) {
+export function SocialButtons({ callbackURL = "/dashboard", className, buttonClassName }: SocialButtonsProps) {
   const [loading, setLoading] = useState<"github" | "google" | null>(null)
 
   const handleProviderSignIn = async (provider: "github" | "google") => {
@@ -54,6 +55,7 @@ export function SocialButtons({ callbackURL = "/dashboard", className }: SocialB
         <Button
           key={provider.id}
           type="button"
+          className={cn("gap-1 not-dark:border-input/80", buttonClassName)}
           variant="outline"
           onClick={() => handleProviderSignIn(provider.id)}
           disabled={loading === provider.id}
