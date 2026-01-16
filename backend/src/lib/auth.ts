@@ -10,7 +10,7 @@ const sendVerificationOTP = async ({ email, otp, type }: { email: string; otp: s
 
   await resend.emails.send({
     from,
-    to: [email],
+    to: email,
     subject: type === "sign-in" ? "Your Résumemo sign-in code" : "Verify your Résumemo email",
     html: `
       <table style="width:100%;background:#05050f;padding:32px 0;font-family:Inter,system-ui,sans-serif;color:#f5f5ff;">
@@ -64,6 +64,12 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     maxPasswordLength: 128,
     minPasswordLength: 5
+  },
+  account: {
+    allowAccountLinking: true,
+    accountLinking: {
+      enabled: true
+    }
   },
   socialProviders: {
     google: {
