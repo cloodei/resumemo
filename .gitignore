@@ -8,6 +8,7 @@ node_modules
 .windsurf
 .vscode
 .idea
+.agent
 
 # Build outputs
 dist
@@ -22,3 +23,6 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+
+/docs

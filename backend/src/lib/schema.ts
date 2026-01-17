@@ -37,7 +37,7 @@ export const session = pgTable("session", {
     .$onUpdate(() => new Date())
     .notNull(),
 }, (table) => [
-  index("session_userId_idx").on(table.userId),
+  index().on(table.userId),
 ]);
 
 export const account = pgTable("account", {
@@ -64,7 +64,7 @@ export const account = pgTable("account", {
     .$onUpdate(() => new Date())
     .notNull(),
 }, (table) => [
-  index("account_userId_idx").on(table.userId),
+  index().on(table.userId),
 ]);
 
 export const verification = pgTable("verification", {
@@ -81,4 +81,4 @@ export const verification = pgTable("verification", {
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
-}, (table) => [index("verification_identifier_idx").on(table.identifier)]);
+});
