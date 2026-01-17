@@ -11,7 +11,7 @@ const betterAuth = new Elysia({ name: "better-auth" })
         const session = await auth.api.getSession({ headers });
 
         if (!session)
-          return status(401);
+          return status(401, { message: "Unauthorized" });
 
         return {
           user: session.user,
