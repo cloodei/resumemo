@@ -1,4 +1,3 @@
-import path from "path";
 import type { NextConfig } from "next";
 
 export default {
@@ -9,8 +8,5 @@ export default {
         hostname: 'i.postimg.cc',
       },
     ],
-  },
-  turbopack: {
-    root: path.resolve(__dirname, './'),
   },
 } satisfies NextConfig;

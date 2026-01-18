@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "resumemo",
@@ -12,18 +13,19 @@
     "backend": {
       "name": "backend",
       "dependencies": {
-        "@elysiajs/cors": "^1.4.0",
+        "@elysiajs/cors": "^1.4.1",
         "@elysiajs/jwt": "^1.4.0",
-        "@elysiajs/openapi": "^1.4.11",
+        "@elysiajs/openapi": "^1.4.13",
         "@resumemo/shared": "workspace:*",
-        "better-auth": "^1.4.1",
+        "better-auth": "^1.4.14",
         "drizzle-orm": "^0.44.7",
-        "elysia": "^1.4.16",
-        "resend": "^6.5.2",
+        "elysia": "^1.4.22",
+        "postgres": "^3.4.8",
+        "resend": "^6.7.0",
       },
       "devDependencies": {
         "bun-types": "latest",
-        "drizzle-kit": "^0.31.7",
+        "drizzle-kit": "^0.31.8",
       },
     },
     "frontend": {
@@ -56,6 +58,7 @@
         "react-hook-form": "^7.71.1",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.4.0",
+        "zod": "^4.3.5",
         "zustand": "^5.0.10",
       },
       "devDependencies": {
@@ -572,6 +575,8 @@
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
     "postcss": ["postcss@8.5.6", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
+
+    "postgres": ["postgres@3.4.8", "", {}, "sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg=="],
 
     "react": ["react@19.2.3", "", {}, "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="],
 

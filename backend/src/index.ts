@@ -1,3 +1,4 @@
+import cors from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { openapi } from "@elysiajs/openapi";
 
@@ -22,14 +23,15 @@ const betterAuth = new Elysia({ name: "better-auth" })
   });
 
 const app = new Elysia({ precompile: true })
-  // .use(
-  //   cors({
-  //     origin: process.env.FRONTEND_URL ?? "http://localhost:5000",
-  //     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  //     credentials: true,
-  //     allowedHeaders: ["Content-Type", "Authorization"],
-  //   }),
-  // )
+  .use(
+    cors({
+      // origin: process.env.FRONTEND_URL ?? "http://localhost:5000",
+      origin: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      credentials: true,
+      allowedHeaders: ["Content-Type", "Authorization"],
+    }),
+  )
   .use(openapi())
   .use(betterAuth)
   .get("/", () => ({ status: "ok" }))

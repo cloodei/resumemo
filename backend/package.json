@@ -5,16 +5,19 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "./main",
-    "build": "bun build --compile --minify --outfile main index.ts"
+    "build": "bun build --compile --minify --outfile main index.ts",
+    "push": "bunx --bun drizzle-kit push",
+    "generate": "bunx --bun drizzle-kit generate"
   },
   "dependencies": {
-    "@resumemo/shared": "workspace:*",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.13",
+    "@resumemo/shared": "workspace:*",
     "better-auth": "^1.4.14",
     "drizzle-orm": "^0.44.7",
     "elysia": "^1.4.22",
+    "postgres": "^3.4.8",
     "resend": "^6.7.0"
   },
   "devDependencies": {

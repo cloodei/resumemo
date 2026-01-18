@@ -7,6 +7,7 @@ import * as schema from "./schema";
 
 const sendVerificationOTP = async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
   const from = process.env.RESEND_FROM ?? "Resumemo Auth <no-reply@resumemo.app>";
+  console.log("SENDING OTP: ", otp, "\nFROM: ", from, "\nTO: ", email);
 
   await resend.emails.send({
     from,
