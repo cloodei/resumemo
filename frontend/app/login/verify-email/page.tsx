@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { ShieldCheck, ArrowLeft } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth";
 import { ThemeToggler } from "@/components/theme-toggle";
@@ -15,83 +13,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") ?? "";
+  const token = searchParams.get("token");
+  const email = searchParams.get("email");
 
-  const [otp, setOtp] = useState("");
-  const [cooldown, setCooldown] = useState(0);
-  const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "pending">(
+    token ? "loading" : "pending"
+  );
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
-    if (!cooldown) return;
-    const timer = setInterval(() => {
-      setCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [cooldown]);
+    if (!token) return;
 
-  // Redirect if no email provided
-  useEffect(() => {
-    if (!email) {
-      toast.error("Missing email. Please sign up again.");
-      router.replace("/login");
-    }
-  }, [email, router]);
-
-  const handleResend = async () => {
-    if (!email || cooldown > 0 || isSending) return;
-
-    setIsSending(true);
-    try {
-      const { error } = await authClient.emailOtp.sendVerificationOtp({
-        email,
-        type: "email-verification",
-      });
-
-      if (error) {
-        toast.error(error.message ?? "Unable to send code");
-        return;
+    const verifyEmail = async () => {
+      try {
+        const { error } = await authClient.verifyEmail({ query: { token } });
+        if (error) {
+          setStatus("error");
+          setErrorMessage(error.message ?? "Verification failed");
+        } else {
+          setStatus("success");
+          // Redirect to dashboard after successful verification
+          setTimeout(() => router.push("/dashboard"), 2000);
+        }
+      } catch {
+        setStatus("error");
+        setErrorMessage("An unexpected error occurred");
       }
+    };
 
-      toast.success("Verification code sent");
-      setCooldown(60);
+    verifyEmail();
+  }, [token, router]);
+
+  const handleResendVerification = async () => {
+    if (!email || isResending) return;
+    
+    setIsResending(true);
+    try {
+      const { error } = await authClient.sendVerificationEmail({ email });
+      if (error) {
+        setErrorMessage(error.message ?? "Failed to resend verification email");
+      } else {
+        setStatus("pending");
+        setErrorMessage("");
+      }
     } finally {
-      setIsSending(false);
+      setIsResending(false);
     }
   };
-
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!otp || otp.length < 6) {
-      toast.error("Enter the 6-digit code");
-      return;
-    }
-
-    setIsVerifying(true);
-    try {
-      const { error } = await authClient.emailOtp.verifyEmail({
-        email,
-        otp,
-      });
-
-      if (error) {
-        toast.error(error.message ?? "Incorrect code");
-        return;
-      }
-
-      toast.success("Email verified! Welcome to Résumemo");
-      router.push("/dashboard");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  if (!email) {
-    toast.error("Missing email. Please sign up again.");
-    router.replace("/login");
-    return null;
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-neutral-100 dark:bg-background">
@@ -103,57 +72,58 @@ export default function VerifyEmailPage() {
 
           <CardHeader className="pb-2">
             <div className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
-              <ShieldCheck className="size-6" />
+              {status === "loading" && <Loader2 className="size-6 animate-spin" />}
+              {status === "success" && <CheckCircle className="size-6 text-emerald-500" />}
+              {status === "error" && <XCircle className="size-6 text-rose-500" />}
+              {status === "pending" && <Mail className="size-6" />}
             </div>
-            <CardTitle className="text-center pt-3">Verify your email</CardTitle>
+            <CardTitle className="text-center pt-3">
+              {status === "loading" && "Verifying your email..."}
+              {status === "success" && "Email verified!"}
+              {status === "error" && "Verification failed"}
+              {status === "pending" && "Check your inbox"}
+            </CardTitle>
             <CardDescription className="text-center">
-              We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>
+              {status === "loading" && "Please wait while we verify your email address."}
+              {status === "success" && "Your email has been verified. Redirecting to dashboard..."}
+              {status === "error" && (errorMessage || "The verification link may have expired or is invalid.")}
+              {status === "pending" && (
+                <>
+                  We&apos;ve sent a verification link to{" "}
+                  {email ? <span className="font-medium text-foreground">{email}</span> : "your email"}.
+                  Click the link to verify your account.
+                </>
+              )}
             </CardDescription>
           </CardHeader>
 
           <CardContent>
-            <form className="space-y-4" onSubmit={handleVerify}>
-              <div className="space-y-2">
-                <Input
-                  placeholder="123456"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  className="tracking-[0.4em] text-center text-xl h-12"
-                  autoFocus
-                />
-              </div>
-
-              <Button className="w-full" type="submit" disabled={isVerifying}>
-                {isVerifying ? "Verifying..." : "Verify email"}
-              </Button>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {(status === "error" || status === "pending") && email && (
                 <Button
                   type="button"
                   variant="outline"
                   className="flex-1"
-                  disabled={isSending || cooldown > 0}
-                  onClick={handleResend}
+                  disabled={isResending}
+                  onClick={handleResendVerification}
                 >
-                  {isSending ? "Sending..." : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+                  {isResending ? "Sending..." : "Resend verification email"}
                 </Button>
-                <Button type="button" variant="ghost" className="flex-1" asChild>
-                  <Link href="/login">
-                    <ArrowLeft className="size-4 mr-2" />
-                    Back to signup
-                  </Link>
-                </Button>
-              </div>
-            </form>
+              )}
+              <Button type="button" variant="ghost" className="flex-1" asChild>
+                <Link href="/login">
+                  <ArrowLeft className="size-4 mr-2" />
+                  Back to login
+                </Link>
+              </Button>
+            </div>
           </CardContent>
 
           <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-rose-500/40 via-primary/40 to-emerald-500/30" />
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
-          Didn't receive the email? Check your spam folder or{" "}
+          Didn&apos;t receive the email? Check your spam folder or{" "}
           <Link href="/support" className="text-primary hover:underline">
             contact support
           </Link>

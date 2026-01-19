@@ -2,7 +2,9 @@ import cors from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { openapi } from "@elysiajs/openapi";
 
+import { db } from "./lib/db";
 import { auth } from "./lib/auth";
+import * as schema from "./lib/schema";
 
 const betterAuth = new Elysia({ name: "better-auth" })
   .mount(auth.handler)
@@ -43,6 +45,14 @@ const app = new Elysia({ precompile: true })
     }),
     { auth: true },
   )
+  .get("/api/clear", async () => { // CLEAR ALL DATA, ONLY DEVELOPMENT FEATURE
+    const [numUsersDeleted, numSessionsDeleted, numAccountsDeleted] = await Promise.all([
+      db.delete(schema.user),
+      db.delete(schema.session),
+      db.delete(schema.account),
+    ]);
+    return { status: "ok", numUsersDeleted, numSessionsDeleted, numAccountsDeleted };
+  })
   .listen({ hostname: "0.0.0.0", port: 8080 });
 
 export type API = typeof app;
