@@ -16,17 +16,15 @@ export const auth = betterAuth({
     }
   },
   trustedOrigins: [process.env.FRONTEND_URL ?? "http://localhost:5000"],
-  emailAndPassword: {
-    enabled: true,
-    disableSignUp: false,
-    requireEmailVerification: true,
-    maxPasswordLength: 128,
-    minPasswordLength: 5,
-    sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
-      const from = process.env.RESEND_FROM ?? "Resumemo Auth <no-reply@resumemo.app>";
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    async sendVerificationEmail({ user, url }) {
+      // const from = process.env.RESEND_FROM ?? "Resumemo Auth <no-reply@resumemo.app>";
+      const from = "Resumemo Auth <no-reply@resumemo.app>";
       console.log("SENDING VERIFICATION EMAIL TO:", user.email, "\nURL:", url);
 
-      await resend.emails.send({
+      resend.emails.send({
         from,
         to: user.email,
         subject: "Verify your Résumemo email",
@@ -62,6 +60,13 @@ export const auth = betterAuth({
         `,
       });
     },
+  },
+  emailAndPassword: {
+    enabled: true,
+    disableSignUp: false,
+    requireEmailVerification: true,
+    maxPasswordLength: 128,
+    minPasswordLength: 5,
   },
   // account: {
   //   allowAccountLinking: true,

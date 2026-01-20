@@ -10,6 +10,7 @@
       "@shared": ["../packages/shared/src"],
       "@shared/*": ["../packages/shared/src/*"]
     },
+    "jsx": "react",
     "types": ["bun-types"],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

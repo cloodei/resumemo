@@ -3,7 +3,6 @@ import { ArrowRight, ArrowUpRight, Compass, Layers, PenTool, ShieldCheck, Sparkl
 
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/tlg';
 
 const METRICS = [
   { value: '18k+', label: 'Resumes refined' },
