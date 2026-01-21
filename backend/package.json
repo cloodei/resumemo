@@ -7,7 +7,7 @@
     "start": "./main",
     "build": "bun build --compile --minify --outfile main index.ts",
     "push": "bunx --bun drizzle-kit push",
-    "generate": "bunx --bun drizzle-kit generate"
+    "generate": "bunx --bun @better-auth/cli generate"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",

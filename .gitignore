@@ -9,6 +9,7 @@ node_modules
 .vscode
 .idea
 .agent
+.kombai
 
 # Build outputs
 dist
