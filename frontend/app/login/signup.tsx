@@ -11,7 +11,6 @@ import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth";
-import { SocialButtons } from "./social-buttons";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const signupSchema = z
@@ -55,8 +54,8 @@ export function SignUpForm() {
       return;
     }
 
-    toast.success("Please check your email for the verification code");
-    router.push(`/login/verify-email?email=${encodeURIComponent(values.email)}`);
+    toast.success("Welcome to Résumemo! 🎉");
+    router.push("/dashboard");
   });
 
   return (
@@ -162,19 +161,8 @@ export function SignUpForm() {
           type="submit"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Creating account..." : "Continue with email"}
+          {form.formState.isSubmitting ? "Creating account..." : "Create account with Email"}
         </Button>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t dark:border-neutral-300/80 border-neutral-700/50" />
-          </div>
-          <div className="relative flex justify-center text-[11px] uppercase">
-            <span className="bg-background rounded-sm px-[6px] text-muted-foreground">Or continue with</span>
-          </div>
-        </div>
-
-        <SocialButtons />
       </form>
     </Form>
   );

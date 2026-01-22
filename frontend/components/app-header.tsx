@@ -2,21 +2,39 @@
 
 import Link from "next/link"
 import { toast } from "sonner"
-import { Menu } from "lucide-react"
+import { Menu, Github, LogOut, User, ChevronDown } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { cn } from "@/lib/utils"
 import { Logo } from "./tlg"
 import { Button } from "./ui/button"
 import { ThemeToggler } from "./theme-toggle"
-import { Avatar, AvatarFallback } from "./ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { authClient, useSession } from "@/lib/auth"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu"
+import { Badge } from "./ui/badge"
 
 const navItems = [
 	{ href: "/dashboard", label: "Dashboard" },
 	{ href: "/jobs/new", label: "New Job" },
 	{ href: "/jd-library", label: "JD Library" }
 ]
+
+// Helper to get provider display info
+function getProviderInfo(accounts: { providerId: string }[] | undefined) {
+  if (!accounts || accounts.length === 0) return null
+  const provider = accounts[0]?.providerId
+  if (provider === "google") return { label: "Google", icon: null, color: "text-blue-500" }
+  if (provider === "github") return { label: "GitHub", icon: Github, color: "text-foreground" }
+  return { label: "Email", icon: null, color: "text-muted-foreground" }
+}
 
 export function AppHeader() {
 	const pathname = usePathname()
@@ -33,6 +51,9 @@ export function AppHeader() {
 		toast.success("Signed out")
 		router.push("/login")
 	}
+
+	const user = session?.user
+  const providerInfo = getProviderInfo(session?.session ? [{ providerId: (session.session as unknown as { activeOrganizationId?: string })?.activeOrganizationId ?? "credential" }] : undefined)
 
 	return (
 		<header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-sm">
@@ -74,22 +95,50 @@ export function AppHeader() {
 						<Menu className="size-5" />
 					</Button>
 					<ThemeToggler />
-					{session?.user ? (
-						<div className="flex items-center gap-2">
-							<Avatar className="size-8 border border-border">
-								<AvatarFallback className="text-xs">
-									{session.user.name?.[0]?.toUpperCase() ?? session.user.email?.[0]?.toUpperCase() ?? "U"}
-								</AvatarFallback>
-							</Avatar>
-							<Button 
-								size="sm" 
-								variant="ghost" 
-								className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline-flex"
-								onClick={handleSignOut}
-							>
-								Sign out
-							</Button>
-						</div>
+					{user ? (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" className="flex items-center gap-2 px-2 h-10">
+									<Avatar className="size-8 border border-border">
+                    <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
+										<AvatarFallback className="text-xs bg-primary/10 text-primary">
+											{user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
+										</AvatarFallback>
+									</Avatar>
+									<div className="hidden sm:flex flex-col items-start">
+										<span className="text-sm font-medium leading-none">{user.name ?? "User"}</span>
+										<span className="text-[11px] text-muted-foreground leading-tight">{user.email}</span>
+									</div>
+									<ChevronDown className="size-4 text-muted-foreground hidden sm:block" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-64">
+								<DropdownMenuLabel className="font-normal">
+									<div className="flex flex-col gap-1.5">
+										<p className="text-sm font-medium">{user.name}</p>
+										<p className="text-xs text-muted-foreground truncate">{user.email}</p>
+										{user.emailVerified && (
+											<Badge variant="secondary" className="w-fit text-[10px] py-0">
+												Verified
+											</Badge>
+										)}
+									</div>
+								</DropdownMenuLabel>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem className="gap-2">
+									<User className="size-4" />
+									<span>Profile settings</span>
+								</DropdownMenuItem>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem 
+									className="gap-2 text-destructive focus:text-destructive"
+									onClick={handleSignOut}
+								>
+									<LogOut className="size-4" />
+									<span>Sign out</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					) : (
 						<Button
 							size="sm"

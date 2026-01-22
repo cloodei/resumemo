@@ -9,7 +9,6 @@ import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth"
-import { SocialButtons } from "./social-buttons"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 type SignInFormValues = {
@@ -102,19 +101,8 @@ export function SignInForm() {
         />
 
         <Button className="w-full" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in..." : "Sign In"}
+          {isSubmitting ? "Signing in..." : "Sign In with Email"}
         </Button>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t dark:border-neutral-300/80 border-neutral-700/50" />
-          </div>
-          <div className="relative flex justify-center text-[11px] uppercase">
-            <span className="bg-background rounded-sm px-[6px] text-muted-foreground">Or continue with</span>
-          </div>
-        </div>
-
-        <SocialButtons />
       </form>
     </Form>
   )

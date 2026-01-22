@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { motion } from "motion/react"
 import { cn } from "@/lib/utils"
+import { useSession } from "@/lib/auth"
 import {
   Card,
   CardContent,
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Github, Mail, Sparkles, Clock, Briefcase, FileText } from "lucide-react"
 
 const recentJobs = [
   {
@@ -47,46 +50,118 @@ const recentJobs = [
   },
 ]
 
-const metrics = [
-  {
-    label: "Active Jobs",
-    value: "12",
-    change: "+3.8% vs last week",
-  },
-  {
-    label: "Resumes Processed",
-    value: "6,284",
-    change: "+18.2%",
-  },
-  {
-    label: "Avg. Turnaround",
-    value: "4m 12s",
-    change: "-1m 05s",
-  },
-  {
-    label: "Top JD Template",
-    value: "Full-Stack SWE",
-    change: "Using default scoring model",
-  },
-]
+// Helper to detect OAuth provider from user data
+function detectAuthProvider(user: { image?: string | null; email?: string | null } | undefined) {
+  if (!user) return "email"
+  if (user.image?.includes("googleusercontent.com")) return "google"
+  if (user.image?.includes("avatars.githubusercontent.com")) return "github"
+  return "email"
+}
+
+function getProviderBadge(provider: string) {
+  switch (provider) {
+    case "google":
+      return { label: "Google", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" }
+    case "github":
+      return { label: "GitHub", color: "bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20", icon: Github }
+    default:
+      return { label: "Email", color: "bg-primary/10 text-primary border-primary/20", icon: Mail }
+  }
+}
 
 export default function Page() {
+  const { data: session, isPending } = useSession()
+  const user = session?.user
+  const authProvider = detectAuthProvider(user)
+  const providerBadge = getProviderBadge(authProvider)
+
+  const metrics = [
+    {
+      label: "Active Jobs",
+      value: "12",
+      change: "+3.8% vs last week",
+      icon: Briefcase,
+    },
+    {
+      label: "Resumes Processed",
+      value: "6,284",
+      change: "+18.2%",
+      icon: FileText,
+    },
+    {
+      label: "Avg. Turnaround",
+      value: "4m 12s",
+      change: "-1m 05s",
+      icon: Clock,
+    },
+    {
+      label: "Top JD Template",
+      value: "Full-Stack SWE",
+      change: "Using default scoring model",
+      icon: Sparkles,
+    },
+  ]
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="flex flex-col gap-8">
+        {/* User Welcome Section */}
         <section className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-              Real-time insights
-            </p>
-            <h1 className="head-text-md gradient-text">Welcome back, recruiter 👋</h1>
-            <p className="max-w-2xl text-balance text-sm text-muted-foreground">
-              Monitor ranking activity, jump into active jobs, and keep talent pipelines moving with confidence.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+            {/* User Avatar & Info */}
+            {user && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center gap-4"
+              >
+                <Avatar className="size-16 border-2 border-primary/20 shadow-lg">
+                  <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
+                  <AvatarFallback className="text-xl bg-primary/10 text-primary font-semibold">
+                    {user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold tracking-tight">
+                      Welcome back, {user.name?.split(" ")[0] ?? "there"} 👋
+                    </h1>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>{user.email}</span>
+                    <Badge 
+                      variant="outline" 
+                      className={cn("text-[10px] py-0 px-1.5 gap-1", providerBadge.color)}
+                    >
+                      {providerBadge.icon && <providerBadge.icon className="size-3" />}
+                      {providerBadge.label}
+                    </Badge>
+                    {user.emailVerified && (
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                        ✓ Verified
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            {isPending && (
+              <div className="flex items-center gap-4">
+                <div className="size-16 rounded-full bg-muted animate-pulse" />
+                <div className="flex flex-col gap-2">
+                  <div className="h-7 w-48 bg-muted animate-pulse rounded" />
+                  <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                </div>
+              </div>
+            )}
           </div>
+          <p className="max-w-2xl text-balance text-sm text-muted-foreground">
+            Monitor ranking activity, jump into active jobs, and keep talent pipelines moving with confidence.
+          </p>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric, index) => (
@@ -100,10 +175,13 @@ export default function Page() {
                 className="group relative overflow-hidden transition-all duration-300 shadow-x border-none hover:-translate-y-1"
               >
                 <div className="absolute inset-0 bg-linear-to-br from-primary/2 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <CardHeader className="relative">
-                  <CardTitle className="text-base font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                    {metric.label}
-                  </CardTitle>
+                <CardHeader className="relative pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                      {metric.label}
+                    </CardTitle>
+                    <metric.icon className="size-4 text-muted-foreground/50" />
+                  </div>
                   <CardDescription className="text-xs">{metric.change}</CardDescription>
                 </CardHeader>
                 <CardContent className="relative">
