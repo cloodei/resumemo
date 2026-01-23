@@ -10,7 +10,8 @@ import { Logo } from "./tlg"
 import { Button } from "./ui/button"
 import { ThemeToggler } from "./theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { authClient, useSession } from "@/lib/auth"
+import { useAuth } from "@/components/auth-provider"
+import { Skeleton } from "./ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,21 +40,17 @@ function getProviderInfo(accounts: { providerId: string }[] | undefined) {
 export function AppHeader() {
 	const pathname = usePathname()
 	const router = useRouter()
-	const { data: session } = useSession()
+	const { user, isLoading, signOut } = useAuth()
 
 	const handleSignOut = async () => {
-		const { error } = await authClient.signOut()
-		if (error) {
-			toast.error(error.message ?? "Unable to sign out")
-			return
+		try {
+			await signOut()
+			toast.success("Signed out")
+			router.push("/login")
+		} catch {
+			toast.error("Unable to sign out")
 		}
-
-		toast.success("Signed out")
-		router.push("/login")
 	}
-
-	const user = session?.user
-  const providerInfo = getProviderInfo(session?.session ? [{ providerId: (session.session as unknown as { activeOrganizationId?: string })?.activeOrganizationId ?? "credential" }] : undefined)
 
 	return (
 		<header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-sm">
@@ -95,7 +92,15 @@ export function AppHeader() {
 						<Menu className="size-5" />
 					</Button>
 					<ThemeToggler />
-					{user ? (
+					{isLoading ? (
+						<div className="flex items-center gap-2">
+							<Skeleton className="size-8 rounded-full" />
+							<div className="hidden sm:flex flex-col gap-1">
+								<Skeleton className="h-3 w-20" />
+								<Skeleton className="h-2.5 w-28" />
+							</div>
+						</div>
+					) : user ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<Button variant="ghost" className="flex items-center gap-2 px-2 h-10">
@@ -112,7 +117,8 @@ export function AppHeader() {
 									<ChevronDown className="size-4 text-muted-foreground hidden sm:block" />
 								</Button>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-64">
+
+							<DropdownMenuContent align="end" className="w-64 border border-border">
 								<DropdownMenuLabel className="font-normal">
 									<div className="flex flex-col gap-1.5">
 										<p className="text-sm font-medium">{user.name}</p>
@@ -124,14 +130,18 @@ export function AppHeader() {
 										)}
 									</div>
 								</DropdownMenuLabel>
+
 								<DropdownMenuSeparator />
+
 								<DropdownMenuItem className="gap-2">
 									<User className="size-4" />
 									<span>Profile settings</span>
 								</DropdownMenuItem>
+
 								<DropdownMenuSeparator />
+
 								<DropdownMenuItem 
-									className="gap-2 text-destructive focus:text-destructive"
+									className="gap-2.5 text-destructive focus:text-destructive"
 									onClick={handleSignOut}
 								>
 									<LogOut className="size-4" />

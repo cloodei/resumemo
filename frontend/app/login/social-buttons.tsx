@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
+const frontendURL = process.env.NEXT_PUBLIC_FRONTEND_URL ?? "http://localhost:5000"
+
 const providers = [
   {
     id: "google" as const,
@@ -43,10 +45,15 @@ type SocialButtonsProps = {
 export function SocialButtons({ callbackURL = "/dashboard", className, variant = "default" }: SocialButtonsProps) {
   const [loading, setLoading] = useState<"github" | "google" | null>(null)
 
+  const absoluteCallbackURL = callbackURL.startsWith("http") ? callbackURL : `${frontendURL}${callbackURL}`
+
   const handleProviderSignIn = async (provider: "github" | "google") => {
     setLoading(provider)
     try {
-      const { error } = await authClient.signIn.social({ provider, callbackURL })
+      const { error } = await authClient.signIn.social({ 
+        provider, 
+        callbackURL: absoluteCallbackURL 
+      })
       if (error)
         toast.error(error.message ?? `Unable to connect with ${provider}`)
     }
@@ -70,7 +77,7 @@ export function SocialButtons({ callbackURL = "/dashboard", className, variant =
             className={cn(
               "relative w-full h-14 justify-start gap-4 px-5 transition-all duration-300",
               "border-2 border-border/50 hover:border-primary/40",
-              "bg-gradient-to-r from-transparent to-transparent",
+              "bg-linear-to-r from-transparent to-transparent",
               provider.hoverBg,
               "group overflow-hidden"
             )}
@@ -78,7 +85,7 @@ export function SocialButtons({ callbackURL = "/dashboard", className, variant =
             disabled={loading === provider.id}
           >
             <div className={cn(
-              "absolute left-0 top-0 h-full w-1 bg-gradient-to-b opacity-0 group-hover:opacity-100 transition-opacity",
+              "absolute left-0 top-0 h-full w-1 bg-linear-to-b opacity-0 group-hover:opacity-100 transition-opacity",
               provider.gradient
             )} />
             <div className="flex size-10 items-center justify-center rounded-xl bg-muted/50 group-hover:bg-muted transition-colors">
