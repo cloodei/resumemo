@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, inet } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -27,7 +27,7 @@ export const session = pgTable("session", {
     .references(() => user.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   token: varchar("token", { length: 512 }).notNull().unique(),
-  ipAddress: inet("ip_address"),
+  ipAddress: varchar("ip_address", { length: 64 }),
   userAgent: varchar("user_agent", { length: 512 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
