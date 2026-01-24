@@ -1,16 +1,12 @@
 "use client";
 
+import { ThemeProvider } from "next-themes"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { ThemeProvider as NextThemeProvider } from "next-themes"
 
-import { Toaster } from "@/components/ui/sonner"
-import { AuthProvider } from "@/components/auth-provider"
+import { Toaster } from "./ui/sonner"
+import { AuthProvider } from "./auth-provider"
 
 const queryClient = new QueryClient()
-
-export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemeProvider>) {
-  return <NextThemeProvider {...props}>{children}</NextThemeProvider>
-}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

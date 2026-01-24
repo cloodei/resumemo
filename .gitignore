@@ -10,6 +10,7 @@ node_modules
 .idea
 .agent
 .kombai
+.opencode
 
 # Build outputs
 dist

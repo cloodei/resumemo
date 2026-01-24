@@ -3,25 +3,35 @@
 import { createContext, useContext, useState } from "react"
 import { authClient, useSession } from "@/lib/auth"
 
+// type User = {
+//   id: string
+//   name: string | null
+//   email: string
+//   emailVerified: boolean
+//   image: string | null
+//   createdAt: Date
+//   updatedAt: Date
+// }
+
 type User = {
-  id: string
-  name: string | null
-  email: string
-  emailVerified: boolean
-  image: string | null
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: string | null | undefined;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 type Session = {
-  id: string
-  userId: string
-  expiresAt: Date
-  token: string
-  createdAt: Date
-  updatedAt: Date
-  ipAddress: string | null
-  userAgent: string | null
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  expiresAt: Date;
+  token: string;
+  ipAddress?: string | null | undefined;
+  userAgent?: string | null | undefined;
 }
 
 type AuthContextType = {
@@ -60,7 +70,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsSigningOut(true)
     try {
       await authClient.signOut()
-    } finally {
+    }
+    catch (error) {
+      console.error(error)
+    }
+    finally {
       setIsSigningOut(false)
     }
   }
@@ -72,8 +86,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   return (
     <AuthContext.Provider
       value={{
-        user: user as User | null,
-        session: session as Session | null,
+        user,
+        session,
         isLoading,
         isAuthenticated,
         signOut: handleSignOut,
