@@ -6,8 +6,8 @@ import * as schema from "./schema";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:8080",
-  basePath: "/api/auth",
+  // baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:8080",
+  // basePath: "/api/auth",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema
@@ -16,13 +16,13 @@ export const auth = betterAuth({
     database: {
       generateId: "uuid"
     },
-    crossSubDomainCookies: {
-      enabled: true
-    },
-    defaultCookieAttributes: {
-      sameSite: "none",
-      secure: process.env.NODE_ENV === "production"
-    }
+    // crossSubDomainCookies: {
+    //   enabled: true
+    // },
+    // defaultCookieAttributes: {
+    //   sameSite: "none",
+    //   secure: process.env.NODE_ENV === "production"
+    // }
   },
   trustedOrigins: [process.env.FRONTEND_URL ?? "http://localhost:5000"],
   emailAndPassword: {

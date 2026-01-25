@@ -1,6 +1,7 @@
 import cors from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { openapi } from "@elysiajs/openapi";
+import { logger } from "@rasla/logify";
 
 import { db } from "./lib/db";
 import { auth } from "./lib/auth";
@@ -34,6 +35,7 @@ const app = new Elysia({ precompile: true })
       allowedHeaders: ["Content-Type", "Authorization"],
     }),
   )
+  .use(logger())
   .use(openapi())
   .use(betterAuth)
   .get("/", () => ({ status: "ok" }))

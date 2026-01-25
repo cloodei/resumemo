@@ -9,8 +9,12 @@ node_modules
 .vscode
 .idea
 .agent
+.agents
 .kombai
 .opencode
+.gemini
+.cursor
+.claude
 
 # Build outputs
 dist

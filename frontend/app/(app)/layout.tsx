@@ -10,9 +10,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login")
-    }
+    if (!isLoading && !isAuthenticated)
+      router.replace("/login")
   }, [isLoading, isAuthenticated, router])
 
   if (isLoading) {
