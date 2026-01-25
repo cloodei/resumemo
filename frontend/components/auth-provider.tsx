@@ -58,7 +58,7 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { data: sessionData, isPending, error, refetch } = useSession()
+  const { data: sessionData, isPending, refetch } = useSession()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   const user = sessionData?.user ?? null

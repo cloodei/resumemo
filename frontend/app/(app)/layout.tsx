@@ -1,11 +1,42 @@
-import { AppHeader } from "@/components/app-header"
+"use client"
 
-export default function HomeLayout({ children }: { children: React.ReactNode }) {
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
+import { Sidebar } from "@/components/sidebar"
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isLoading, isAuthenticated, router])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
-    <div className="relative flex min-h-screen flex-col bg-linear-to-br from-background via-background to-muted">
-      <AppHeader />
-      <main className="mx-auto w-full xl:max-w-6xl 2xl:max-w-7xl flex-1 px-4 pb-12 pt-4">
-        {children}
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <main className="flex-1 overflow-auto">
+        <div className="mx-auto w-full max-w-6xl px-6 py-8">
+          {children}
+        </div>
       </main>
     </div>
   )
