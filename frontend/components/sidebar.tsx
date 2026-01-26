@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { usePathname } from "next/navigation"
 import {
   ChevronUp,
   LayoutDashboard,
@@ -17,6 +16,7 @@ import {
   Bell,
 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { SignOutDialog } from "./signout-dialog"
 import { Logo } from "./tlg"
 import { ThemeToggler } from "./theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
@@ -59,20 +59,9 @@ const secondaryNavItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      toast.success("Signed out")
-      router.push("/login")
-    } catch {
-      toast.error("Unable to sign out")
-    }
-  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -192,13 +181,17 @@ export function AppSidebar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="mr-2 size-4" />
-                    Sign out
-                  </DropdownMenuItem>
+                  <SignOutDialog
+                    trigger={
+                      <DropdownMenuItem
+                        className="cursor-pointer text-destructive focus:text-destructive"
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        <LogOut className="mr-2 size-4" />
+                        Sign out
+                      </DropdownMenuItem>
+                    }
+                  />
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>

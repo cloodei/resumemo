@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { toast } from "sonner"
-import { Menu, Github, LogOut, User, ChevronDown } from "lucide-react"
+import { Menu, Github, User, ChevronDown, Bell, HelpCircle, Settings, LogOut } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { cn } from "@/lib/utils"
@@ -11,6 +10,7 @@ import { Button } from "./ui/button"
 import { ThemeToggler } from "./theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { useAuth } from "@/components/auth-provider"
+import { SignOutDialog } from "@/components/signout-dialog"
 import { Skeleton } from "./ui/skeleton"
 import {
   DropdownMenu,
@@ -40,20 +40,10 @@ function getProviderInfo(accounts: { providerId: string }[] | undefined) {
 export function AppHeader() {
 	const pathname = usePathname()
 	const router = useRouter()
-	const { user, isLoading, signOut } = useAuth()
-
-	const handleSignOut = async () => {
-		try {
-			await signOut()
-			toast.success("Signed out")
-			router.push("/login")
-		} catch {
-			toast.error("Unable to sign out")
-		}
-	}
+	const { user, isLoading } = useAuth()
 
 	return (
-		<header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-sm">
+		<header className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur-sm">
 			<div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
 				<Link href="/" className="flex shrink-0 items-center gap-3">
 					<Logo className="size-9 rounded-xl" backgroundClassName="fill-transparent dark:fill-[#140005]" />
@@ -83,13 +73,22 @@ export function AppHeader() {
 					})}
 				</nav>
 
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-1.5">
 					<Button
 						size="icon"
 						variant="ghost"
 						className="md:hidden"
 					>
 						<Menu className="size-5" />
+					</Button>
+					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
+						<Bell className="size-4" />
+					</Button>
+					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
+						<HelpCircle className="size-4" />
+					</Button>
+					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
+						<Settings className="size-4" />
 					</Button>
 					<ThemeToggler />
 					{isLoading ? (
@@ -105,7 +104,7 @@ export function AppHeader() {
 							<DropdownMenuTrigger asChild>
 								<Button variant="ghost" className="flex items-center gap-2 px-2 h-10">
 									<Avatar className="size-8 border border-border">
-                    <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
+										<AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
 										<AvatarFallback className="text-xs bg-primary/10 text-primary">
 											{user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
 										</AvatarFallback>
@@ -138,15 +137,29 @@ export function AppHeader() {
 									<span>Profile settings</span>
 								</DropdownMenuItem>
 
+								<DropdownMenuItem className="gap-2">
+									<Settings className="size-4" />
+									<span>Workspace settings</span>
+								</DropdownMenuItem>
+
+								<DropdownMenuItem className="gap-2">
+									<HelpCircle className="size-4" />
+									<span>Help & support</span>
+								</DropdownMenuItem>
+
 								<DropdownMenuSeparator />
 
-								<DropdownMenuItem 
-									className="gap-2.5 text-destructive focus:text-destructive"
-									onClick={handleSignOut}
-								>
-									<LogOut className="size-4" />
-									<span>Sign out</span>
-								</DropdownMenuItem>
+								<SignOutDialog
+									trigger={
+										<DropdownMenuItem
+											className="gap-2.5 text-destructive focus:text-destructive"
+											onSelect={(event) => event.preventDefault()}
+										>
+											<LogOut className="size-4" />
+											<span>Sign out</span>
+										</DropdownMenuItem>
+									}
+								/>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					) : (
