@@ -33,8 +33,7 @@ export default function LoginPage() {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Prominent social buttons first */}
-            <SocialButtons variant="prominent" />
+            <SocialButtons />
 
             {/* Divider */}
             <div className="relative">
