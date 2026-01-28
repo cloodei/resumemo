@@ -27,7 +27,7 @@
         "./*"
       ],
       "~/*": [
-        "../backend/src/*"
+        "../api/src/*"
       ],
       "@shared": [
         "../packages/shared/src"

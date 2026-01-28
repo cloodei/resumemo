@@ -3,7 +3,7 @@
 **Resumemo** (Resume Ranker) is a monorepo application with:
 - **Runtime**: Bun 1.3.6
 - **Build System**: Turborepo
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS v4
+- **Frontend**: Vite + React 19, Tailwind CSS v4
 - **Backend**: Elysia (Bun web framework)
 - **Database**: PostgreSQL with Drizzle ORM
 - **Auth**: Better Auth (email/password + Google/GitHub OAuth)
@@ -12,12 +12,12 @@
 
 ```
 resumemo/
-├── frontend/          # Next.js 16 app (port 5000)
-│   ├── app/           # App Router pages
-│   ├── components/    # React components (ui/ for shadcn-style)
-│   ├── hooks/         # Custom React hooks
-│   └── lib/           # Utilities, auth client
-├── backend/           # Elysia API server (port 8080)
+├── web/               # Vite React app (port 5000)
+│   ├── src/pages/     # Route pages
+│   ├── src/components/# React components (ui/ for shadcn-style)
+│   ├── src/hooks/     # Custom React hooks
+│   └── src/lib/       # Utilities, auth client
+├── api/               # Elysia API server (port 8080)
 │   └── src/
 │       ├── index.ts   # Main entry point
 │       └── lib/       # DB, auth, schema
@@ -32,24 +32,23 @@ resumemo/
 bun run dev              # Start all workspaces in dev mode
 bun run build            # Build all packages
 bun run lint             # Lint all packages
-bun run start            # Start frontend + backend (production)
-bun run frontend         # Dev mode frontend only
-bun run backend          # Dev mode backend only
+bun run start            # Start web + api (production)
+bun run web              # Dev mode web only
+bun run api              # Dev mode api only
 bun run clean            # Clean all build artifacts and node_modules
 ```
 
-### Frontend Commands
+### Web Commands
 ```bash
-cd frontend
+cd web
 bun run dev              # Start dev server (port 5000)
 bun run build            # Production build
-bun run lint             # Run Biome linter
-bun run format           # Format code with Biome
+bun run lint             # Run ESLint
 ```
 
-### Backend Commands
+### API Commands
 ```bash
-cd backend
+cd api
 bun run dev              # Watch mode development (port 8080)
 bun run build            # Compile to standalone binary
 bun run push             # Push Drizzle schema to database
@@ -67,7 +66,7 @@ No testing framework is currently configured. When adding tests:
 ### Formatting (Biome)
 - **Indentation**: Tabs (width: 2)
 - **Organize imports**: Enabled (auto-sorted)
-- Run `bun run format` in frontend to format
+- Run `bun run lint` in web to lint
 
 ### TypeScript
 - Strict mode enabled across all packages
@@ -77,9 +76,9 @@ No testing framework is currently configured. When adding tests:
 
 ### Path Aliases
 ```typescript
-// Frontend
-import { cn } from "@/lib/utils"        // @/* -> frontend/*
-import { db } from "~/lib/db"           // ~/* -> backend/src/*
+// Web
+import { cn } from "@/lib/utils"        // @/* -> web/src/*
+import { db } from "~/lib/db"           // ~/* -> api/src/*
 import { userSchema } from "@shared/schemas"  // @shared/* -> packages/shared/src/*
 ```
 
@@ -184,16 +183,16 @@ const app = new Elysia()
 - React Hook Form for form state
 
 ## File Creation Guidelines
-- Place UI components in `frontend/components/ui/`
-- Place feature components in `frontend/components/`
-- Place hooks in `frontend/hooks/`, zustand stores in `frontend/stores/`
+- Place UI components in `web/src/components/ui/`
+- Place feature components in `web/src/components/`
+- Place hooks in `web/src/hooks/`, zustand stores in `web/src/stores/`
 - Place shared types/schemas in `packages/shared/src/`
-- Add new API routes in `backend/src/index.ts`
+- Add new API routes in `api/src/index.ts`
 
 ## Repository Layout (Target)
 ```
-frontend/                   # NextJS application
-backend/                    # ElysiaJS API server
+web/                        # Vite React application
+api/                        # ElysiaJS API server
 packages/shared/            # Types and validation schemas
 services/parser/            # NLP parsing pipeline (future)
 services/scorer/            # ML scoring pipeline (future)
