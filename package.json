@@ -16,6 +16,13 @@
     "lint": "turbo lint",
     "clean": "turbo clean && rimraf node_modules web/node_modules api/node_modules packages/*/node_modules"
   },
+  "overrides": {
+    "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.8"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1"
+  },
   "devDependencies": {
     "concurrently": "^9.2.1",
     "rimraf": "^6.1.2",
