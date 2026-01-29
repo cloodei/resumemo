@@ -1,3 +1,1 @@
-type User = Record<string, never>;
-
-export type { User };
+export * from "@shared/types/auth";

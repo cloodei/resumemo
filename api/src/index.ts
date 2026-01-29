@@ -5,7 +5,7 @@ import { logger } from "@rasla/logify";
 
 import { db } from "./lib/db";
 import { auth } from "./lib/auth";
-import * as schema from "./lib/schema";
+import * as schema from "@shared/schemas";
 
 const betterAuth = new Elysia({ name: "better-auth" })
   .mount(auth.handler)
@@ -47,6 +47,15 @@ const app = new Elysia({ precompile: true })
     }),
     { auth: true },
   )
+  .get("/api/test", async () => {
+    const [users, sessions, accounts, verifications] = await Promise.all([
+      db.select().from(schema.user),
+      db.select().from(schema.session),
+      db.select().from(schema.account),
+      db.select().from(schema.verification),
+    ]);
+    return { users, sessions, accounts, verifications };
+  })
   .get("/api/clear", async () => {
     /**
      * TODO: Remove this endpoint

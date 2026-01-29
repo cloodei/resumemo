@@ -1,5 +1,5 @@
 {
-  "name": "@resumemo/shared",
+  "name": "@shared",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -11,9 +11,12 @@
     "./types": "./src/types/index.ts"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.7",
+    "bun-types": "^1.3.8",
     "typescript": "^5.9.3"
   }
 }

@@ -14,9 +14,9 @@
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.14",
     "@rasla/logify": "^5.1.3",
-    "@resumemo/shared": "workspace:*",
-    "better-auth": "^1.4.17",
-    "drizzle-orm": "^0.44.7",
+    "@shared": "workspace:*",
+    "better-auth": "^1.4.18",
+    "drizzle-orm": "^0.45.1",
     "elysia": "^1.4.22",
     "postgres": "^3.4.8",
     "resend": "^6.9.1"

@@ -24,7 +24,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@resumemo/shared": "workspace:*",
+    "@shared": "workspace:*",
     "@tanstack/react-query": "^5.90.18",
     "@tanstack/react-table": "^8.21.3",
     "better-auth": "^1.4.14",
