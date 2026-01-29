@@ -226,7 +226,7 @@ Recruiter-facing resume screening platform with AI-assisted ranking, search, exp
 - Favor modular, versioned services over monolith-only deployments.
 
 ## System Components
-**Frontend (NextJS)**
+**Frontend (ReactJS)**
 - Recruiter UI for upload, search, scoring, and exports.
 - Admin UI for roles, permissions, and configuration.
 - Dashboard UI for pipeline metrics and historical review.
