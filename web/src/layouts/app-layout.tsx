@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect } from "react"
 import { Bell, ChevronDown, HelpCircle, Settings } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"

@@ -24,27 +24,30 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Github, Mail, Sparkles, Clock, Briefcase, FileText } from "lucide-react"
 
-const recentJobs = [
+const recentSessions = [
   {
-    id: "JOB-2409",
-    role: "Senior Frontend Engineer",
-    createdAt: "Sep 12, 2025",
+    id: "prof-2f8a9c1d",
+    name: "Senior Frontend Engineer - Q1 2026",
+    jobTitle: "Senior Frontend Engineer",
+    createdAt: "Jan 28, 2026",
     resumes: 48,
-    status: "Completed",
+    status: "completed",
   },
   {
-    id: "JOB-2408",
-    role: "Product Designer",
-    createdAt: "Sep 10, 2025",
+    id: "prof-9e3b7a2f",
+    name: "Product Design Lead",
+    jobTitle: "Product Designer",
+    createdAt: "Jan 25, 2026",
     resumes: 32,
-    status: "Processing",
+    status: "profiling",
   },
   {
-    id: "JOB-2407",
-    role: "AI Research Scientist",
-    createdAt: "Sep 08, 2025",
+    id: "prof-1c5d8e4b",
+    name: "AI Research Team",
+    jobTitle: "AI Research Scientist",
+    createdAt: "Jan 22, 2026",
     resumes: 64,
-    status: "Completed",
+    status: "completed",
   },
 ]
 
@@ -74,27 +77,27 @@ export default function Page() {
 
   const metrics = [
     {
-      label: "Active Jobs",
+      label: "Active Sessions",
       value: "12",
       change: "+3.8% vs last week",
       icon: Briefcase,
     },
     {
-      label: "Resumes Processed",
+      label: "Resumes Uploaded",
       value: "6,284",
       change: "+18.2%",
       icon: FileText,
     },
     {
-      label: "Avg. Turnaround",
+      label: "Avg. Profiling Time",
       value: "4m 12s",
       change: "-1m 05s",
       icon: Clock,
     },
     {
-      label: "Top JD Template",
-      value: "Full-Stack SWE",
-      change: "Using default scoring model",
+      label: "AI Model",
+      value: "Default v2.1",
+      change: "Optimized for tech roles",
       icon: Sparkles,
     },
   ]
@@ -196,23 +199,23 @@ export default function Page() {
           <Card className="h-full border-none shadow-md">
             <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/30 pb-4">
               <div>
-                <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Recent ranking jobs</CardTitle>
-                <CardDescription className="text-sm mt-1">Track status and jump back into jobs that need attention.</CardDescription>
+                <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Recent Profiling Sessions</CardTitle>
+                <CardDescription className="text-sm mt-1">Track AI analysis status and manage your resume profiling sessions.</CardDescription>
               </div>
               <Button
                 asChild
                 size="sm"
                 className="relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_1px_2px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_4px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.15)] dark:hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.3),0_3px_6px_rgba(0,0,0,0.4)] transition-all before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-linear-to-b before:from-primary/5 before:to-primary/10 before:opacity-80 before:transition-opacity before:duration-300"
               >
-                <Link to="/jobs/new">New job</Link>
+                <Link to="/uploads">Upload Resumes</Link>
               </Button>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Job ID</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Job Title</TableHead>
                     <TableHead className="hidden sm:table-cell">Created</TableHead>
                     <TableHead className="hidden md:table-cell">Resumes</TableHead>
                     <TableHead>Status</TableHead>
@@ -220,38 +223,38 @@ export default function Page() {
                 </TableHeader>
 
                 <TableBody>
-                  {recentJobs.map((job) => (
+                  {recentSessions.map((session) => (
                     <TableRow 
-                      key={job.id} 
+                      key={session.id} 
                       className="group cursor-pointer transition-all hover:bg-muted/50 dark:hover:bg-muted/20"
                     >
                       <TableCell className="font-semibold text-foreground">
                           <Link
-                            to={`/jobs/${job.id}`}
+                            to={`/profiling/${session.id}`}
                             className="hover:text-primary transition-colors hover:underline underline-offset-4 decoration-primary/30"
                           >
-                           {job.id}
+                           {session.id.slice(0, 12)}...
                           </Link>
                       </TableCell>
-                      <TableCell className="font-medium group-hover:text-foreground transition-colors">{job.role}</TableCell>
+                      <TableCell className="font-medium group-hover:text-foreground transition-colors">{session.jobTitle}</TableCell>
                       <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                        {job.createdAt}
+                        {session.createdAt}
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground">
-                        {job.resumes}
+                        {session.resumes}
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={job.status === "Completed" ? "secondary" : "outline"}
-                          className="shadow-sm"
+                          variant={session.status === "completed" ? "secondary" : session.status === "profiling" ? "default" : "outline"}
+                          className="shadow-sm capitalize"
                         >
-                          {job.status}
+                          {session.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-                <TableCaption>Résumé processing updates refresh every 30 seconds.</TableCaption>
+                <TableCaption>Profiling session updates refresh every 30 seconds.</TableCaption>
               </Table>
             </CardContent>
           </Card>
