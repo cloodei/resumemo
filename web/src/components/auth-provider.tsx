@@ -1,18 +1,5 @@
-"use client"
-/* eslint-disable react-refresh/only-export-components */
-
 import { createContext, useContext, useState } from "react"
 import { authClient, useSession } from "@/lib/auth"
-
-// type User = {
-//   id: string
-//   name: string | null
-//   email: string
-//   emailVerified: boolean
-//   image: string | null
-//   createdAt: Date
-//   updatedAt: Date
-// }
 
 type User = {
   id: string;

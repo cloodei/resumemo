@@ -1,20 +1,10 @@
-import type { ReactNode } from "react"
-
-import AppLayout from "@/layouts/app-layout"
 import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
 import NewJobPage from "@/pages/jobs/new-job"
 import JobResultsPage from "@/pages/jobs/job-results"
 
-export type RouteDefinition = {
-  path: string
-  title: string
-  element: ReactNode
-  layout?: "app" | "none"
-}
-
-export const ROUTES: RouteDefinition[] = [
+export const ROUTES = [
   {
     path: "/",
     title: "Résumé Ranker",
@@ -51,6 +41,4 @@ export const ROUTES: RouteDefinition[] = [
     element: <DashboardPage />,
     layout: "app",
   },
-]
-
-export { AppLayout }
+] as const

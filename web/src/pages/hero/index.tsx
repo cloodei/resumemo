@@ -1,5 +1,3 @@
-"use client";
-
 import { HeroCurrent } from "./hero-current";
 import { HeroEditorial } from "./hero-editorial";
 import { HeroNeon } from "./hero-neon";

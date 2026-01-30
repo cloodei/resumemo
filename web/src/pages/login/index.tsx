@@ -3,11 +3,11 @@ import { Link } from "react-router-dom"
 import { Logo } from "@/components/tlg"
 import { SignInForm } from "./signin"
 import { SignUpForm } from "./signup"
-import { ThemeToggler } from "@/components/theme-toggle"
+import { LoginGuard } from "./login-guard"
 import { SocialButtons } from "./social-buttons"
+import { ThemeToggler } from "@/components/theme-toggle"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoginGuard } from "./login-guard"
 
 export default function LoginPage() {
   return (

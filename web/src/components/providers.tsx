@@ -1,5 +1,3 @@
-"use client";
-
 import { ThemeProvider } from "next-themes"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
@@ -20,6 +18,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AuthProvider>
           {children}
         </AuthProvider>
+
         <Toaster richColors position="top-center" closeButton />
       </ThemeProvider>
     </QueryClientProvider>

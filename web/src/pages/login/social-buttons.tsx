@@ -1,5 +1,3 @@
-"use client";
-
 import { toast } from "sonner"
 import { Github, Sparkles } from "lucide-react"
 import { useState } from "react"

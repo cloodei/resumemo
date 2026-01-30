@@ -1,5 +1,3 @@
-"use client";
-
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowRight, BadgeCheck, BookOpen, Layers, Sparkles } from "lucide-react";
