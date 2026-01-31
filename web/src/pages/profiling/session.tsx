@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { motion } from "motion/react"
@@ -434,11 +432,17 @@ export default function ProfilingResultsPage() {
                               Candidate {index + 1}
                             </span>
                           </div>
-                          {file.parsedCandidateData?.name && (
+
+                          {/*
+                            COME BACK TO THIS ONE
+                          */}
+                          {file.parsedCandidateData?.name ? (
                             <p className="text-xs text-muted-foreground">
-                              {file.parsedCandidateData.name}
+                              {"" + file.parsedCandidateData.name}
                             </p>
-                          )}
+                          ) : null}
+
+
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">

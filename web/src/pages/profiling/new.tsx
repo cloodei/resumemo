@@ -1,8 +1,7 @@
-"use client"
-
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "motion/react"
+import { toast } from "sonner"
 import {
   ArrowRight,
   CheckCircle2,
@@ -21,7 +20,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { toast } from "sonner"
 
 type UploadedFile = {
   id: string
@@ -51,16 +49,18 @@ export default function NewProfilingPage() {
         credentials: "include",
       })
       
-      if (!response.ok) throw new Error("Failed to fetch files")
+      if (!response.ok)
+        throw new Error("Failed to fetch files")
       
       const data = await response.json()
-      // Only show uploaded files
       const uploadedFiles = data.files.filter((f: UploadedFile) => f.status === "uploaded")
       setFiles(uploadedFiles)
-    } catch (error) {
+    }
+    catch (error) {
       toast.error("Failed to load uploaded files")
       console.error(error)
-    } finally {
+    }
+    finally {
       setIsFetching(false)
     }
   }
@@ -68,26 +68,28 @@ export default function NewProfilingPage() {
   const toggleFile = (fileId: string) => {
     setSelectedFiles(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(fileId)) {
+      if (newSet.has(fileId))
         newSet.delete(fileId)
-      } else {
+      else
         newSet.add(fileId)
-      }
+
       return newSet
     })
   }
 
   const toggleAll = () => {
-    if (selectedFiles.size === files.length) {
+    if (selectedFiles.size === files.length)
       setSelectedFiles(new Set())
-    } else {
+    else
       setSelectedFiles(new Set(files.map(f => f.id)))
-    }
   }
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024)
+      return `${bytes} B`
+    if (bytes < 1024 * 1024)
+      return `${(bytes / 1024).toFixed(1)} KB`
+
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
@@ -95,11 +97,11 @@ export default function NewProfilingPage() {
 
   const handleSubmit = async () => {
     if (!canSubmit) {
-      if (selectedFiles.size === 0) {
+      if (selectedFiles.size === 0)
         toast.error("Select at least one resume file")
-      } else {
+      else
         toast.error("Job description must be at least 50 characters")
-      }
+
       return
     }
 
@@ -124,15 +126,15 @@ export default function NewProfilingPage() {
       }
 
       const data = await response.json()
-      
       toast.success("Profiling session created!")
-      
-      // Navigate to the session page
+
       navigate(`/profiling/${data.session.id}`)
-    } catch (error) {
+    }
+    catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create session"
       toast.error(message)
-    } finally {
+    }
+    finally {
       setIsLoading(false)
     }
   }
@@ -242,7 +244,7 @@ export default function NewProfilingPage() {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4"
             >
-              <AlertCircle className="size-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="size-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-amber-700">Before you can start profiling:</p>
                 <ul className="mt-1 space-y-1 text-amber-600">
@@ -260,7 +262,7 @@ export default function NewProfilingPage() {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4"
             >
-              <CheckCircle2 className="size-5 text-emerald-500 flex-shrink-0" />
+              <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
               <div className="text-sm">
                 <p className="font-medium text-emerald-700">Ready to profile!</p>
                 <p className="text-emerald-600">
@@ -273,7 +275,7 @@ export default function NewProfilingPage() {
 
         {/* File Selection Section */}
         <Card className="h-full flex flex-col shadow-x border-none">
-          <CardHeader className="flex-shrink-0 border-b border-border/50 pb-4">
+          <CardHeader className="shrink-0 border-b border-border/50 pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
@@ -339,7 +341,7 @@ export default function NewProfilingPage() {
                       onCheckedChange={() => toggleFile(file.id)}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <div className="flex-shrink-0 size-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                    <div className="shrink-0 size-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
                       <FileText className="size-4 text-sky-500" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -351,7 +353,7 @@ export default function NewProfilingPage() {
                       </p>
                     </div>
                     {selectedFiles.has(file.id) && (
-                      <CheckCircle2 className="size-4 text-primary flex-shrink-0" />
+                      <CheckCircle2 className="size-4 text-primary shrink-0" />
                     )}
                   </motion.div>
                 ))}
@@ -359,7 +361,7 @@ export default function NewProfilingPage() {
             )}
           </CardContent>
           
-          <CardFooter className="flex-shrink-0 flex-col gap-3 border-t bg-muted/20 py-4">
+          <CardFooter className="shrink-0 flex-col gap-3 border-t bg-muted/20 py-4">
             <div className="flex w-full items-center justify-between text-xs text-muted-foreground">
               <span>Selection</span>
               <span className="font-medium text-foreground">

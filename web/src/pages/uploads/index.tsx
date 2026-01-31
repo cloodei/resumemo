@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { baseURL } from "@/lib/utils"
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -131,7 +132,7 @@ export default function UploadPage() {
     
     try {
       // Request presigned URLs from API
-      const response = await fetch("/api/uploads/request", {
+      const response = await fetch(`${baseURL}/api/uploads/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -170,7 +171,7 @@ export default function UploadPage() {
           
           try {
             // Update API that upload started
-            await fetch(`/api/uploads/${upload.id}/start`, {
+            await fetch(`${baseURL}/api/uploads/${upload.id}/start`, {
               method: "PATCH",
               credentials: "include",
             })
@@ -201,7 +202,8 @@ export default function UploadPage() {
               xhr.addEventListener("load", () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                   resolve()
-                } else {
+                }
+                else {
                   reject(new Error(`Upload failed: ${xhr.statusText}`))
                 }
               })
@@ -214,7 +216,7 @@ export default function UploadPage() {
             })
 
             // Mark as completed
-            await fetch(`/api/uploads/${upload.id}/complete`, {
+            await fetch(`${baseURL}/api/uploads/${upload.id}/complete`, {
               method: "PATCH",
               credentials: "include",
             })
@@ -222,10 +224,11 @@ export default function UploadPage() {
             setFiles(prev => prev.map(f => 
               f.originalName === upload.originalName ? { ...f, status: "uploaded", progress: 100 } : f
             ))
-          } catch (error) {
+          }
+          catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Upload failed"
             
-            await fetch(`/api/uploads/${upload.id}/fail`, {
+            await fetch(`${baseURL}/api/uploads/${upload.id}/fail`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
@@ -242,10 +245,12 @@ export default function UploadPage() {
       )
       
       toast.success("Upload batch completed!")
-    } catch (error) {
+    }
+    catch (error) {
       toast.error("Failed to start upload batch")
       console.error(error)
-    } finally {
+    }
+    finally {
       setIsUploading(false)
     }
   }
@@ -441,7 +446,7 @@ export default function UploadPage() {
 
         {/* File Queue */}
         <Card className="h-full max-h-[600px] flex flex-col shadow-x border-none">
-          <CardHeader className="flex-shrink-0 flex-row items-start justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
+          <CardHeader className="shrink-0 flex-row items-start justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
             <div>
               <CardTitle className="text-lg font-semibold">Upload Queue</CardTitle>
               <CardDescription className="text-sm mt-1">
@@ -480,7 +485,7 @@ export default function UploadPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex-shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <div className="shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center">
                           <FileText className="size-5 text-primary" />
                         </div>
                         <div className="min-w-0">
@@ -493,7 +498,7 @@ export default function UploadPage() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         {file.status === "uploaded" && (
                           <CheckCircle2 className="size-4 text-emerald-500" />
                         )}
@@ -537,7 +542,7 @@ export default function UploadPage() {
           </CardContent>
           
           {files.length > 0 && (
-            <CardFooter className="flex-shrink-0 flex-col gap-3 border-t bg-muted/20 py-4">
+            <CardFooter className="shrink-0 flex-col gap-3 border-t bg-muted/20 py-4">
               <div className="flex w-full items-center justify-between text-xs text-muted-foreground">
                 <span>Progress</span>
                 <span className="font-medium text-foreground">

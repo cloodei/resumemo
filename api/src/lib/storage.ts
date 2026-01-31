@@ -24,7 +24,7 @@ const r2Client = new S3Client({
  * Generate a unique storage key for a file
  * Format: userId/uuid-filename
  */
-export function generateStorageKey(userId: string, originalName: string): string {
+export function generateStorageKey(userId: string, originalName: string) {
 	const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_").toLowerCase();
 	const uniqueId = randomUUIDv7();
 	return `${userId}/${uniqueId}-${safeName}`;
@@ -33,34 +33,32 @@ export function generateStorageKey(userId: string, originalName: string): string
 /**
  * Generate a presigned URL for direct upload to R2
  */
-export async function generateUploadUrl(storageKey: string, contentType: string): Promise<string> {
+export function generateUploadUrl(storageKey: string, contentType: string) {
 	const command = new PutObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
 		ContentType: contentType,
 	});
 
-	// URL valid for 15 minutes
 	return getSignedUrl(r2Client, command, { expiresIn: 900 });
 }
 
 /**
  * Generate a presigned URL for downloading a file
  */
-export async function generateDownloadUrl(storageKey: string): Promise<string> {
+export function generateDownloadUrl(storageKey: string) {
 	const command = new GetObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
 	});
 
-	// URL valid for 1 hour
-	return getSignedUrl(r2Client, command, { expiresIn: 3600 });
+	return getSignedUrl(r2Client, command, { expiresIn: 1800 });
 }
 
 /**
  * Delete a file from R2
  */
-export async function deleteFile(storageKey: string): Promise<void> {
+export async function deleteFile(storageKey: string) {
 	const command = new DeleteObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
