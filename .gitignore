@@ -6,11 +6,9 @@ node_modules
 
 # IDE
 .windsurf
-.vscode
 .idea
 .agent
 .agents
-.kombai
 .opencode
 .gemini
 .cursor
@@ -18,7 +16,6 @@ node_modules
 
 # Build outputs
 dist
-.next
 .turbo
 main
 
