@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import { baseURL } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -132,22 +132,17 @@ export default function UploadPage() {
     
     try {
       // Request presigned URLs from API
-      const response = await fetch(`${baseURL}/api/uploads/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          files: pendingFiles.map(f => ({
-            name: f.originalName,
-            size: f.size,
-            mimeType: f.mimeType,
-          })),
-        }),
+      const { data, error } = await api.api.uploads.request.post({
+        files: pendingFiles.map(f => ({
+          name: f.originalName,
+          size: f.size,
+          mimeType: f.mimeType,
+        })),
       })
       
-      if (!response.ok) throw new Error("Failed to get upload URLs")
+      if (error || !data) throw new Error("Failed to get upload URLs")
       
-      const { uploads } = await response.json()
+      const { uploads } = data
       
       // Update files with upload URLs and IDs
       setFiles(prev => prev.map(f => {
@@ -171,10 +166,7 @@ export default function UploadPage() {
           
           try {
             // Update API that upload started
-            await fetch(`${baseURL}/api/uploads/${upload.id}/start`, {
-              method: "PATCH",
-              credentials: "include",
-            })
+            await api.api.uploads({ id: upload.id }).start.patch()
 
             // Upload to R2 via presigned URL
             const xhr = new XMLHttpRequest()
@@ -189,12 +181,7 @@ export default function UploadPage() {
                   
                   // Update progress periodically
                   if (progress % 10 === 0) {
-                    fetch(`/api/uploads/${upload.id}/progress`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({ progress }),
-                    }).catch(console.error)
+                    api.api.uploads({ id: upload.id }).progress.patch({ progress }).catch(console.error)
                   }
                 }
               })
@@ -216,10 +203,7 @@ export default function UploadPage() {
             })
 
             // Mark as completed
-            await fetch(`${baseURL}/api/uploads/${upload.id}/complete`, {
-              method: "PATCH",
-              credentials: "include",
-            })
+            await api.api.uploads({ id: upload.id }).complete.patch()
             
             setFiles(prev => prev.map(f => 
               f.originalName === upload.originalName ? { ...f, status: "uploaded", progress: 100 } : f
@@ -228,12 +212,7 @@ export default function UploadPage() {
           catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Upload failed"
             
-            await fetch(`${baseURL}/api/uploads/${upload.id}/fail`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ error: errorMessage }),
-            })
+            await api.api.uploads({ id: upload.id }).fail.patch({ error: errorMessage })
             
             setFiles(prev => prev.map(f => 
               f.originalName === upload.originalName ? { ...f, status: "error", errorMessage } : f

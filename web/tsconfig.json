@@ -8,7 +8,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../packages/shared/src/*"]
+      "@shared/*": ["../packages/shared/src/*"],
+      "@api": ["../api/src/index.ts"]
     }
   }
 }

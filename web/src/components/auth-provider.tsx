@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { authClient, useSession } from "@/lib/auth"
 
 type User = {
@@ -70,6 +70,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const handleRefetch = async () => {
     await refetch()
   }
+
+  // Re-validate session when tab gains focus (catches expired sessions after inactivity)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refetch()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [])
 
   return (
     <AuthContext.Provider

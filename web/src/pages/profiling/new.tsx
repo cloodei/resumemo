@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { api } from "@/lib/api"
 
 type UploadedFile = {
   id: string
@@ -45,16 +46,13 @@ export default function NewProfilingPage() {
 
   const fetchFiles = async () => {
     try {
-      const response = await fetch("/api/uploads", {
-        credentials: "include",
-      })
+      const { data, error } = await api.api.uploads.get()
       
-      if (!response.ok)
+      if (error || !data)
         throw new Error("Failed to fetch files")
       
-      const data = await response.json()
-      const uploadedFiles = data.files.filter((f: UploadedFile) => f.status === "uploaded")
-      setFiles(uploadedFiles)
+      const uploadedFiles = data.files.filter((f) => f.status === "uploaded")
+      setFiles(uploadedFiles as UploadedFile[])
     }
     catch (error) {
       toast.error("Failed to load uploaded files")
@@ -108,26 +106,19 @@ export default function NewProfilingPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/profiling", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: sessionName || undefined,
-          jobTitle: jobTitle || undefined,
-          jobDescription: jobDescription.trim(),
-          fileIds: Array.from(selectedFiles),
-        }),
+      const { data, error } = await api.api.profiling.post({
+        name: sessionName || undefined,
+        jobTitle: jobTitle || undefined,
+        jobDescription: jobDescription.trim(),
+        fileIds: Array.from(selectedFiles),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to create profiling session")
+      if (error || !data || !data.session) {
+        const errorData = error as { message?: string } | undefined
+        throw new Error(errorData?.message || "Failed to create profiling session")
       }
 
-      const data = await response.json()
       toast.success("Profiling session created!")
-
       navigate(`/profiling/${data.session.id}`)
     }
     catch (error) {

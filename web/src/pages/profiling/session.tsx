@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 type ProfilingSession = {
   id: string
@@ -33,9 +34,9 @@ type ProfilingSession = {
   processedFiles: number
   summary: unknown
   errorMessage: string | null
-  createdAt: string
-  startedAt: string | null
-  completedAt: string | null
+  createdAt: Date
+  startedAt: Date | null
+  completedAt: Date | null
 }
 
 type SessionFile = {
@@ -51,7 +52,7 @@ type SessionFile = {
 export default function ProfilingResultsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [session, setSession] = useState<ProfilingSession | null>(null)
+  const [session, setSession] = useState<ProfilingSession>()
   const [files, setFiles] = useState<SessionFile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isStarting, setIsStarting] = useState(false)
@@ -65,12 +66,10 @@ export default function ProfilingResultsPage() {
 
   const fetchSession = async () => {
     try {
-      const response = await fetch(`/api/profiling/${id}`, {
-        credentials: "include",
-      })
+      const { data, error } = await api.api.profiling({ id: id! }).get()
 
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (error || !data) {
+        if ('message' in (error || {}) && (error as { message?: string })?.message === "Session not found") {
           toast.error("Profiling session not found")
           navigate("/dashboard")
           return
@@ -78,13 +77,14 @@ export default function ProfilingResultsPage() {
         throw new Error("Failed to fetch session")
       }
 
-      const data = await response.json()
       setSession(data.session)
-      setFiles(data.files)
-    } catch (error) {
+      setFiles((data.files || []) as SessionFile[])
+    }
+    catch (error) {
       toast.error("Failed to load profiling session")
       console.error(error)
-    } finally {
+    }
+    finally {
       setIsLoading(false)
     }
   }
@@ -94,14 +94,11 @@ export default function ProfilingResultsPage() {
 
     setIsStarting(true)
     try {
-      const response = await fetch(`/api/profiling/${id}/start`, {
-        method: "POST",
-        credentials: "include",
-      })
+      const { data, error } = await api.api.profiling({ id }).start.post()
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to start profiling")
+      if (error || !data) {
+        const errorData = error as { message?: string } | undefined
+        throw new Error(errorData?.message || "Failed to start profiling")
       }
 
       toast.success("Profiling started!")

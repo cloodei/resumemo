@@ -30,6 +30,9 @@
       ],
       "@shared/*": [
         "../packages/shared/src/*"
+      ],
+      "@api": [
+        "../api/src/index.ts"
       ]
     }
   },
