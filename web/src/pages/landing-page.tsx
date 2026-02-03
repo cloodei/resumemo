@@ -15,8 +15,14 @@ import { AppFooter } from "@/components/app-footer";
 import { Button } from "@/components/ui/button";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0 },
+  hidden: {
+    opacity: 0,
+    y: 18
+  },
+  visible: {
+    opacity: 1,
+    y: 0
+  },
 };
 
 const stagger = {
@@ -26,8 +32,6 @@ const stagger = {
     transition: { staggerChildren: 0.12 },
   },
 };
-
-const CTA_POINTS = Array.from({ length: 10 });
 
 const HIGHLIGHTS = [
   {
@@ -57,8 +61,6 @@ const STATS = [
   { label: "Time saved", value: "68%" },
   { label: "Active studios", value: "320" },
 ];
-
-const SIGNALS = ["Live explainability", "Role memory", "ATS-ready exports"];
 
 const WORKFLOW = [
   {
@@ -140,11 +142,15 @@ export default function LandingPage() {
               </motion.p>
 
               <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
-                {SIGNALS.map((signal) => (
-                  <span key={signal} className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs text-white/70">
-                    {signal}
-                  </span>
-                ))}
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs text-white/70">
+                  Live explainability
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs text-white/70">
+                  Role memory
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs text-white/70">
+                  ATS-ready exports
+                </span>
               </motion.div>
 
               <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-4">
@@ -159,7 +165,7 @@ export default function LandingPage() {
                     <span className="relative z-10">Launch studio</span>
                     <ArrowRight className="relative z-10 size-4 transition-transform group-hover:translate-x-1" />
                     <span className="pointer-events-none absolute inset-0 z-0">
-                      {CTA_POINTS.map((_, index) => (
+                      {Array.from({ length: 10 }).map((_, index) => (
                         <span
                           key={`cta-point-${index}`}
                           className="absolute bottom-[-8px] h-1 w-1 rounded-full bg-white/80 opacity-0"
