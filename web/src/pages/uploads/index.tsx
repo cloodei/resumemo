@@ -1,5 +1,3 @@
-"use client"
-
 import { useCallback, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react"
