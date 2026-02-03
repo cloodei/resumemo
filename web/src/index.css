@@ -423,6 +423,20 @@ html {
   animation: fadein-blur 0.8s ease-out both;
 }
 
+@keyframes cta-float {
+  0% {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-36px);
+    opacity: 0;
+  }
+}
+
 @keyframes fadein-blur {
   from {
     opacity: 0;
