@@ -1,168 +1,142 @@
-"use client"
-
-import { Menu, User, ChevronDown, Bell, HelpCircle, Settings, LogOut } from "lucide-react"
-import { Link, useLocation, useNavigate } from "react-router-dom"
-
-import { cn } from "@/lib/utils"
-import { Logo } from "./tlg"
-import { Button } from "./ui/button"
-import { ThemeToggler } from "./theme-toggle"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { Bell, ChevronDown, HelpCircle, Settings } from "lucide-react"
+import { Link } from "react-router-dom"
 import { useAuth } from "@/components/auth-provider"
 import { SignOutDialog } from "@/components/signout-dialog"
-import { Skeleton } from "./ui/skeleton"
+import { ThemeToggler } from "@/components/theme-toggle"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu"
-import { Badge } from "./ui/badge"
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-const navItems = [
-	{ href: "/dashboard", label: "Dashboard" },
-	{ href: "/jobs/new", label: "New Job" },
-	{ href: "/jd-library", label: "JD Library" }
-]
+function HeaderActions() {
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" className="hidden md:inline-flex">
+            <Bell className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Notifications</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" className="hidden md:inline-flex">
+            <HelpCircle className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Help</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" className="hidden md:inline-flex">
+            <Settings className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
+      <ThemeToggler className="h-9 w-9" />
+    </>
+  )
+}
+
+function UserMenu() {
+  const { user } = useAuth()
+
+  if (!user) return null
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="flex h-10 items-center gap-2 px-2">
+          <Avatar className="size-8 border border-border">
+            <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
+            <AvatarFallback className="text-xs bg-primary/10 text-primary">
+              {user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-sm font-medium leading-none">
+              {user.name ?? "User"}
+            </span>
+            <span className="text-[11px] text-muted-foreground leading-tight">
+              {user.email}
+            </span>
+          </div>
+          <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 border border-border">
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-sm font-medium">{user.name ?? "User"}</p>
+            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/settings" className="cursor-pointer">
+            Workspace settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/help" className="cursor-pointer">
+            Help & support
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <SignOutDialog
+          trigger={
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(event) => event.preventDefault()}
+            >
+              Sign out
+            </DropdownMenuItem>
+          }
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function WorkspaceBadge() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <div className="size-2 rounded-full bg-primary shadow-[0_0_0_4px_rgba(59,130,246,0.1)]" />
+        <span className="text-sm font-semibold tracking-wide">Workspace</span>
+      </div>
+      <Badge variant="secondary" className="hidden text-[10px] uppercase tracking-wider sm:inline-flex">
+        Recruiter
+      </Badge>
+    </div>
+  )
+}
 
 export function AppHeader() {
-	const { pathname } = useLocation()
-	const navigate = useNavigate()
-	const { user, isLoading } = useAuth()
-
-	return (
-		<header className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur-sm">
-			<div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-				<Link to="/" className="flex shrink-0 items-center gap-3">
-					<Logo className="size-9 rounded-xl" backgroundClassName="fill-transparent dark:fill-[#140005]" />
-					<span className="text-sm font-semibold tracking-wide text-foreground">
-						Resumemo
-					</span>
-				</Link>
-
-				<nav className="hidden items-center gap-1 md:flex">
-					{navItems.map((item) => {
-						const isActive = pathname === item.href
-						return (
-							<Link key={item.href} to={item.href}>
-								<Button
-									variant="ghost"
-									size="sm"
-									className={cn(
-										"px-4 text-sm font-medium text-muted-foreground transition-colors",
-										"hover:bg-muted hover:text-foreground",
-										isActive && "bg-muted text-foreground"
-									)}
-								>
-									{item.label}
-								</Button>
-							</Link>
-						)
-					})}
-				</nav>
-
-				<div className="flex items-center gap-1.5">
-					<Button
-						size="icon"
-						variant="ghost"
-						className="md:hidden"
-					>
-						<Menu className="size-5" />
-					</Button>
-					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
-						<Bell className="size-4" />
-					</Button>
-					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
-						<HelpCircle className="size-4" />
-					</Button>
-					<Button size="icon" variant="ghost" className="hidden md:inline-flex">
-						<Settings className="size-4" />
-					</Button>
-					<ThemeToggler />
-					{isLoading ? (
-						<div className="flex items-center gap-2">
-							<Skeleton className="size-8 rounded-full" />
-							<div className="hidden sm:flex flex-col gap-1">
-								<Skeleton className="h-3 w-20" />
-								<Skeleton className="h-2.5 w-28" />
-							</div>
-						</div>
-					) : user ? (
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="ghost" className="flex items-center gap-2 px-2 h-10">
-									<Avatar className="size-8 border border-border">
-										<AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
-										<AvatarFallback className="text-xs bg-primary/10 text-primary">
-											{user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
-										</AvatarFallback>
-									</Avatar>
-									<div className="hidden sm:flex flex-col items-start">
-										<span className="text-sm font-medium leading-none">{user.name ?? "User"}</span>
-										<span className="text-[11px] text-muted-foreground leading-tight">{user.email}</span>
-									</div>
-									<ChevronDown className="size-4 text-muted-foreground hidden sm:block" />
-								</Button>
-							</DropdownMenuTrigger>
-
-							<DropdownMenuContent align="end" className="w-64 border border-border">
-								<DropdownMenuLabel className="font-normal">
-									<div className="flex flex-col gap-1.5">
-										<p className="text-sm font-medium">{user.name}</p>
-										<p className="text-xs text-muted-foreground truncate">{user.email}</p>
-										{user.emailVerified && (
-											<Badge variant="secondary" className="w-fit text-[10px] py-0">
-												Verified
-											</Badge>
-										)}
-									</div>
-								</DropdownMenuLabel>
-
-								<DropdownMenuSeparator />
-
-								<DropdownMenuItem className="gap-2">
-									<User className="size-4" />
-									<span>Profile settings</span>
-								</DropdownMenuItem>
-
-								<DropdownMenuItem className="gap-2">
-									<Settings className="size-4" />
-									<span>Workspace settings</span>
-								</DropdownMenuItem>
-
-								<DropdownMenuItem className="gap-2">
-									<HelpCircle className="size-4" />
-									<span>Help & support</span>
-								</DropdownMenuItem>
-
-								<DropdownMenuSeparator />
-
-								<SignOutDialog
-									trigger={
-										<DropdownMenuItem
-											className="gap-2.5 text-destructive focus:text-destructive"
-											onSelect={(event) => event.preventDefault()}
-										>
-											<LogOut className="size-4" />
-											<span>Sign out</span>
-										</DropdownMenuItem>
-									}
-								/>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					) : (
-					<Button
-						size="sm"
-						className="bg-brand text-brand-foreground hover:bg-brand/90"
-						onClick={() => navigate("/login")}
-					>
-						Sign in
-					</Button>
-				)}
-				</div>
-			</div>
-		</header>
-	)
+  return (
+    <header className="relative flex h-16 shrink-0 items-center border-b border-border/50 bg-background/70 px-4 backdrop-blur">
+      {/* Decorative elements */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/50 to-transparent" />
+      <div className="pointer-events-none absolute right-6 top-1/2 h-12 w-12 -translate-y-1/2 rounded-full bg-primary/10 blur-2xl" />
+      
+      <div className="relative flex w-full items-center gap-3">
+        <WorkspaceBadge />
+        
+        <div className="ml-auto flex items-center gap-1.5">
+          <HeaderActions />
+          <UserMenu />
+        </div>
+      </div>
+    </header>
+  )
 }

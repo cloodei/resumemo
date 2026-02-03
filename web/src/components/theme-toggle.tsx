@@ -1,5 +1,3 @@
-"use client";
-
 import { useTheme } from "next-themes";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";

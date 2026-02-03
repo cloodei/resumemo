@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import { Footer } from "@/components/footer";
+import { AppFooter } from "@/components/app-footer";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/tlg";
 
@@ -373,7 +373,7 @@ export function HeroCurrent() {
         </div>
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   );
 }

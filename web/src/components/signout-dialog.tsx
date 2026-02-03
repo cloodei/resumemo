@@ -1,5 +1,3 @@
-"use client"
-
 import { LogOut } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
@@ -33,9 +31,11 @@ export function SignOutDialog({ trigger }: SignOutDialogProps) {
 			await signOut()
 			toast.success("Signed out")
 			navigate("/login")
-		} catch {
+		}
+		catch {
 			toast.error("Unable to sign out")
-		} finally {
+		}
+		finally {
 			setIsSigningOut(false)
 			setOpen(false)
 		}

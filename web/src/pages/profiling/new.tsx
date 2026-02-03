@@ -52,7 +52,8 @@ export default function NewProfilingPage() {
         throw new Error("Failed to fetch files")
       
       const uploadedFiles = data.files.filter((f) => f.status === "uploaded")
-      setFiles(uploadedFiles as UploadedFile[])
+      // setFiles(uploadedFiles as UploadedFile[])
+      setFiles(uploadedFiles as any)
     }
     catch (error) {
       toast.error("Failed to load uploaded files")

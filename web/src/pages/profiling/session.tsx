@@ -61,7 +61,6 @@ export default function ProfilingResultsPage() {
     if (id) {
       void fetchSession()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const fetchSession = async () => {
@@ -78,7 +77,8 @@ export default function ProfilingResultsPage() {
       }
 
       setSession(data.session)
-      setFiles((data.files || []) as SessionFile[])
+      // setFiles((data.files || []) as SessionFile[])
+      setFiles((data.files || []) as any)
     }
     catch (error) {
       toast.error("Failed to load profiling session")

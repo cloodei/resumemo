@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, jsonb, bigint } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ============== USER SCHEMA (Better Auth) ==============
@@ -100,7 +100,7 @@ export const resumeFile = pgTable("resume_file", {
   originalName: varchar("original_name", { length: 512 }).notNull(),
   fileName: varchar("file_name", { length: 512 }).notNull(), // Stored name in R2
   mimeType: varchar("mime_type", { length: 128 }).notNull(),
-  size: integer("size").notNull(), // bytes
+  size: bigint("size", { mode: "bigint" }).notNull(), // bytes
   storageKey: varchar("storage_key", { length: 1024 }).notNull(), // R2 object key
   storageUrl: text("storage_url"), // Public or presigned URL
   status: varchar("status", { length: 32, enum: fileStatusEnum }).notNull().default("pending"),

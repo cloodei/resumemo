@@ -1,23 +1,16 @@
-"use client"
-
 import { Link, useLocation } from "react-router-dom"
 import {
   ChevronUp,
   LayoutDashboard,
-  PlusCircle,
-  FolderOpen,
+  Upload,
+  UserSearch,
   Settings,
   HelpCircle,
   LogOut,
-  BarChart3,
-  FileText,
-  Users,
-  Bell,
 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { SignOutDialog } from "./signout-dialog"
 import { Logo } from "./tlg"
-import { ThemeToggler } from "./theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import {
   Sidebar,
@@ -31,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "./ui/sidebar"
 import {
@@ -42,18 +36,14 @@ import {
 } from "./ui/dropdown-menu"
 
 const mainNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jobs/new", label: "New Job", icon: PlusCircle },
-  { href: "/jobs", label: "All Jobs", icon: FolderOpen },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/templates", label: "Templates", icon: FileText },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview & recent sessions" },
+  { href: "/uploads", label: "Upload Resumes", icon: Upload, description: "Upload resume files" },
+  { href: "/profiling/new", label: "New Profiling", icon: UserSearch, description: "Start a profiling session" },
 ]
 
 const secondaryNavItems = [
-  { href: "/team", label: "Team", icon: Users },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/help", label: "Help & Support", icon: HelpCircle },
+  { href: "/settings", label: "Settings", icon: Settings, description: "Workspace settings" },
+  { href: "/help", label: "Help & Support", icon: HelpCircle, description: "Documentation & support" },
 ]
 
 export function AppSidebar() {
@@ -64,18 +54,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
-      <SidebarHeader className="h-14 flex-row items-center justify-start gap-3 px-3">
-        <Link to="/dashboard" className="flex items-center gap-2.5">
-          <Logo 
-            className="size-8 shrink-0 rounded-lg" 
-            backgroundClassName="fill-transparent dark:fill-[#140005]" 
-          />
-          {!isCollapsed && (
-            <span className="text-sm font-semibold tracking-wide text-foreground">
+      <SidebarHeader className={`h-14 flex-row items-center gap-2 px-3 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {!isCollapsed && (
+          <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
+            <Logo 
+              className="size-8 shrink-0 rounded-lg" 
+              backgroundClassName="fill-transparent dark:fill-[#140005]" 
+            />
+            <span className="text-sm font-semibold tracking-wide text-foreground truncate">
               Resumemo
             </span>
-          )}
-        </Link>
+          </Link>
+        )}
+        <SidebarTrigger className="shrink-0" />
       </SidebarHeader>
 
       <SidebarContent>
@@ -135,9 +126,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center justify-center py-1">
-          <ThemeToggler />
-        </div>
 
         {user && (
           <SidebarMenu>

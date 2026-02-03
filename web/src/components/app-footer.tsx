@@ -1,5 +1,3 @@
-'use client';
-
 import { Link } from "react-router-dom";
 import { motion, spring } from 'motion/react';
 import {
@@ -65,7 +63,7 @@ const itemVariants = {
   },
 };
 
-export function Footer() {
+export function AppFooter() {
   return (
     <footer className="relative overflow-hidden border-t border-white/10 bg-surface">
       {/* Brand-themed background gradients */}
