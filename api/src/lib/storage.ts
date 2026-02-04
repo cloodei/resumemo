@@ -1,15 +1,11 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUIDv7 } from "bun";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCOUNT_ID = process.env.ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? "resumemo-uploads";
-
-if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-	console.warn("⚠️ R2 credentials not configured. File uploads will fail.");
-}
 
 const r2Client = new S3Client({
 	region: "auto",
@@ -24,7 +20,7 @@ const r2Client = new S3Client({
  * Generate a unique storage key for a file
  * Format: userId/uuid-filename
  */
-export function generateStorageKey(userId: string, originalName: string) {
+function generateStorageKey(userId: string, originalName: string) {
 	const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_").toLowerCase();
 	const uniqueId = randomUUIDv7();
 	return `${userId}/${uniqueId}-${safeName}`;
@@ -33,7 +29,7 @@ export function generateStorageKey(userId: string, originalName: string) {
 /**
  * Generate a presigned URL for direct upload to R2
  */
-export function generateUploadUrl(storageKey: string, contentType: string) {
+function generateUploadUrl(storageKey: string, contentType: string) {
 	const command = new PutObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
@@ -46,7 +42,7 @@ export function generateUploadUrl(storageKey: string, contentType: string) {
 /**
  * Generate a presigned URL for downloading a file
  */
-export function generateDownloadUrl(storageKey: string) {
+function generateDownloadUrl(storageKey: string) {
 	const command = new GetObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
@@ -58,7 +54,7 @@ export function generateDownloadUrl(storageKey: string) {
 /**
  * Delete a file from R2
  */
-export async function deleteFile(storageKey: string) {
+async function deleteFile(storageKey: string) {
 	const command = new DeleteObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
@@ -67,4 +63,4 @@ export async function deleteFile(storageKey: string) {
 	await r2Client.send(command);
 }
 
-export { r2Client, R2_BUCKET_NAME };
+export { r2Client, R2_BUCKET_NAME, generateStorageKey, generateUploadUrl, generateDownloadUrl, deleteFile };

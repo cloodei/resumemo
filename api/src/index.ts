@@ -63,13 +63,13 @@ const app = new Elysia({ precompile: true })
      * TODO: Remove this endpoint
      * ONLY FOR DEVELOPMENT
      */
-    const [numUsersDeleted, numSessionsDeleted, numAccountsDeleted, numVerificationsDeleted] = await Promise.all([
+    await Promise.all([
       db.delete(schema.user),
       db.delete(schema.session),
       db.delete(schema.account),
       db.delete(schema.verification),
     ]);
-    return { status: "ok", numUsersDeleted, numSessionsDeleted, numAccountsDeleted, numVerificationsDeleted };
+    return { status: "ok" };
   })
   
   // ============== FILE UPLOAD ROUTES ==============

@@ -304,9 +304,9 @@ export default function ProfilingResultsPage() {
             className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
           >
             <Card className="h-full shadow-x border-none">
-              <CardHeader className="flex flex-row items-center justify-between gap-6 border-b border-border/50 pb-4">
+              <CardHeader className="flex flex-row items-center justify-between gap-6 border-b border-border/50 dark:border-border/30 pb-4">
                 <div>
-                  <CardTitle className="text-lg font-semibold">Profiling Summary</CardTitle>
+                  <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Profiling Summary</CardTitle>
                   <CardDescription className="text-sm mt-1">
                     Overall results and key insights
                   </CardDescription>
@@ -345,8 +345,8 @@ export default function ProfilingResultsPage() {
             </Card>
 
             <Card className="border-none shadow-x">
-              <CardHeader className="border-b border-border/50 pb-4">
-                <CardTitle className="text-lg font-semibold">Filters</CardTitle>
+              <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
+                <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Filters</CardTitle>
                 <CardDescription className="text-sm mt-1">
                   Refine results by score, skills, or other criteria
                 </CardDescription>
@@ -384,10 +384,10 @@ export default function ProfilingResultsPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="shadow-m border-border/60">
-              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-4">
+            <Card className="shadow-m border-border/60 dark:border-border/40">
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
                 <div>
-                  <CardTitle className="text-lg font-semibold">Ranked Candidates</CardTitle>
+                  <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Ranked Candidates</CardTitle>
                   <CardDescription className="text-sm mt-1">
                     AI-ranked based on job description match
                   </CardDescription>
