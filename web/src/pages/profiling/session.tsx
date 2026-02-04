@@ -161,12 +161,15 @@ export default function ProfilingResultsPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <Badge 
-            variant={isCompleted ? "default" : isProfiling ? "secondary" : isFailed ? "destructive" : "outline"}
-            className="text-xs uppercase tracking-wider"
+            variant={isCompleted ? "outline" : isProfiling ? "secondary" : isFailed ? "destructive" : "outline"}
+            className={`text-xs uppercase tracking-widest ${isCompleted ? "text-primary" : ""}`}
           >
             {session.status}
           </Badge>
-          <p className="text-sm text-muted-foreground">Session {session.id.slice(0, 8)}</p>
+          <p className="text-sm text-muted-foreground">
+            {isCompleted && session.completedAt && `Finished ${new Date(session.completedAt).toLocaleDateString()}`}
+            {!isCompleted && `Session ${session.id.slice(0, 8)}`}
+          </p>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -473,6 +476,48 @@ export default function ProfilingResultsPage() {
                     Download CSV
                   </Button>
                 </div>
+              </CardFooter>
+            </Card>
+          </motion.section>
+
+          {/* Candidate Spotlight - like in job-results */}
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+          >
+            <Card className="xl:col-span-1 shadow-m border-none">
+              <CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
+                <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
+                <CardDescription className="text-sm mt-1">Dig into resume insights for top candidates.</CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
+                {sortedFiles.slice(0, 2).map((file, index) => (
+                  <div 
+                    key={file.id}
+                    className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <p className="text-sm font-semibold text-foreground">
+                      {file.parsedCandidateData?.name ? String(file.parsedCandidateData.name) : `Candidate ${index + 1}`}
+                    </p>
+                    <p className="mt-1 text-xs">Score {file.score || 0}/100</p>
+                    {file.alignmentNotes && (
+                      <p className="mt-3 text-xs leading-relaxed">{file.alignmentNotes}</p>
+                    )}
+                    <Button size="sm" variant="ghost" className="mt-4 gap-2">
+                      View resume
+                      <ArrowUpRight className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+              <CardFooter className="border-t bg-muted/20 py-4">
+                <Button size="sm" variant="secondary" className="w-full gap-2">
+                  Compare candidates
+                  <ArrowUpRight className="size-4" />
+                </Button>
               </CardFooter>
             </Card>
           </motion.section>
