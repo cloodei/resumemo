@@ -8,11 +8,11 @@ import {
   ChevronRight,
   Layers,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import { AppFooter } from "@/components/app-footer";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const fadeUp = {
   hidden: {
@@ -117,17 +117,9 @@ export default function LandingPage() {
           <div className="absolute inset-x-0 bottom-0 h-48 bg-[linear-gradient(180deg,rgba(7,7,9,0),rgba(7,7,9,0.7))]" />
         </div>
 
-        <div className="relative mx-auto w-full max-w-6xl px-4 pb-24 pt-32 sm:px-6">
+        <div className="relative mx-auto w-full max-w-6xl px-4 pb-24 pt-16 sm:px-6">
           <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <motion.div initial="hidden" animate="visible" variants={stagger} className="flex flex-col gap-6">
-              <motion.div
-                variants={fadeUp}
-                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-white/70"
-              >
-                <Sparkles className="size-3.5 text-[#7dd3fc]" />
-                Hiring studio
-              </motion.div>
-
               <motion.h1
                 variants={fadeUp}
                 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl"
@@ -230,12 +222,25 @@ export default function LandingPage() {
                     <p className="mt-3 text-lg font-semibold">84%</p>
                     <p className="text-xs text-slate-400">Role calibration synced</p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/50 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-white/60">Editors</p>
+                  <div className="col-span-2 rounded-2xl border border-white/10 bg-black/50 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-white/60">SPONSORS</p>
                     <div className="mt-3 flex items-center gap-2">
-                      {Array.from({ length: 3 }).map((_, index) => (
-                        <span key={`avatar-${index}`} className="size-7 rounded-full border border-white/20 bg-white/10" />
-                      ))}
+                      <Avatar>
+                        <AvatarImage src="/sponsor1.jpg" />
+                        <AvatarFallback>TMT</AvatarFallback>
+                      </Avatar>
+                      <Avatar>
+                        <AvatarImage src="/sponsor2.jpg" />
+                        <AvatarFallback>NVN</AvatarFallback>
+                      </Avatar>
+                      <Avatar>
+                        <AvatarImage src="/dunk.jpg" />
+                        <AvatarFallback>GOB</AvatarFallback>
+                      </Avatar>
+                      <Avatar>
+                        <AvatarImage src="/forest-goblins.png" />
+                        <AvatarFallback>GOB</AvatarFallback>
+                      </Avatar>
                     </div>
                     <p className="mt-3 text-xs text-slate-400">Collaborating now</p>
                   </div>
@@ -261,10 +266,10 @@ export default function LandingPage() {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-120px" }} variants={stagger}>
               <motion.div variants={fadeUp} className="text-center">
                 <p className="text-xs uppercase tracking-[0.4em] text-white/50">Features</p>
-                <h2 className="mt-4 text-3xl font-semibold text-white">A full studio for modern recruiting</h2>
+                <h2 className="mt-2 text-3xl font-semibold text-white">A full studio for modern recruiting</h2>
               </motion.div>
 
-              <div className="mt-12 grid gap-6 md:grid-cols-2">
+              <div className="mt-8 grid gap-6 md:grid-cols-2">
                 {HIGHLIGHTS.map(({ title, description, icon: Icon }) => (
                   <motion.div
                     key={title}
@@ -332,10 +337,10 @@ export default function LandingPage() {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-120px" }} variants={stagger}>
               <motion.div variants={fadeUp} className="text-center">
                 <p className="text-xs uppercase tracking-[0.4em] text-white/50">Workflow</p>
-                <h2 className="mt-4 text-3xl font-semibold text-white">From intake to shortlist in three moves</h2>
+                <h2 className="mt-2 text-3xl font-semibold text-white">From intake to shortlist in three moves</h2>
               </motion.div>
 
-              <div className="mt-12 grid gap-4 lg:grid-cols-3">
+              <div className="mt-8 grid gap-4 lg:grid-cols-3">
                 {WORKFLOW.map((item, index) => (
                   <motion.div
                     key={item.step}
@@ -354,17 +359,17 @@ export default function LandingPage() {
             </motion.div>
           </section>
 
-          <section id="modules" className="mt-24">
+          <section id="modules" className="mt-26">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-120px" }} variants={stagger}>
               <motion.div variants={fadeUp} className="text-center">
                 <p className="text-xs uppercase tracking-[0.4em] text-white/50">Modules</p>
-                <h2 className="mt-4 text-3xl font-semibold text-white">Blocks that feel intentional</h2>
-                <p className="mt-3 text-sm text-slate-400">
+                <h2 className="mt-2 text-3xl font-semibold text-white">Blocks that feel intentional</h2>
+                <p className="mt-1.5 text-sm text-slate-400">
                   Mix interview kits, signal dashboards, and export-ready decks without sacrificing design.
                 </p>
               </motion.div>
 
-              <div className="mt-12 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <motion.div variants={fadeUp} className="rounded-[32px] border border-white/10 bg-white/5 p-6">
                   <div className="flex items-center justify-between text-xs text-white/60">
                     <span>Studio board</span>
