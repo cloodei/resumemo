@@ -49,7 +49,7 @@ export default function NewProfilingPage() {
   const files = useUploadFiles()
   const isUploading = useIsUploading()
   const { addFiles, removeFile, clearAll, updateFile, setIsUploading } = useUploadActions()
-  
+
   const [isDragging, setIsDragging] = useState(false)
   const [jobTitle, setJobTitle] = useState("")
   const [jobDescription, setJobDescription] = useState("")

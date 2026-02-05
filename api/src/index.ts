@@ -1,7 +1,7 @@
 import cors from "@elysiajs/cors";
-import { Elysia, t } from "elysia";
-import { openapi } from "@elysiajs/openapi";
 import { logger } from "@rasla/logify";
+import { openapi } from "@elysiajs/openapi";
+import { Elysia, t } from "elysia";
 import { eq, and, desc } from "drizzle-orm";
 
 import { db } from "./lib/db";

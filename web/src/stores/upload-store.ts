@@ -17,16 +17,16 @@ export type UploadFile = {
 interface UploadStore {
   files: UploadFile[]
   isUploading: boolean
-  
-  addFiles: (newFiles: File[]) => void
-  removeFile: (id: string) => void
-  clearAll: () => void
-  clearCompleted: () => void
-  
-  updateFile: (id: string, updates: Partial<UploadFile>) => void
-  setIsUploading: (value: boolean) => void
-  
-  restoreFileObject: (id: string, file: File) => void
+
+  actions: {
+    addFiles: (newFiles: File[]) => void
+    removeFile: (id: string) => void
+    clearAll: () => void
+    clearCompleted: () => void
+    updateFile: (id: string, updates: Partial<UploadFile>) => void
+    setIsUploading: (value: boolean) => void
+    restoreFileObject: (id: string, file: File) => void
+  }
 }
 
 const uploadStore = create<UploadStore>()(
@@ -35,63 +35,65 @@ const uploadStore = create<UploadStore>()(
       files: [],
       isUploading: false,
 
-      addFiles: (newFiles: File[]) => {
-        const currentFiles = get().files
-        
-        if (currentFiles.length + newFiles.length > MAX_BATCH_SIZE)
-          return
+      actions: {
+        addFiles: (newFiles: File[]) => {
+          const currentFiles = get().files
+          
+          if (currentFiles.length + newFiles.length > MAX_BATCH_SIZE)
+            return
 
-        const validFiles: UploadFile[] = []
-        for (const file of newFiles) {
-          if (!ALLOWED_MIME_TYPES_STRING.includes(file.type)) continue
-          if (file.size > MAX_FILE_SIZE) continue
-          if (currentFiles.some(f => f.originalName === file.name)) continue
+          const validFiles: UploadFile[] = []
+          for (const file of newFiles) {
+            if (!ALLOWED_MIME_TYPES_STRING.includes(file.type)) continue
+            if (file.size > MAX_FILE_SIZE) continue
+            if (currentFiles.some(f => f.originalName === file.name)) continue
 
-          validFiles.push({
-            id: crypto.randomUUID(),
-            file,
-            originalName: file.name,
-            size: file.size,
-            mimeType: file.type,
-            status: "pending",
-            progress: 0,
+            validFiles.push({
+              id: crypto.randomUUID(),
+              file,
+              originalName: file.name,
+              size: file.size,
+              mimeType: file.type,
+              status: "pending",
+              progress: 0,
+            })
+          }
+
+          set({ files: [...currentFiles, ...validFiles] })
+        },
+
+        removeFile: (id: string) => {
+          set({ files: get().files.filter(f => f.id !== id) })
+        },
+
+        clearAll: () => {
+          set({ files: [], isUploading: false })
+        },
+
+        clearCompleted: () => {
+          set({ files: get().files.filter(f => f.status !== "uploaded") })
+        },
+
+        updateFile: (id: string, updates: Partial<UploadFile>) => {
+          set({
+            files: get().files.map(f => 
+              f.id === id ? { ...f, ...updates } : f
+            )
+          })
+        },
+
+        setIsUploading: (value: boolean) => {
+          set({ isUploading: value })
+        },
+
+        restoreFileObject: (id: string, file: File) => {
+          set({
+            files: get().files.map(f => 
+              f.id === id ? { ...f, file } : f
+            )
           })
         }
-
-        set({ files: [...currentFiles, ...validFiles] })
-      },
-
-      removeFile: (id: string) => {
-        set({ files: get().files.filter(f => f.id !== id) })
-      },
-
-      clearAll: () => {
-        set({ files: [], isUploading: false })
-      },
-
-      clearCompleted: () => {
-        set({ files: get().files.filter(f => f.status !== "uploaded") })
-      },
-
-      updateFile: (id: string, updates: Partial<UploadFile>) => {
-        set({
-          files: get().files.map(f => 
-            f.id === id ? { ...f, ...updates } : f
-          )
-        })
-      },
-
-      setIsUploading: (value: boolean) => {
-        set({ isUploading: value })
-      },
-
-      restoreFileObject: (id: string, file: File) => {
-        set({
-          files: get().files.map(f => 
-            f.id === id ? { ...f, file } : f
-          )
-        })
-      },
+      }
     }),
     {
       name: "resumemo-uploads",
@@ -104,12 +106,4 @@ const uploadStore = create<UploadStore>()(
 
 export const useUploadFiles   = () => uploadStore(state => state.files)
 export const useIsUploading   = () => uploadStore(state => state.isUploading)
-export const useUploadActions = () => uploadStore(state => ({
-  addFiles: state.addFiles,
-  removeFile: state.removeFile,
-  clearAll: state.clearAll,
-  clearCompleted: state.clearCompleted,
-  updateFile: state.updateFile,
-  setIsUploading: state.setIsUploading,
-  restoreFileObject: state.restoreFileObject,
-}))
+export const useUploadActions = () => uploadStore(state => state.actions)
