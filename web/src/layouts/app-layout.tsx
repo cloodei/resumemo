@@ -1,8 +1,9 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+
 import { useAuth } from "@/components/auth-provider"
-import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
+import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

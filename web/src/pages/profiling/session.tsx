@@ -1,28 +1,16 @@
+import { toast } from "sonner"
+import { motion } from "motion/react"
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { motion } from "motion/react"
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  BarChart3,
-  Download,
-  FileText,
-  Loader2,
-  Mail,
-  RefreshCw,
-  Sparkles,
-  UserRound,
-  AlertCircle,
-} from "lucide-react"
+import { ArrowLeft, ArrowUpRight, BarChart3, Download, FileText, Loader2, Mail, RefreshCw, Sparkles, UserRound, AlertCircle } from "lucide-react"
 
+import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { toast } from "sonner"
-import { api } from "@/lib/api"
 
 type ProfilingSession = {
   id: string
@@ -48,6 +36,7 @@ type SessionFile = {
   alignmentNotes: string | null
   parsedCandidateData: Record<string, unknown> | null
 }
+
 
 export default function ProfilingResultsPage() {
   const { id } = useParams<{ id: string }>()
@@ -90,7 +79,8 @@ export default function ProfilingResultsPage() {
   }
 
   const startProfiling = async () => {
-    if (!id) return
+    if (!id)
+      return
 
     setIsStarting(true)
     try {
@@ -102,12 +92,13 @@ export default function ProfilingResultsPage() {
       }
 
       toast.success("Profiling started!")
-      // Refresh to get updated status
       fetchSession()
-    } catch (error) {
+    }
+    catch (error) {
       const message = error instanceof Error ? error.message : "Failed to start"
       toast.error(message)
-    } finally {
+    }
+    finally {
       setIsStarting(false)
     }
   }
@@ -130,12 +121,7 @@ export default function ProfilingResultsPage() {
   const isCompleted = session.status === "completed"
   const isFailed = session.status === "failed"
 
-  // Calculate progress for profiling state
-  const progress = session.totalFiles > 0
-    ? (session.processedFiles / session.totalFiles) * 100
-    : 0
-
-  // Sort files by score/rank for display
+  const progress = session.totalFiles > 0 ? (session.processedFiles / session.totalFiles) * 100 : 0
   const sortedFiles = [...files].sort((a, b) => {
     if (a.score === null && b.score === null) return 0
     if (a.score === null) return 1

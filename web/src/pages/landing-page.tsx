@@ -1,17 +1,9 @@
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
-import {
-  ArrowRight,
-  BadgeCheck,
-  BookOpen,
-  BrainCircuit,
-  ChevronRight,
-  Layers,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, BadgeCheck, BookOpen, BrainCircuit, ChevronRight, Layers, ShieldCheck } from "lucide-react";
 
-import { AppFooter } from "@/components/app-footer";
 import { Button } from "@/components/ui/button";
+import { AppFooter } from "@/components/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const fadeUp = {

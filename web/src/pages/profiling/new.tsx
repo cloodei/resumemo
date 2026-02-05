@@ -1,27 +1,19 @@
-import { Link } from "react-router-dom"
-import { motion, AnimatePresence } from "motion/react"
 import { toast } from "sonner"
-import {
-  ArrowRight,
-  CheckCircle2,
-  FileText,
-  Layers,
-  Loader2,
-  UploadCloud,
-  X,
-} from "lucide-react"
+import { useState } from "react"
+import { useNavigate, Link } from "react-router-dom"
+import { motion, AnimatePresence } from "motion/react"
+import { ArrowRight, CheckCircle2, FileText, Layers, Loader2, UploadCloud, X } from "lucide-react"
 
+import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useUploadFiles, useIsUploading, useUploadActions } from "@/stores/upload-store"
+import { MAX_BATCH_SIZE, MAX_FILE_SIZE, ALLOWED_MIME_TYPES_STRING } from "@/lib/constants"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useUploadFiles, useIsUploading, useUploadActions, MAX_BATCH_SIZE, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/stores/upload-store"
-import { api } from "@/lib/api"
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
 
 const steps = [
   {
@@ -78,26 +70,23 @@ export default function NewProfilingPage() {
       return
     }
 
-    const invalidFiles: string[] = []
     const validFiles: File[] = []
-
     for (const file of newFiles) {
-      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-        invalidFiles.push(`${file.name}: Only PDF, DOCX, and TXT allowed`)
+      if (!ALLOWED_MIME_TYPES_STRING.includes(file.type)) {
+        toast.error(`${file.name}: Only PDF, DOCX, and TXT allowed`)
         continue
       }
       if (file.size > MAX_FILE_SIZE) {
-        invalidFiles.push(`${file.name}: File too large (max 10MB)`)
+        toast.error(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
         continue
       }
       if (files.some(f => f.originalName === file.name)) {
-        invalidFiles.push(`${file.name}: Already added`)
+        toast.error(`${file.name}: Already added`)
         continue
       }
       validFiles.push(file)
     }
 
-    invalidFiles.forEach(msg => toast.error(msg))
     addFiles(validFiles)
   }
 

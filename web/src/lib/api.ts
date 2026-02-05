@@ -1,16 +1,13 @@
 import { treaty } from "@elysiajs/eden"
 import type { API } from "@api"
+import { BASE_URL } from "./constants"
 
-const baseURL = import.meta.env.VITE_AUTH_SERVER_URL ?? "http://localhost:8080"
-
-export const api = treaty<API>(baseURL, {
+export const api = treaty<API>(BASE_URL, {
   fetch: {
     credentials: "include",
   },
   onResponse: (response) => {
-    if (response.status === 401) {
-      // Redirect to login on any 401 response
+    if (response.status === 401)
       window.location.href = "/login"
-    }
   },
 })
