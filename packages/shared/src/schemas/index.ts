@@ -1,8 +1,6 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, jsonb, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, bigint } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-
-// ============== USER SCHEMA (Better Auth) ==============
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -86,10 +84,6 @@ export const verification = pgTable("verification", {
     .notNull(),
 });
 
-// ============== FILE UPLOADS ==============
-
-export const fileStatusEnum = ["pending", "uploading", "uploaded", "processing", "parsed", "error"] as const;
-
 export const resumeFile = pgTable("resume_file", {
   id: uuid("id")
     .$defaultFn(randomUUIDv7)
@@ -98,17 +92,10 @@ export const resumeFile = pgTable("resume_file", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   originalName: varchar("original_name", { length: 512 }).notNull(),
-  fileName: varchar("file_name", { length: 512 }).notNull(), // Stored name in R2
   mimeType: varchar("mime_type", { length: 128 }).notNull(),
-  size: bigint("size", { mode: "bigint" }).notNull(), // bytes
-  storageKey: varchar("storage_key", { length: 1024 }).notNull(), // R2 object key
-  storageUrl: text("storage_url"), // Public or presigned URL
-  status: varchar("status", { length: 32, enum: fileStatusEnum }).notNull().default("pending"),
-  progress: integer("progress").notNull().default(0), // 0-100 for upload tracking
-  errorMessage: text("error_message"),
-  parsedData: jsonb("parsed_data"), // Extracted text, structured data, etc.
-  uploadStartedAt: timestamp("upload_started_at", { withTimezone: true }),
-  uploadCompletedAt: timestamp("upload_completed_at", { withTimezone: true }),
+  size: bigint("size", { mode: "bigint" }).notNull(),
+  storageKey: varchar("storage_key", { length: 1024 }).notNull(),
+  fingerprint: varchar("fingerprint", { length: 128 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -118,12 +105,10 @@ export const resumeFile = pgTable("resume_file", {
     .notNull(),
 }, (table) => [
   index().on(table.userId),
-  index().on(table.status),
+  index().on(table.fingerprint),
 ]);
 
-// ============== PROFILING SESSIONS ==============
-
-export const profilingStatusEnum = ["draft", "ready", "profiling", "completed", "failed"] as const;
+export const sessionStatusEnum = ["uploading", "ready", "processing", "completed", "failed"] as const;
 
 export const profilingSession = pgTable("profiling_session", {
   id: uuid("id")
@@ -132,16 +117,12 @@ export const profilingSession = pgTable("profiling_session", {
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }), // Optional name for the session
+  name: varchar("name", { length: 255 }).notNull(),
   jobDescription: text("job_description").notNull(),
   jobTitle: varchar("job_title", { length: 255 }),
-  status: varchar("status", { length: 32, enum: profilingStatusEnum }).notNull().default("draft"),
+  status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("uploading"),
   totalFiles: integer("total_files").notNull().default(0),
-  processedFiles: integer("processed_files").notNull().default(0),
-  summary: jsonb("summary"), // Results summary after profiling
   errorMessage: text("error_message"),
-  startedAt: timestamp("started_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -153,8 +134,6 @@ export const profilingSession = pgTable("profiling_session", {
   index().on(table.userId),
   index().on(table.status),
 ]);
-
-// ============== PROFILING SESSION FILES (Many-to-Many) ==============
 
 export const profilingSessionFile = pgTable("profiling_session_file", {
   id: uuid("id")
@@ -166,10 +145,6 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
   fileId: uuid("file_id")
     .notNull()
     .references(() => resumeFile.id, { onDelete: "cascade" }),
-  score: integer("score"), // AI match score 0-100
-  alignmentNotes: text("alignment_notes"), // Why it matched
-  parsedCandidateData: jsonb("parsed_candidate_data"), // Structured candidate info
-  rank: integer("rank"), // Position in ranked results
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -177,8 +152,6 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
   index().on(table.sessionId),
   index().on(table.fileId),
 ]);
-
-// ============== RELATIONS ==============
 
 export const userRelations = relations(user, ({ many }) => ({
   resumeFiles: many(resumeFile),

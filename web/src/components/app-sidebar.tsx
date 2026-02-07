@@ -2,8 +2,7 @@ import { Link, useLocation } from "react-router-dom"
 import {
   ChevronUp,
   LayoutDashboard,
-  Upload,
-  UserSearch,
+  FilePlus2,
   Settings,
   HelpCircle,
   LogOut,
@@ -37,8 +36,7 @@ import {
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview & recent sessions" },
-  { href: "/uploads", label: "Upload Resumes", icon: Upload, description: "Upload resume files" },
-  { href: "/profiling/new", label: "New Profiling", icon: UserSearch, description: "Start a profiling session" },
+  { href: "/profiling/new", label: "New Session", icon: FilePlus2, description: "Upload resumes & start profiling" },
 ]
 
 const secondaryNavItems = [

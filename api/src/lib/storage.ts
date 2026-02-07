@@ -1,8 +1,8 @@
 import { randomUUIDv7 } from "bun";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
-const R2_ACCOUNT_ID = process.env.ACCOUNT_ID;
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? "resumemo-uploads";
@@ -40,18 +40,6 @@ function generateUploadUrl(storageKey: string, contentType: string) {
 }
 
 /**
- * Generate a presigned URL for downloading a file
- */
-function generateDownloadUrl(storageKey: string) {
-	const command = new GetObjectCommand({
-		Bucket: R2_BUCKET_NAME,
-		Key: storageKey,
-	});
-
-	return getSignedUrl(r2Client, command, { expiresIn: 1800 });
-}
-
-/**
  * Delete a file from R2
  */
 async function deleteFile(storageKey: string) {
@@ -63,4 +51,4 @@ async function deleteFile(storageKey: string) {
 	await r2Client.send(command);
 }
 
-export { r2Client, R2_BUCKET_NAME, generateStorageKey, generateUploadUrl, generateDownloadUrl, deleteFile };
+export { r2Client, R2_BUCKET_NAME, generateStorageKey, generateUploadUrl, deleteFile };

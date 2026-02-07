@@ -1,7 +1,6 @@
 import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
-import UploadPage from "@/pages/uploads"
 import NewProfilingPage from "@/pages/profiling/new"
 import ProfilingResultsPage from "@/pages/profiling/session"
 import NewJobPage from "@/pages/jobs/new-job"
@@ -24,12 +23,6 @@ export const ROUTES = [
     path: "/dashboard",
     title: "Dashboard · Résumé Ranker",
     element: <DashboardPage />,
-    layout: "app",
-  },
-  {
-    path: "/uploads",
-    title: "Upload Resumes · Résumé Ranker",
-    element: <UploadPage />,
     layout: "app",
   },
   {

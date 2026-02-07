@@ -26,7 +26,7 @@ const recentSessions = [
     jobTitle: "Product Designer",
     createdAt: "Jan 25, 2026",
     resumes: 32,
-    status: "profiling",
+    status: "processing",
   },
   {
     id: "prof-1c5d8e4b",
@@ -194,7 +194,7 @@ export default function Page() {
                 size="sm"
                 className="relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_1px_2px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_4px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.15)] dark:hover:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.3),0_3px_6px_rgba(0,0,0,0.4)] transition-all before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-linear-to-b before:from-primary/5 before:to-primary/10 before:opacity-80 before:transition-opacity before:duration-300"
               >
-                <Link to="/uploads">Upload Resumes</Link>
+                <Link to="/profiling/new">New Session</Link>
               </Button>
             </CardHeader>
             <CardContent>
@@ -220,7 +220,7 @@ export default function Page() {
                             to={`/profiling/${session.id}`}
                             className="hover:text-primary transition-colors hover:underline underline-offset-4 decoration-primary/30"
                           >
-                           {session.id.slice(0, 12)}...
+                           {session.name}
                           </Link>
                       </TableCell>
                       <TableCell className="font-medium group-hover:text-foreground transition-colors">{session.jobTitle}</TableCell>
@@ -232,7 +232,7 @@ export default function Page() {
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={session.status === "completed" ? "secondary" : session.status === "profiling" ? "default" : "outline"}
+                          variant={session.status === "completed" ? "secondary" : session.status === "processing" ? "default" : "outline"}
                           className="shadow-sm capitalize"
                         >
                           {session.status}
