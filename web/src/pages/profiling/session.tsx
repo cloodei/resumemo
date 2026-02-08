@@ -36,14 +36,14 @@ type ProfilingSession = {
 	status: "uploading" | "ready" | "processing" | "completed" | "failed"
 	totalFiles: number
 	errorMessage: string | null
-	createdAt: string
+	createdAt: Date
 }
 
 type SessionFile = {
 	id: string
 	originalName: string
 	mimeType: string
-	size: number
+	size: bigint
 }
 
 function statusBadgeVariant(status: ProfilingSession["status"]) {
@@ -93,7 +93,7 @@ export default function ProfilingResultsPage() {
 				throw new Error("Failed to fetch session")
 			}
 
-			setSession(data.session as ProfilingSession)
+			setSession(data.session)
 			setFiles((data.files || []) as SessionFile[])
 		} catch (err) {
 			toast.error("Failed to load profiling session")
@@ -353,7 +353,7 @@ export default function ProfilingResultsPage() {
 													{file.originalName}
 												</p>
 												<p className="text-xs text-muted-foreground">
-													{formatFileSize(file.size)}
+													{formatFileSize(Number(file.size))}
 												</p>
 											</div>
 										</div>

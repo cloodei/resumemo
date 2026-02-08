@@ -2,6 +2,7 @@ import { toast } from "sonner"
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react"
+import { useForm } from "react-hook-form"
 import {
 	ArrowRight,
 	CheckCircle2,
@@ -92,6 +93,12 @@ function fileStatusIcon(status: FileStatus) {
 	}
 }
 
+type SessionFormData = {
+	sessionName: string
+	jobTitle: string
+	jobDescription: string
+}
+
 export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
@@ -99,29 +106,32 @@ export default function NewProfilingPage() {
 	const { addFiles, removeFile, clearAll, updateFile, setPhase, hashFiles } = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
-	const [sessionName, setSessionName] = useState("")
-	const [jobTitle, setJobTitle] = useState("")
-	const [jobDescription, setJobDescription] = useState("")
+
+	const {
+		register,
+		handleSubmit,
+		setValue,
+		formState: { errors },
+	} = useForm<SessionFormData>({
+		defaultValues: {
+			sessionName: "",
+			jobTitle: "",
+			jobDescription: "",
+		},
+	})
 
 	useEffect(() => {
 		const hasUnhashed = files.some(f => f.status === "selected" && !f.fingerprint)
 		if (hasUnhashed) {
 			hashFiles()
 		}
-	}, [files, hashFiles])
+	}, [files])
 
 	const readyFiles = files.filter(f => f.status === "ready" || f.status === "uploaded" || f.status === "reused")
 	const failedFiles = files.filter(f => f.status === "failed")
 	const hashingFiles = files.filter(f => f.status === "hashing" || f.status === "selected")
 	const allFilesReady = files.length > 0 && hashingFiles.length === 0
 	const isBusy = phase !== "idle" && phase !== "done" && phase !== "error"
-
-	const canCreate =
-		sessionName.trim().length > 0 &&
-		jobDescription.trim().length >= 50 &&
-		files.length > 0 &&
-		allFilesReady &&
-		!isBusy
 
 	const handleAddFiles = useCallback(
 		(newFiles: File[]) => {
@@ -168,8 +178,12 @@ export default function NewProfilingPage() {
 		e.target.value = ""
 	}
 
-	const handleCreateSession = async () => {
-		if (!canCreate) return
+	const onSubmit = async (data: SessionFormData) => {
+		if (!allFilesReady || files.length === 0) {
+			toast.error("Please add files and wait for them to be ready")
+			return
+		}
+
 		const filesToUpload = files.filter(f => f.status === "ready" && f.fingerprint)
 		if (filesToUpload.length === 0) {
 			toast.error("No files ready for upload")
@@ -180,10 +194,10 @@ export default function NewProfilingPage() {
 			// Phase 1: Create session + get presigned URLs
 			setPhase("creating")
 
-			const { data, error } = await api.api.sessions.post({
-				name: sessionName.trim(),
-				jobTitle: jobTitle.trim() || undefined,
-				jobDescription: jobDescription.trim(),
+			const { data: responseData, error } = await api.api.sessions.post({
+				name: data.sessionName.trim(),
+				jobTitle: data.jobTitle.trim() || undefined,
+				jobDescription: data.jobDescription.trim(),
 				files: filesToUpload.map(f => ({
 					name: f.originalName,
 					size: f.size,
@@ -192,11 +206,11 @@ export default function NewProfilingPage() {
 				})),
 			})
 
-			if (error || !data) {
+			if (error || !responseData) {
 				throw new Error("Failed to create session")
 			}
 
-			const { session, newUploads, reusedFiles } = data as {
+			const { session, newUploads, reusedFiles } = responseData as {
 				session: { id: string }
 				newUploads: { id: string; originalName: string; uploadUrl: string; storageKey: string }[]
 				reusedFiles: { id: string; originalName: string }[]
@@ -303,6 +317,8 @@ export default function NewProfilingPage() {
 		}
 	}
 
+	const canCreate = allFilesReady && files.length > 0 && !isBusy
+
 	const phaseLabel = {
 		idle: "",
 		hashing: "Preparing files...",
@@ -381,17 +397,19 @@ export default function NewProfilingPage() {
 								<label className="text-sm font-medium text-foreground" htmlFor="session-name">
 									Session name
 								</label>
-								{sessionName.trim().length === 0 && (
-									<span className="text-xs text-muted-foreground">Required</span>
+								{errors.sessionName && (
+									<span className="text-xs text-destructive">{errors.sessionName.message}</span>
 								)}
 							</div>
 							<Input
 								id="session-name"
 								placeholder="e.g. Q1 Frontend Hiring"
 								className="h-11"
-								value={sessionName}
-								onChange={(e) => setSessionName(e.target.value)}
 								disabled={isBusy}
+								{...register("sessionName", {
+									required: "Session name is required",
+									minLength: { value: 3, message: "Min 3 characters" },
+								})}
 							/>
 						</div>
 
@@ -403,9 +421,8 @@ export default function NewProfilingPage() {
 								id="job-title"
 								placeholder="e.g. Staff Product Designer"
 								className="h-11"
-								value={jobTitle}
-								onChange={(e) => setJobTitle(e.target.value)}
 								disabled={isBusy}
+								{...register("jobTitle")}
 							/>
 						</div>
 
@@ -414,20 +431,20 @@ export default function NewProfilingPage() {
 								<label className="text-sm font-medium text-foreground" htmlFor="job-description">
 									Job description detail
 								</label>
-								<span
-									className={`text-xs ${jobDescription.length < 50 ? "text-muted-foreground" : "text-emerald-500"}`}
-								>
-									{jobDescription.length < 50 ? "Min 50 characters" : "Ready"}
-								</span>
 							</div>
 							<Textarea
 								id="job-description"
 								placeholder="Describe responsibilities, skills, and must-have experience..."
 								className="min-h-[180px] resize-none"
-								value={jobDescription}
-								onChange={(e) => setJobDescription(e.target.value)}
 								disabled={isBusy}
+								{...register("jobDescription", {
+									required: "Job description is required",
+									minLength: { value: 50, message: "Min 50 characters" },
+								})}
 							/>
+							{errors.jobDescription && (
+								<span className="text-xs text-destructive">{errors.jobDescription.message}</span>
+							)}
 						</div>
 
 						<Tabs defaultValue="templates" className="pt-2">
@@ -445,8 +462,8 @@ export default function NewProfilingPage() {
 										key={template.title}
 										className="group rounded-lg border border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-l hover:-translate-y-0.5 cursor-pointer"
 										onClick={() => {
-											setJobTitle(template.title)
-											setJobDescription(template.summary + "\n\nAdd more details about the role...")
+											setValue("jobTitle", template.title)
+											setValue("jobDescription", template.summary + "\n\nAdd more details about the role...")
 										}}
 									>
 										<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
@@ -690,7 +707,7 @@ export default function NewProfilingPage() {
 									<Button
 										className="flex-1 sm:flex-none gap-2"
 										disabled={!canCreate}
-										onClick={handleCreateSession}
+										onClick={handleSubmit(onSubmit)}
 									>
 										{isBusy ? (
 											<>

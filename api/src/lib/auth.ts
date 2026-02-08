@@ -1,3 +1,4 @@
+import { Elysia } from "elysia";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
@@ -52,3 +53,20 @@ export const auth = betterAuth({
     window: 60,
   },
 })
+
+export const authMiddleware = new Elysia({ name: "auth" })
+  .mount(auth.handler)
+  .macro({
+    auth: {
+      async resolve({ status, request: { headers } }) {
+        const session = await auth.api.getSession({ headers });
+
+        if (!session) return status(401, { message: "Unauthorized" });
+
+        return {
+          user: session.user,
+          session: session.session,
+        };
+      },
+    },
+  });
