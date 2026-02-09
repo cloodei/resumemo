@@ -1,29 +1,88 @@
-import { Elysia, t } from "elysia";
+import { Elysia, sse, t } from "elysia";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import * as schema from "@shared/schemas";
+import { MAX_FILE_BYTES, MAX_FILES_PER_SESSION, SSE_EVENTS } from "@shared/constants/file-uploads";
 
 import { db } from "../lib/db";
+import { computeXXH64 } from "../lib/hash";
 import { authMiddleware } from "../lib/auth";
-import { deleteFile, generateStorageKey, generateUploadUrl, headFile } from "../lib/storage";
+import { validateFileContent } from "../lib/upload-guard";
+import { deleteFile, generateStorageKey, uploadFile } from "../lib/storage";
 
 const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 	.use(authMiddleware)
+
 	/**
-	 * Create a new profiling session and get presigned upload URLs.
+	 * Create a new profiling session (metadata only — no files yet).
 	 *
-	 * This is the single entry point for the upload flow. It:
-	 * 1. Deduplicates files by fingerprint + size + mimeType against existing user files
-	 * 2. Creates the profiling session (status: "uploading")
-	 * 3. Creates new file records for files that don't already exist
-	 * 4. Creates join table entries for all files (new + reused)
-	 * 5. Returns presigned URLs only for files that need uploading
+	 * Returns the session record so the client can proceed to
+	 * the dedup check and upload steps using the session ID.
 	 */
 	.post(
 		"/",
-		async ({ user, body, set }) => {
-			const { name, jobTitle, jobDescription, files } = body;
-			const fingerprints = files.map((file) => file.fingerprint);
+		async ({ user, body }) => {
+			const { name, jobTitle, jobDescription } = body;
+
+			const [session] = await db
+				.insert(schema.profilingSession)
+				.values({
+					userId: user.id,
+					name,
+					jobDescription,
+					jobTitle,
+					status: "uploading",
+					totalFiles: 0,
+				})
+				.returning();
+
+			return { session };
+		},
+		{
+			auth: true,
+			body: t.Object({
+				name: t.String({ minLength: 1, maxLength: 255 }),
+				jobDescription: t.String({ minLength: 1 }),
+				jobTitle: t.Optional(t.String({ maxLength: 255 })),
+			}),
+		},
+	)
+
+	/**
+	 * Pre-check which files already exist for this user (dedup).
+	 *
+	 * The client sends an array of `{ name, size, mimeType, xxh64 }`.
+	 * The server checks the user's existing files by fingerprint+size+mimeType
+	 * composite key and returns:
+	 *   - `duplicates`:  files that already exist — automatically linked to the session
+	 *   - `toUpload`:    files that need uploading
+	 */
+	.post(
+		"/:id/check-duplicates",
+		async ({ user, params, body, set }) => {
+			// Verify session ownership and state
+			const [session] = await db
+				.select()
+				.from(schema.profilingSession)
+				.where(and(
+					eq(schema.profilingSession.id, params.id),
+					eq(schema.profilingSession.userId, user.id),
+				));
+
+			if (!session) {
+				set.status = 404;
+				return { status: "error" as const, message: "Session not found" };
+			}
+
+			if (session.status !== "uploading") {
+				set.status = 409;
+				return { status: "error" as const, message: "Session is not in uploading state" };
+			}
+
+			const { files } = body;
+
+			// Collect all fingerprints to query
+			const fingerprints = files.map((f) => f.xxh64);
 
 			let existingFiles: (typeof schema.resumeFile.$inferSelect)[] = [];
 			if (fingerprints.length > 0) {
@@ -36,7 +95,7 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 					));
 			}
 
-			// Build a lookup: fingerprint+size+mimeType -> existing file record
+			// Build composite key lookup: xxh64:size:mimeType → existing file
 			const existingLookup = new Map(
 				existingFiles.map((file) => [
 					`${file.fingerprint}:${file.size}:${file.mimeType}`,
@@ -44,128 +103,381 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				]),
 			);
 
-			// Partition incoming files into reused vs new
-			const reusedFiles: { id: string; originalName: string }[] = [];
-			const newFileEntries: {
-				meta: typeof files[number];
-				storageKey: string;
-			}[] = [];
+			const duplicates: { name: string; existingFileId: string }[] = [];
+			const toUpload: { name: string }[] = [];
 
 			for (const file of files) {
-				const key = `${file.fingerprint}:${file.size}:${file.mimeType}`;
+				const key = `${file.xxh64}:${file.size}:${file.mimeType}`;
 				const existing = existingLookup.get(key);
 
 				if (existing) {
-					reusedFiles.push({ id: existing.id, originalName: existing.originalName });
+					duplicates.push({ name: file.name, existingFileId: existing.id });
 				} else {
-					const storageKey = generateStorageKey(user.id, file.name);
-					newFileEntries.push({ meta: file, storageKey });
+					toUpload.push({ name: file.name });
 				}
 			}
 
-			// --- Create new file records ---
-			let insertedFiles: (typeof schema.resumeFile.$inferSelect)[] = [];
-			if (newFileEntries.length > 0) {
-				insertedFiles = await db
-					.insert(schema.resumeFile)
-					.values(newFileEntries.map(({ meta, storageKey }) => ({
-						userId: user.id,
-						originalName: meta.name,
-						mimeType: meta.mimeType,
-						size: BigInt(meta.size),
-						storageKey,
-						fingerprint: meta.fingerprint,
-					})))
-					.returning();
+			// Link duplicate files to this session
+			if (duplicates.length > 0) {
+				// Check which are already linked to avoid duplicates in join table
+				const existingLinks = await db
+					.select({ fileId: schema.profilingSessionFile.fileId })
+					.from(schema.profilingSessionFile)
+					.where(and(
+						eq(schema.profilingSessionFile.sessionId, params.id),
+						inArray(
+							schema.profilingSessionFile.fileId,
+							duplicates.map((d) => d.existingFileId),
+						),
+					));
+
+				const alreadyLinked = new Set(existingLinks.map((l) => l.fileId));
+				const newLinks = duplicates.filter((d) => !alreadyLinked.has(d.existingFileId));
+
+				if (newLinks.length > 0) {
+					await db
+						.insert(schema.profilingSessionFile)
+						.values(newLinks.map((d) => ({
+							sessionId: params.id,
+							fileId: d.existingFileId,
+						})));
+				}
 			}
 
-			// --- Generate presigned URLs for new files ---
-			const newUploads = await Promise.all(
-				insertedFiles.map(async (file, index) => {
-					const uploadUrl = await generateUploadUrl(
-						newFileEntries[index].storageKey,
-						file.mimeType,
-					);
-					return {
-						id: file.id,
-						originalName: file.originalName,
-						uploadUrl,
-						storageKey: file.storageKey,
-					};
-				}),
-			);
-
-			const totalFiles = reusedFiles.length + insertedFiles.length;
-
-			// --- Create the profiling session ---
-			const [session] = await db
-				.insert(schema.profilingSession)
-				.values({
-					userId: user.id,
-					name,
-					jobDescription,
-					jobTitle,
-					status: "uploading",
-					totalFiles,
-				})
-				.returning();
-
-			// --- Create join table entries for ALL files (reused + new) ---
-			const allFileIds = [
-				...reusedFiles.map((file) => file.id),
-				...insertedFiles.map((file) => file.id),
-			];
-
-			if (allFileIds.length > 0) {
-				await db
-					.insert(schema.profilingSessionFile)
-					.values(allFileIds.map((fileId) => ({
-						sessionId: session.id,
-						fileId,
-					})));
-			}
-
-			return {
-				session,
-				newUploads,
-				reusedFiles,
-			};
+			return { status: "ok" as const, duplicates, toUpload };
 		},
 		{
 			auth: true,
 			body: t.Object({
-				name: t.String({ minLength: 1, maxLength: 255 }),
-				jobDescription: t.String({ minLength: 1 }),
-				jobTitle: t.Optional(t.String({ maxLength: 255 })),
 				files: t.Array(
 					t.Object({
 						name: t.String({ minLength: 1, maxLength: 512 }),
-						size: t.Number({ minimum: 1, maximum: 2 * 1024 * 1024 }),
+						size: t.Number({ minimum: 1, maximum: MAX_FILE_BYTES }),
 						mimeType: t.String({ minLength: 1, maxLength: 128 }),
-						fingerprint: t.String({ minLength: 8, maxLength: 128 }),
+						xxh64: t.String({ minLength: 8, maxLength: 32 }),
 					}),
-					{ minItems: 1, maxItems: 50 },
+					{ minItems: 1, maxItems: MAX_FILES_PER_SESSION },
 				),
 			}),
 		},
 	)
 
 	/**
-	 * Confirm upload completion for a session.
+	 * Upload files to a session via multipart/form-data.
 	 *
-	 * The client sends the final list of successfully uploaded file IDs.
-	 * Any files that were created but not confirmed are cleaned up (removed
-	 * from R2 + DB). The session's totalFiles count is updated to reflect
-	 * the actual confirmed set, and the session transitions to "ready".
+	 * Returns an SSE stream with per-file status events as each file
+	 * is validated, hashed, and uploaded to object storage.
 	 *
-	 * If zero files were confirmed, the session transitions to "failed".
+	 * Pipeline per file:
+	 *   1. Read bytes from multipart body
+	 *   2. Validate: size, MIME type, extension, magic bytes
+	 *   3. Compute authoritative XXH64 hash
+	 *   4. Check for duplicates (in case client skipped pre-check)
+	 *   5. Upload to R2
+	 *   6. Insert DB record + link to session
+	 *   7. Emit SSE event with result
 	 */
 	.post(
-		"/:id/confirm",
-		async ({ user, params, body, set }) => {
-			const uploadedFileIds = Array.from(new Set(body.uploadedFileIds));
+		"/:id/upload",
+		async function* ({ user, params, body, set }) {
+			// Verify session ownership and state
+			const [session] = await db
+				.select()
+				.from(schema.profilingSession)
+				.where(and(
+					eq(schema.profilingSession.id, params.id),
+					eq(schema.profilingSession.userId, user.id),
+				));
 
-			// Verify session belongs to user and is in "uploading" state
+			if (!session) {
+				set.status = 404;
+				yield sse({
+					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					data: JSON.stringify({
+						sessionId: params.id,
+						totalConfirmed: 0,
+						totalFailed: 0,
+						totalReused: 0,
+						status: "error",
+						message: "Session not found",
+					}),
+				});
+				return;
+			}
+
+			if (session.status !== "uploading") {
+				set.status = 409;
+				yield sse({
+					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					data: JSON.stringify({
+						sessionId: params.id,
+						totalConfirmed: 0,
+						totalFailed: 0,
+						totalReused: 0,
+						status: "error",
+						message: "Session is not in uploading state",
+					}),
+				});
+				return;
+			}
+
+			// Extract files from multipart body
+			const rawFiles = body.files;
+			const files: File[] = Array.isArray(rawFiles) ? rawFiles : [rawFiles];
+
+			if (files.length === 0 || files.length > MAX_FILES_PER_SESSION) {
+				yield sse({
+					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					data: JSON.stringify({
+						sessionId: params.id,
+						totalConfirmed: 0,
+						totalFailed: 0,
+						totalReused: 0,
+						status: "error",
+						message: files.length === 0
+							? "No files provided"
+							: `Too many files (max ${MAX_FILES_PER_SESSION})`,
+					}),
+				});
+				return;
+			}
+
+			let totalConfirmed = 0;
+			let totalFailed = 0;
+			let totalReused = 0;
+
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i];
+				const fileName = file.name;
+
+				// ── Step 1: Emit validating event ────────────────────────
+				yield sse({
+					event: SSE_EVENTS.FILE_VALIDATING,
+					data: JSON.stringify({ index: i, name: fileName }),
+				});
+
+				// ── Step 2: Read bytes ───────────────────────────────────
+				let data: Uint8Array;
+				try {
+					const arrayBuffer = await file.arrayBuffer();
+					data = new Uint8Array(arrayBuffer);
+				} catch {
+					yield sse({
+						event: SSE_EVENTS.FILE_FAILED,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							reason: "Failed to read file data",
+						}),
+					});
+					totalFailed++;
+					continue;
+				}
+
+				// ── Step 3: Validate content ─────────────────────────────
+				const validation = validateFileContent({
+					fileName,
+					claimedMimeType: file.type,
+					data,
+				});
+
+				if (!validation.ok) {
+					yield sse({
+						event: SSE_EVENTS.FILE_FAILED,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							reason: validation.message,
+						}),
+					});
+					totalFailed++;
+					continue;
+				}
+
+				yield sse({
+					event: SSE_EVENTS.FILE_VALIDATED,
+					data: JSON.stringify({ index: i, name: fileName }),
+				});
+
+				// ── Step 4: Compute authoritative hash ───────────────────
+				const xxh64 = await computeXXH64(data);
+
+				// ── Step 5: Check for server-side dedup ──────────────────
+				const compositeKey = `${xxh64}:${data.length}:${file.type}`;
+
+				const [existingFile] = await db
+					.select()
+					.from(schema.resumeFile)
+					.where(and(
+						eq(schema.resumeFile.userId, user.id),
+						eq(schema.resumeFile.fingerprint, xxh64),
+					));
+
+				if (
+					existingFile &&
+					`${existingFile.fingerprint}:${existingFile.size}:${existingFile.mimeType}` === compositeKey
+				) {
+					// File already exists — link to session if not already linked
+					const [existingLink] = await db
+						.select()
+						.from(schema.profilingSessionFile)
+						.where(and(
+							eq(schema.profilingSessionFile.sessionId, params.id),
+							eq(schema.profilingSessionFile.fileId, existingFile.id),
+						));
+
+					if (!existingLink) {
+						await db
+							.insert(schema.profilingSessionFile)
+							.values({ sessionId: params.id, fileId: existingFile.id });
+					}
+
+					yield sse({
+						event: SSE_EVENTS.FILE_REUSED,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							fileId: existingFile.id,
+							xxh64,
+						}),
+					});
+					totalReused++;
+					continue;
+				}
+
+				// ── Step 6: Upload to R2 ─────────────────────────────────
+				yield sse({
+					event: SSE_EVENTS.FILE_UPLOADING,
+					data: JSON.stringify({ index: i, name: fileName }),
+				});
+
+				const storageKey = generateStorageKey(user.id, fileName);
+
+				try {
+					await uploadFile(storageKey, data, file.type);
+				} catch (err) {
+					yield sse({
+						event: SSE_EVENTS.FILE_FAILED,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							reason: "Failed to upload to storage",
+						}),
+					});
+					totalFailed++;
+					continue;
+				}
+
+				// ── Step 7: Insert DB record + link to session ───────────
+				try {
+					const [inserted] = await db
+						.insert(schema.resumeFile)
+						.values({
+							userId: user.id,
+							originalName: fileName,
+							mimeType: file.type,
+							size: BigInt(data.length),
+							storageKey,
+							fingerprint: xxh64,
+						})
+						.returning();
+
+					await db
+						.insert(schema.profilingSessionFile)
+						.values({ sessionId: params.id, fileId: inserted.id });
+
+					yield sse({
+						event: SSE_EVENTS.FILE_DONE,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							fileId: inserted.id,
+							xxh64,
+						}),
+					});
+					totalConfirmed++;
+				} catch (err) {
+					// Rollback: delete from R2 since DB insert failed
+					try { await deleteFile(storageKey); } catch { /* best-effort */ }
+
+					yield sse({
+						event: SSE_EVENTS.FILE_FAILED,
+						data: JSON.stringify({
+							index: i,
+							name: fileName,
+							reason: "Failed to save file record",
+						}),
+					});
+					totalFailed++;
+				}
+			}
+
+			// ── Finalize session ─────────────────────────────────────────
+			const confirmedTotal = totalConfirmed + totalReused;
+
+			if (confirmedTotal === 0) {
+				await db
+					.update(schema.profilingSession)
+					.set({
+						status: "failed",
+						totalFiles: 0,
+						errorMessage: "No files were uploaded successfully",
+					})
+					.where(eq(schema.profilingSession.id, params.id));
+
+				yield sse({
+					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					data: JSON.stringify({
+						sessionId: params.id,
+						totalConfirmed,
+						totalFailed,
+						totalReused,
+						status: "failed",
+						message: "No files were uploaded successfully",
+					}),
+				});
+				return;
+			}
+
+			await db
+				.update(schema.profilingSession)
+				.set({
+					status: "ready",
+					totalFiles: confirmedTotal,
+				})
+				.where(eq(schema.profilingSession.id, params.id));
+
+			yield sse({
+				event: SSE_EVENTS.UPLOAD_COMPLETE,
+				data: JSON.stringify({
+					sessionId: params.id,
+					totalConfirmed,
+					totalFailed,
+					totalReused,
+					status: "ready",
+				}),
+			});
+		},
+		{
+			auth: true,
+			body: t.Object({
+				files: t.Union([
+					t.File({ maxSize: MAX_FILE_BYTES }),
+					t.Array(t.File({ maxSize: MAX_FILE_BYTES }), { maxItems: MAX_FILES_PER_SESSION }),
+				]),
+			}),
+		},
+	)
+
+	/**
+	 * Cancel and clean up an uploading session.
+	 *
+	 * Removes all session-file links, deletes orphaned files from R2 + DB,
+	 * and deletes the session record. Returns confirmation to the client.
+	 */
+	.post(
+		"/:id/cancel",
+		async ({ user, params, set }) => {
 			const [session] = await db
 				.select()
 				.from(schema.profilingSession)
@@ -181,141 +493,50 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 
 			if (session.status !== "uploading") {
 				set.status = 409;
-				return { status: "error", message: "Session is not in uploading state" };
+				return { status: "error", message: "Only uploading sessions can be cancelled" };
 			}
 
-			// Get all files associated with this session
-			const sessionFiles = await db.select({
-				joinId: schema.profilingSessionFile.id,
-				fileId: schema.profilingSessionFile.fileId,
-				file: schema.resumeFile,
-			})
+			// Get all files linked to this session
+			const sessionFiles = await db
+				.select({ fileId: schema.profilingSessionFile.fileId })
 				.from(schema.profilingSessionFile)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.profilingSessionFile.fileId, schema.resumeFile.id),
-				)
 				.where(eq(schema.profilingSessionFile.sessionId, params.id));
 
-			const sessionFileIds = new Set(sessionFiles.map((file) => file.fileId));
-			const invalidIds = uploadedFileIds.filter((id) => !sessionFileIds.has(id));
-			if (invalidIds.length > 0) {
-				set.status = 400;
-				return { status: "error", message: "Invalid file ids for this session" };
-			}
+			// Delete all join records for this session
+			await db
+				.delete(schema.profilingSessionFile)
+				.where(eq(schema.profilingSessionFile.sessionId, params.id));
 
-			const confirmedSet = new Set(uploadedFileIds);
-			const joinIdByFileId = new Map(
-				sessionFiles.map((file) => [file.fileId, file.joinId]),
-			);
-
-			const failedJoinIds: string[] = [];
-			const failedFileIds: string[] = [];
-			const confirmedValidIds: string[] = [];
-
-			// Any files not confirmed are considered failed
-			for (const file of sessionFiles) {
-				if (!confirmedSet.has(file.fileId)) {
-					failedJoinIds.push(file.joinId);
-					failedFileIds.push(file.fileId);
-				}
-			}
-
-			// Validate confirmed files against stored metadata
-			for (const file of sessionFiles) {
-				if (!confirmedSet.has(file.fileId)) continue;
-
-				let headResult: Awaited<ReturnType<typeof headFile>> | null = null;
-				try {
-					headResult = await headFile(file.file.storageKey);
-				} catch {
-					headResult = null;
-				}
-
-				// const validation = validateStoredObject({
-				// 	fileName: file.file.originalName,
-				// 	expectedMimeType: file.file.mimeType,
-				// 	contentType: headResult?.ContentType,
-				// 	contentLength: headResult?.ContentLength,
-				// });
-
-				// if (!validation.ok) {
-				// 	failedFileIds.push(file.fileId);
-				// 	const joinId = joinIdByFileId.get(file.fileId);
-				// 	if (joinId) failedJoinIds.push(joinId);
-				// 	continue;
-				// }
-
-				confirmedValidIds.push(file.fileId);
-
-				if (headResult?.ContentLength && headResult?.ContentType) {
-					await db.update(schema.resumeFile)
-						.set({
-							size: BigInt(headResult.ContentLength),
-							mimeType: headResult.ContentType,
-						})
-						.where(eq(schema.resumeFile.id, file.fileId));
-				}
-			}
-
-			// Remove join records for files that weren't confirmed or failed validation
-			if (failedJoinIds.length > 0) {
-				await db.delete(schema.profilingSessionFile)
-					.where(inArray(schema.profilingSessionFile.id, failedJoinIds));
-			}
-
-			// Clean up failed files from R2 and DB — but only if they aren't
-			// referenced by other sessions (they could be reused files)
-			for (const fileId of failedFileIds) {
-				const otherRefs = await db.select({ id: schema.profilingSessionFile.id })
+			// Clean up orphaned files (not referenced by any other session)
+			for (const { fileId } of sessionFiles) {
+				const otherRefs = await db
+					.select({ id: schema.profilingSessionFile.id })
 					.from(schema.profilingSessionFile)
 					.where(eq(schema.profilingSessionFile.fileId, fileId));
 
 				if (otherRefs.length === 0) {
-					// No other session uses this file — safe to delete
-					const [file] = await db.select()
+					const [file] = await db
+						.select()
 						.from(schema.resumeFile)
 						.where(eq(schema.resumeFile.id, fileId));
 
 					if (file) {
 						try { await deleteFile(file.storageKey); } catch { /* best-effort */ }
-						await db.delete(schema.resumeFile)
+						await db
+							.delete(schema.resumeFile)
 							.where(eq(schema.resumeFile.id, fileId));
 					}
 				}
 			}
 
-			const confirmedCount = confirmedValidIds.length;
-
-			if (confirmedCount === 0) {
-				// No files made it — mark session as failed
-				await db.update(schema.profilingSession)
-					.set({
-						status: "failed",
-						totalFiles: 0,
-						errorMessage: "No files were uploaded successfully",
-					})
-					.where(eq(schema.profilingSession.id, params.id));
-
-				return { status: "failed", message: "No files uploaded", confirmedCount: 0 };
-			}
-
-			// Update session with final file count and transition to "ready"
-			await db.update(schema.profilingSession)
-				.set({
-					status: "ready",
-					totalFiles: confirmedCount,
-				})
+			// Delete the session itself
+			await db
+				.delete(schema.profilingSession)
 				.where(eq(schema.profilingSession.id, params.id));
 
-			return { status: "ok", confirmedCount };
+			return { status: "cancelled" };
 		},
-		{
-			auth: true,
-			body: t.Object({
-				uploadedFileIds: t.Array(t.String({ minLength: 1 })),
-			}),
-		},
+		{ auth: true },
 	)
 
 	/**

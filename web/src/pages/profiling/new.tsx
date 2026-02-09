@@ -1,8 +1,8 @@
 import { toast } from "sonner"
-import { useState, useEffect, useCallback } from "react"
+import { useForm } from "react-hook-form"
 import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react"
-import { useForm } from "react-hook-form"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
 	ArrowRight,
 	CheckCircle2,
@@ -13,18 +13,31 @@ import {
 	RefreshCw,
 	UploadCloud,
 	X,
+	Ban,
 } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { formatFileSize } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MAX_BATCH_SIZE, MAX_FILE_SIZE, ALLOWED_MIME_TYPES_STRING } from "@/lib/constants"
-import { useUploadFiles, useUploadPhase, useUploadActions, type FileStatus } from "@/stores/upload-store"
+import {
+	MAX_FILES_PER_SESSION,
+	MAX_FILE_BYTES,
+	ALLOWED_MIME_TYPES_LIST,
+	FILE_INPUT_ACCEPT,
+	SSE_EVENTS,
+	BASE_URL,
+} from "@/lib/constants"
+import {
+	useUploadFiles,
+	useUploadPhase,
+	useUploadSessionId,
+	useUploadActions,
+	type FileStatus,
+} from "@/stores/upload-store"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 const steps = [
@@ -66,7 +79,7 @@ function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 			return "Ready"
 		case "uploading":
 			return "Uploading..."
-		case "uploaded":
+		case "done":
 			return "Uploaded"
 		case "reused":
 			return "Already on file"
@@ -85,7 +98,7 @@ function fileStatusIcon(status: FileStatus) {
 			return <CheckCircle2 className="size-4 text-sky-500" />
 		case "uploading":
 			return <Loader2 className="size-4 animate-spin text-sky-500" />
-		case "uploaded":
+		case "done":
 		case "reused":
 			return <CheckCircle2 className="size-4 text-emerald-500" />
 		case "failed":
@@ -103,9 +116,19 @@ export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
-	const { addFiles, removeFile, clearAll, updateFile, setPhase, hashFiles } = useUploadActions()
+	const sessionId = useUploadSessionId()
+	const {
+		addFiles,
+		removeFile,
+		clearAll,
+		updateFileByName,
+		setPhase,
+		setSessionId,
+		hashFiles,
+	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
+	const abortRef = useRef<AbortController | null>(null)
 
 	const {
 		register,
@@ -127,7 +150,7 @@ export default function NewProfilingPage() {
 		}
 	}, [files])
 
-	const readyFiles = files.filter(f => f.status === "ready" || f.status === "uploaded" || f.status === "reused")
+	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done" || f.status === "reused")
 	const failedFiles = files.filter(f => f.status === "failed")
 	const hashingFiles = files.filter(f => f.status === "hashing" || f.status === "selected")
 	const allFilesReady = files.length > 0 && hashingFiles.length === 0
@@ -137,19 +160,19 @@ export default function NewProfilingPage() {
 		(newFiles: File[]) => {
 			if (isBusy) return
 
-			if (files.length + newFiles.length > MAX_BATCH_SIZE) {
-				toast.error(`Maximum ${MAX_BATCH_SIZE} files allowed per batch`)
+			if (files.length + newFiles.length > MAX_FILES_PER_SESSION) {
+				toast.error(`Maximum ${MAX_FILES_PER_SESSION} files allowed per batch`)
 				return
 			}
 
 			const validFiles: File[] = []
 			for (const file of newFiles) {
-				if (!ALLOWED_MIME_TYPES_STRING.includes(file.type)) {
+				if (!ALLOWED_MIME_TYPES_LIST.includes(file.type as typeof ALLOWED_MIME_TYPES_LIST[number])) {
 					toast.error(`${file.name}: Only PDF, DOCX, and TXT allowed`)
 					continue
 				}
-				if (file.size > MAX_FILE_SIZE) {
-					toast.error(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
+				if (file.size > MAX_FILE_BYTES) {
+					toast.error(`${file.name}: File too large (max ${MAX_FILE_BYTES / 1024 / 1024}MB)`)
 					continue
 				}
 				if (files.some(f => f.originalName === file.name && f.size === file.size)) {
@@ -163,7 +186,7 @@ export default function NewProfilingPage() {
 				addFiles(validFiles)
 			}
 		},
-		[files, isBusy, addFiles],
+		[files, isBusy]
 	)
 
 	const handleDrop = (e: React.DragEvent) => {
@@ -178,139 +201,257 @@ export default function NewProfilingPage() {
 		e.target.value = ""
 	}
 
+	/**
+	 * Cancel an in-progress upload: abort fetch, call cancel endpoint,
+	 * then reset store state.
+	 */
+	const handleCancel = async () => {
+		// Abort the in-flight SSE fetch
+		abortRef.current?.abort()
+		abortRef.current = null
+
+		// Call server cancel endpoint if we have a session
+		if (sessionId) {
+			try {
+				await api.api.sessions({ id: sessionId }).cancel.post()
+			}
+			catch {
+				// Best-effort — server cleanup will happen eventually
+			}
+		}
+
+		clearAll()
+		toast.info("Upload cancelled")
+	}
+
+	/**
+	 * Consume the SSE stream from the upload endpoint.
+	 * Reads lines from the response body and dispatches per-file
+	 * status updates to the store.
+	 */
+	const consumeSSEStream = async (response: Response) => {
+		const reader = response.body?.getReader()
+		if (!reader) throw new Error("No response body")
+
+		const decoder = new TextDecoder()
+		let buffer = ""
+		let currentEvent = ""
+
+		while (true) {
+			const { done, value } = await reader.read()
+			if (done) break
+
+			buffer += decoder.decode(value, { stream: true })
+
+			// SSE messages are separated by double newlines
+			const parts = buffer.split("\n\n")
+			// Keep the last incomplete part in the buffer
+			buffer = parts.pop() ?? ""
+
+			for (const part of parts) {
+				const lines = part.split("\n")
+
+				for (const line of lines) {
+					if (line.startsWith("event:")) {
+						currentEvent = line.slice(6).trim()
+					} else if (line.startsWith("data:")) {
+						const raw = line.slice(5).trim()
+						if (!raw) continue
+
+						try {
+							const data = JSON.parse(raw)
+							handleSSEEvent(currentEvent, data)
+						} catch {
+							// Skip malformed data lines
+						}
+					}
+				}
+				currentEvent = ""
+			}
+		}
+	}
+
+	/**
+	 * Handle a single SSE event and update the appropriate file in the store.
+	 */
+	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
+		const name = data.name as string | undefined
+		if (!name && event !== SSE_EVENTS.UPLOAD_COMPLETE) return
+
+		switch (event) {
+			case SSE_EVENTS.FILE_VALIDATING:
+				updateFileByName(name!, { status: "uploading" })
+				break
+
+			case SSE_EVENTS.FILE_VALIDATED:
+				// Still processing — keep uploading status
+				break
+
+			case SSE_EVENTS.FILE_UPLOADING:
+				// Already in uploading status
+				break
+
+			case SSE_EVENTS.FILE_DONE:
+				updateFileByName(name!, {
+					status: "done",
+					fileId: data.fileId as string,
+				})
+				break
+
+			case SSE_EVENTS.FILE_REUSED:
+				updateFileByName(name!, {
+					status: "reused",
+					fileId: data.fileId as string,
+				})
+				break
+
+			case SSE_EVENTS.FILE_FAILED:
+				updateFileByName(name!, {
+					status: "failed",
+					errorMessage: (data.reason as string) ?? "Upload failed",
+				})
+				break
+
+			case SSE_EVENTS.UPLOAD_COMPLETE: {
+				const status = data.status as string
+				if (status === "ready") {
+					setPhase("done")
+				} else {
+					setPhase("error")
+				}
+				break
+			}
+		}
+	}
+
 	const onSubmit = async (data: SessionFormData) => {
 		if (!allFilesReady || files.length === 0) {
 			toast.error("Please add files and wait for them to be ready")
 			return
 		}
 
-		const filesToUpload = files.filter(f => f.status === "ready" && f.fingerprint)
-		if (filesToUpload.length === 0) {
+		const filesToProcess = files.filter(f => f.status === "ready" && f.fingerprint)
+		if (filesToProcess.length === 0) {
 			toast.error("No files ready for upload")
 			return
 		}
 
 		try {
-			// Phase 1: Create session + get presigned URLs
+			// ── Phase 1: Create session (metadata only) ─────────────
 			setPhase("creating")
 
-			const { data: responseData, error } = await api.api.sessions.post({
+			const { data: createData, error: createError } = await api.api.sessions.post({
 				name: data.sessionName.trim(),
 				jobTitle: data.jobTitle.trim() || undefined,
 				jobDescription: data.jobDescription.trim(),
-				files: filesToUpload.map(f => ({
-					name: f.originalName,
-					size: f.size,
-					mimeType: f.mimeType,
-					fingerprint: f.fingerprint!,
-				})),
 			})
 
-			if (error || !responseData) {
+			if (createError || !createData) {
 				throw new Error("Failed to create session")
 			}
 
-			const { session, newUploads, reusedFiles } = responseData as {
-				session: { id: string }
-				newUploads: { id: string; originalName: string; uploadUrl: string; storageKey: string }[]
-				reusedFiles: { id: string; originalName: string }[]
+			const createdSessionId = createData.session.id
+			setSessionId(createdSessionId)
+
+			// ── Phase 2: Check duplicates ────────────────────────────
+			setPhase("checking")
+
+			const { data: dedupData, error: dedupError } = await api.api
+				.sessions({ id: createdSessionId })
+				["check-duplicates"]
+				.post({
+					files: filesToProcess.map(f => ({
+						name: f.originalName,
+						size: f.size,
+						mimeType: f.mimeType,
+						xxh64: f.fingerprint!,
+					})),
+				})
+
+			if (dedupError || !dedupData || dedupData.status !== "ok") {
+				throw new Error("Failed to check duplicates")
 			}
 
 			// Mark reused files in the store
-			for (const reused of reusedFiles) {
-				const storeFile = filesToUpload.find(f => f.originalName === reused.originalName)
-				if (storeFile) {
-					updateFile(storeFile.id, { status: "reused", serverId: reused.id, progress: 100 })
-				}
+			for (const dup of dedupData.duplicates) {
+				updateFileByName(dup.name, {
+					status: "reused",
+					fileId: dup.existingFileId,
+				})
 			}
 
-			// Phase 2: Upload new files to R2
+			// Determine which files still need to be uploaded
+			const toUploadNames = new Set(dedupData.toUpload.map(f => f.name))
+			const filesToUpload = filesToProcess.filter(f => toUploadNames.has(f.originalName))
+
+			if (filesToUpload.length === 0) {
+				// All files were duplicates — session is ready
+				setPhase("done")
+				toast.success("Session created! All files were already on file.")
+				setTimeout(() => {
+					clearAll()
+					navigate(`/profiling/${createdSessionId}`)
+				}, 1200)
+				return
+			}
+
+			// ── Phase 3: Upload via multipart + SSE stream ──────────
 			setPhase("uploading")
 
-			const uploadResults: { fileId: string; success: boolean }[] = []
-
-			// Mark reused files as confirmed immediately
-			for (const reused of reusedFiles) {
-				uploadResults.push({ fileId: reused.id, success: true })
+			const formData = new FormData()
+			for (const f of filesToUpload) {
+				formData.append("files", f.file, f.originalName)
 			}
 
-			// Upload new files in parallel
-			await Promise.all(
-				newUploads.map(async (upload) => {
-					const storeFile = filesToUpload.find(f => f.originalName === upload.originalName)
-					if (!storeFile?.file) {
-						uploadResults.push({ fileId: upload.id, success: false })
-						return
-					}
+			const controller = new AbortController()
+			abortRef.current = controller
 
-					updateFile(storeFile.id, { status: "uploading", serverId: upload.id })
-
-					try {
-						const xhr = new XMLHttpRequest()
-
-						await new Promise<void>((resolve, reject) => {
-							xhr.upload.addEventListener("progress", (event) => {
-								if (event.lengthComputable) {
-									const progress = Math.round((event.loaded / event.total) * 100)
-									updateFile(storeFile.id, { progress })
-								}
-							})
-
-							xhr.addEventListener("load", () => {
-								if (xhr.status >= 200 && xhr.status < 300) resolve()
-								else reject(new Error(`Upload returned ${xhr.status}`))
-							})
-
-							xhr.addEventListener("error", () => reject(new Error("Network error")))
-
-							xhr.open("PUT", upload.uploadUrl)
-							xhr.setRequestHeader("Content-Type", storeFile.mimeType)
-							xhr.send(storeFile.file)
-						})
-
-						updateFile(storeFile.id, { status: "uploaded", progress: 100 })
-						uploadResults.push({ fileId: upload.id, success: true })
-					} catch (err) {
-						const msg = err instanceof Error ? err.message : "Upload failed"
-						updateFile(storeFile.id, { status: "failed", errorMessage: msg })
-						uploadResults.push({ fileId: upload.id, success: false })
-					}
-				}),
-			)
-
-			// Phase 3: Confirm the upload
-			setPhase("confirming")
-
-			const uploadedFileIds = uploadResults
-				.filter(r => r.success)
-				.map(r => r.fileId)
-
-			const { error: confirmError } = await api.api.sessions({ id: session.id }).confirm.post({
-				uploadedFileIds,
+			const response = await fetch(`${BASE_URL}/api/sessions/${createdSessionId}/upload`, {
+				method: "POST",
+				body: formData,
+				credentials: "include",
+				signal: controller.signal,
 			})
 
-			if (confirmError) {
-				throw new Error("Failed to confirm upload")
+			if (!response.ok) {
+				throw new Error(`Upload failed with status ${response.status}`)
 			}
 
-			const failedCount = uploadResults.filter(r => !r.success).length
+			// Consume the SSE stream — this updates files in real-time
+			await consumeSSEStream(response)
 
-			setPhase("done")
+			abortRef.current = null
 
-			if (failedCount > 0) {
-				toast.warning(
-					`Session created with ${uploadedFileIds.length} file${uploadedFileIds.length !== 1 ? "s" : ""}. ${failedCount} file${failedCount !== 1 ? "s" : ""} failed.`,
-				)
-			} else {
-				toast.success("Session created successfully!")
+			// Check final state
+			const currentFiles = files
+			const doneCount = currentFiles.filter(f => f.status === "done" || f.status === "reused").length
+			const failedCount = currentFiles.filter(f => f.status === "failed").length
+
+			if (doneCount > 0) {
+				if (failedCount > 0) {
+					toast.warning(
+						`Session created with ${doneCount} file${doneCount !== 1 ? "s" : ""}. ${failedCount} file${failedCount !== 1 ? "s" : ""} failed.`,
+					)
+				}
+				else {
+					toast.success("Session created successfully!")
+				}
+
+				setTimeout(() => {
+					clearAll()
+					navigate(`/profiling/${createdSessionId}`)
+				}, 1200)
 			}
-
-			// Small delay so the user sees the "done" state before navigation
-			setTimeout(() => {
-				clearAll()
-				navigate(`/profiling/${session.id}`)
-			}, 1200)
-		} catch (err) {
+			else {
+				setPhase("error")
+				toast.error("No files were uploaded successfully")
+			}
+		}
+		catch (err) {
+			if (err instanceof DOMException && err.name === "AbortError") {
+				// User cancelled — already handled by handleCancel
+				return
+			}
 			setPhase("error")
 			toast.error(err instanceof Error ? err.message : "Something went wrong")
 			console.error(err)
@@ -323,8 +464,8 @@ export default function NewProfilingPage() {
 		idle: "",
 		hashing: "Preparing files...",
 		creating: "Setting up your session...",
-		uploading: "Uploading files to cloud storage...",
-		confirming: "Finalizing your session...",
+		checking: "Checking for duplicates...",
+		uploading: "Uploading files...",
 		done: "All done! Redirecting...",
 		error: "Something went wrong. You can retry.",
 	}
@@ -439,7 +580,7 @@ export default function NewProfilingPage() {
 								disabled={isBusy}
 								{...register("jobDescription", {
 									required: "Job description is required",
-									minLength: { value: 50, message: "Min 50 characters" },
+									maxLength: { value: 2048, message: "Max 2048 characters" },
 								})}
 							/>
 							{errors.jobDescription && (
@@ -529,7 +670,7 @@ export default function NewProfilingPage() {
 								id="file-input"
 								type="file"
 								multiple
-								accept=".pdf,.docx,.txt"
+								accept={FILE_INPUT_ACCEPT}
 								onChange={handleFileSelect}
 								className="hidden"
 								disabled={isBusy}
@@ -542,12 +683,12 @@ export default function NewProfilingPage() {
 									Drag & drop resumes or click to browse
 								</p>
 								<p className="text-xs text-muted-foreground">
-									PDF, DOCX, TXT up to {MAX_FILE_SIZE / 1024 / 1024}MB each
+									PDF, DOCX, TXT up to {MAX_FILE_BYTES / 1024 / 1024}MB each
 								</p>
 							</div>
 							<div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
 								<span className="inline-flex items-center gap-1">
-									<Layers className="size-3" /> Batch up to {MAX_BATCH_SIZE} files
+									<Layers className="size-3" /> Batch up to {MAX_FILES_PER_SESSION} files
 								</span>
 								<span className="inline-flex items-center gap-1">
 									<FileText className="size-3" /> Duplicates auto-detected
@@ -669,15 +810,9 @@ export default function NewProfilingPage() {
 													</Button>
 												</div>
 											</div>
-											<div className="mt-3 space-y-1">
-												{(file.status === "uploading" || file.status === "uploaded" || file.status === "reused") && (
-													<Progress value={file.progress} className="h-1.5" />
-												)}
+											<div className="mt-3">
 												<div className="flex justify-between text-[10px] text-muted-foreground">
 													<span>{fileStatusLabel(file.status, file.errorMessage)}</span>
-													{(file.status === "uploading" || file.status === "uploaded") && (
-														<span>{file.progress}%</span>
-													)}
 												</div>
 											</div>
 										</motion.div>
@@ -694,11 +829,24 @@ export default function NewProfilingPage() {
 								</div>
 
 								<div className="flex items-center gap-3 w-full sm:w-auto">
+									{isBusy && (
+										<Button
+											variant="destructive"
+											className="flex-1 sm:flex-none gap-2"
+											onClick={handleCancel}
+										>
+											<Ban className="size-4" />
+											Cancel
+										</Button>
+									)}
 									{phase === "error" && (
 										<Button
 											variant="secondary"
 											className="flex-1 sm:flex-none gap-2"
-											onClick={() => setPhase("idle")}
+											onClick={() => {
+												setPhase("idle")
+												setSessionId(null)
+											}}
 										>
 											<RefreshCw className="size-4" />
 											Reset
