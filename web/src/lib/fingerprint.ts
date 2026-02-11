@@ -1,19 +1,18 @@
 /**
- * Compute a full-file XXH64 fingerprint for deduplication.
+ * Compute a SHA-256 fingerprint for dedup.
  *
- * Uses xxhash-wasm for cross-platform compatibility (same library
- * is used server-side). Returns a 16-character zero-padded hex string.
- *
- * The WASM module is lazily initialised once and cached for reuse.
+ * Uses the Web Crypto API (SubtleCrypto) for zero-dependency,
+ * cross-platform SHA-256. Returns a 64-character hex string.
  */
+export async function computeFingerprint(file: File): Promise<string> {
+	const buffer = await file.arrayBuffer();
+	const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+	const hashArray = new Uint8Array(hashBuffer);
 
-import xxhash from "xxhash-wasm"
+	let hex = "";
+	for (let i = 0; i < hashArray.length; i++) {
+		hex += hashArray[i].toString(16).padStart(2, "0");
+	}
 
-const hasher = await xxhash()
-
-export async function computeFingerprint(file: File) {
-	const buffer = await file.arrayBuffer()
-	const data = new Uint8Array(buffer)
-	const hash = hasher.h64Raw(data)
-	return hash.toString(16).padStart(16, "0")
+	return hex;
 }

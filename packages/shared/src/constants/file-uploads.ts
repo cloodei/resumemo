@@ -19,7 +19,7 @@ export const MIME_EXTENSION_MAP = {
 } as const
 
 /** Set of allowed MIME types, derived from the extension map. */
-export const ALLOWED_MIME_TYPES = new Set(
+export const ALLOWED_MIME_TYPES_SET = new Set(
 	Object.keys(MIME_EXTENSION_MAP) as (keyof typeof MIME_EXTENSION_MAP)[],
 )
 
@@ -28,6 +28,9 @@ export const ALLOWED_MIME_TYPES_LIST = Object.keys(MIME_EXTENSION_MAP) as (keyof
 
 /** Flat array of allowed file extensions (useful for `<input accept>`). */
 export const ALLOWED_EXTENSIONS_LIST = Object.values(MIME_EXTENSION_MAP).flat()
+
+/** Type of allowed MIME types (useful for type guards). */
+export type ALLOWED_MIME_TYPES = keyof typeof MIME_EXTENSION_MAP
 
 /** Accept string for `<input type="file">` — combines extensions. */
 export const FILE_INPUT_ACCEPT = ALLOWED_EXTENSIONS_LIST.join(",")
@@ -61,5 +64,6 @@ export const SSE_EVENTS = {
 	FILE_DONE: "file:done",
 	FILE_FAILED: "file:failed",
 	FILE_REUSED: "file:reused",
+	FILE_HASH_MISMATCH: "file:hash_mismatch",
 	UPLOAD_COMPLETE: "upload:complete",
 } as const

@@ -28,12 +28,10 @@ import {
 	ALLOWED_MIME_TYPES_LIST,
 	FILE_INPUT_ACCEPT,
 	SSE_EVENTS,
-	BASE_URL,
 } from "@/lib/constants"
 import {
 	useUploadFiles,
 	useUploadPhase,
-	useUploadSessionId,
 	useUploadActions,
 	type FileStatus,
 } from "@/stores/upload-store"
@@ -111,7 +109,7 @@ export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
-	const sessionId = useUploadSessionId()
+	// const sessionId = useUploadSessionId()
 	const {
 		addFiles,
 		removeFile,
@@ -193,77 +191,19 @@ export default function NewProfilingPage() {
 	}
 
 	/**
-	 * Cancel an in-progress upload: abort fetch, call cancel endpoint,
-	 * then reset store state.
+	 * Cancel an in-progress upload: abort the fetch stream.
+	 * Since the session isn't created until the stream completes,
+	 * aborting is enough — there's nothing to clean up server-side.
 	 */
-	const handleCancel = async () => {
-		// Abort the in-flight SSE fetch
+	const handleCancel = () => {
 		abortRef.current?.abort()
 		abortRef.current = null
-
-		// Call server cancel endpoint if we have a session
-		if (sessionId) {
-			try {
-				await api.api.sessions({ id: sessionId }).cancel.post()
-			}
-			catch {
-				// Best-effort — server cleanup will happen eventually
-			}
-		}
-
 		clearAll()
 		toast.info("Upload cancelled")
 	}
 
 	/**
-	 * Consume the SSE stream from the upload endpoint.
-	 * Reads lines from the response body and dispatches per-file
-	 * status updates to the store.
-	 */
-	const consumeSSEStream = async (response: Response) => {
-		const reader = response.body?.getReader()
-		if (!reader) throw new Error("No response body")
-
-		const decoder = new TextDecoder()
-		let buffer = ""
-		let currentEvent = ""
-
-		while (true) {
-			const { done, value } = await reader.read()
-			if (done) break
-
-			buffer += decoder.decode(value, { stream: true })
-
-			// SSE messages are separated by double newlines
-			const parts = buffer.split("\n\n")
-			// Keep the last incomplete part in the buffer
-			buffer = parts.pop() ?? ""
-
-			for (const part of parts) {
-				const lines = part.split("\n")
-
-				for (const line of lines) {
-					if (line.startsWith("event:")) {
-						currentEvent = line.slice(6).trim()
-					} else if (line.startsWith("data:")) {
-						const raw = line.slice(5).trim()
-						if (!raw) continue
-
-						try {
-							const data = JSON.parse(raw)
-							handleSSEEvent(currentEvent, data)
-						} catch {
-							// Skip malformed data lines
-						}
-					}
-				}
-				currentEvent = ""
-			}
-		}
-	}
-
-	/**
-	 * Handle a single SSE event and update the appropriate file in the store.
+	 * Handle a single SSE chunk from the Eden Treaty async generator.
 	 */
 	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
 		const name = data.name as string | undefined
@@ -299,6 +239,13 @@ export default function NewProfilingPage() {
 				})
 				break
 
+			case SSE_EVENTS.FILE_HASH_MISMATCH:
+				updateFileByName(name!, {
+					status: "failed",
+					errorMessage: "File content changed since hashing (hash mismatch)",
+				})
+				break
+
 			case SSE_EVENTS.FILE_FAILED:
 				updateFileByName(name!, {
 					status: "failed",
@@ -308,8 +255,8 @@ export default function NewProfilingPage() {
 
 			case SSE_EVENTS.UPLOAD_COMPLETE: {
 				const status = data.status as string
-				const sid = data.sessionId as string
-				if (status === "ready") {
+				const sid = data.sessionId as string | null
+				if (status === "ready" && sid) {
 					setPhase("done")
 					toast.success("Session created successfully!")
 					setTimeout(() => {
@@ -319,7 +266,7 @@ export default function NewProfilingPage() {
 				} else {
 					const totalFailed = data.totalFailed as number
 					const totalConfirmed = (data.totalConfirmed as number) + (data.totalReused as number)
-					if (totalConfirmed > 0) {
+					if (totalConfirmed > 0 && sid) {
 						setPhase("done")
 						toast.warning(
 							`Session created with ${totalConfirmed} file${totalConfirmed !== 1 ? "s" : ""}. ${totalFailed} file${totalFailed !== 1 ? "s" : ""} failed.`,
@@ -338,7 +285,7 @@ export default function NewProfilingPage() {
 		}
 	}
 
-	const onSubmit = async (data: SessionFormData) => {
+	const onSubmit = async (formData: SessionFormData) => {
 		if (!allFilesReady || files.length === 0) {
 			toast.error("Please add files and wait for them to be ready")
 			return
@@ -353,42 +300,32 @@ export default function NewProfilingPage() {
 		try {
 			setPhase("uploading")
 
-			// Build the hash manifest for batch dedup
-			const hashManifest = filesToProcess.map(f => ({
-				name: f.originalName,
-				size: f.size,
-				mimeType: f.mimeType,
-				xxh64: f.fingerprint!,
-			}))
-
-			// Single FormData with metadata + hashes + files
-			const formData = new FormData()
-			formData.append("name", data.sessionName.trim())
-			formData.append("jobDescription", data.jobDescription.trim())
-			if (data.jobTitle.trim()) {
-				formData.append("jobTitle", data.jobTitle.trim())
-			}
-			formData.append("hashes", JSON.stringify(hashManifest))
-			for (const f of filesToProcess) {
-				formData.append("files", f.file, f.originalName)
-			}
-
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			const response = await fetch(`${BASE_URL}/api/sessions`, {
-				method: "POST",
-				body: formData,
-				credentials: "include",
-				signal: controller.signal,
+			const { data, error } = await api.api.sessions.post({
+				name: formData.sessionName.trim(),
+				jobDescription: formData.jobDescription.trim(),
+				jobTitle: formData.jobTitle.trim() || undefined,
+				hashes: filesToProcess.map(f => ({
+					name: f.originalName,
+					size: f.size,
+					mimeType: f.mimeType,
+					sha256: f.fingerprint!,
+				})),
+				files: filesToProcess.map(f => f.file),
+			}, {
+				fetch: { signal: controller.signal },
 			})
 
-			if (!response.ok) {
-				throw new Error(`Upload failed with status ${response.status}`)
+			if (error) {
+				throw new Error("Upload request failed")
 			}
 
-			// Consume the SSE stream — events update files and handle navigation
-			await consumeSSEStream(response)
+			// Consume the SSE stream via Eden Treaty's async generator
+			for await (const chunk of data as AsyncIterable<{ event: string; data: Record<string, unknown> }>) {
+				handleSSEEvent(chunk.event, chunk.data)
+			}
 
 			abortRef.current = null
 		}

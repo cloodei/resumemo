@@ -132,7 +132,7 @@ const uploadStore = create<UploadStore>()(
 				},
 
 				/**
-				 * Compute XXH64 fingerprints for all files that don't have one yet.
+				 * Compute SHA-256 fingerprints for all files that don't have one yet.
 				 * Runs in the background as soon as files are added.
 				 */
 				hashFiles: async () => {

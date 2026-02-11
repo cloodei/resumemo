@@ -19,7 +19,7 @@ const r2Client = new S3Client({
  * Generate a unique storage key for a file.
  * Format: `userId/uuid-sanitized_filename`
  */
-function generateStorageKey(userId: string, originalName: string): string {
+function generateStorageKey(userId: string, originalName: string) {
 	const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_").toLowerCase();
 	const uniqueId = randomUUIDv7();
 	return `${userId}/${uniqueId}-${safeName}`;
@@ -31,7 +31,7 @@ function generateStorageKey(userId: string, originalName: string): string {
  * This replaces the old presigned-URL flow — the server now receives
  * the file bytes and performs the upload itself.
  */
-async function uploadFile(storageKey: string, body: Buffer | Uint8Array, contentType: string): Promise<void> {
+async function uploadFile(storageKey: string, body: Buffer | string | Uint8Array, contentType: string) {
 	const command = new PutObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
@@ -45,7 +45,7 @@ async function uploadFile(storageKey: string, body: Buffer | Uint8Array, content
 /**
  * Delete a file from R2.
  */
-async function deleteFile(storageKey: string): Promise<void> {
+async function deleteFile(storageKey: string) {
 	const command = new DeleteObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
