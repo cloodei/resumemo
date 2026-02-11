@@ -43,7 +43,7 @@ type SessionFile = {
 	id: string
 	originalName: string
 	mimeType: string
-	size: bigint
+	size: number
 }
 
 function statusBadgeVariant(status: ProfilingSession["status"]) {
@@ -94,7 +94,7 @@ export default function ProfilingResultsPage() {
 			}
 
 			setSession(data.session)
-			setFiles((data.files || []) as SessionFile[])
+			setFiles((data.files || []))
 		} catch (err) {
 			toast.error("Failed to load profiling session")
 			console.error(err)

@@ -50,12 +50,11 @@ export const MAGIC_BYTES = {
 		bytes: [0x50, 0x4B, 0x03, 0x04], // PK..
 		offset: 0,
 	},
-	// text/plain has no magic bytes — validated by checking for valid UTF-8
-	// and absence of null bytes instead
-} as const satisfies Partial<Record<keyof typeof MIME_EXTENSION_MAP, { bytes: readonly number[]; offset: number }>>
+} as const
 
 /** SSE event types emitted during the upload stream. */
 export const SSE_EVENTS = {
+	SESSION_CREATED: "session:created",
 	FILE_VALIDATING: "file:validating",
 	FILE_VALIDATED: "file:validated",
 	FILE_UPLOADING: "file:uploading",

@@ -3,6 +3,7 @@ import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
 import NewProfilingPage from "@/pages/profiling/new"
 import ProfilingResultsPage from "@/pages/profiling/session"
+import RandomTestPage from "@/pages/test/random"
 import NewJobPage from "@/pages/jobs/new-job"
 import JobResultsPage from "@/pages/jobs/job-results"
 
@@ -35,6 +36,12 @@ export const ROUTES = [
     path: "/profiling/:id",
     title: "Profiling Results · Résumé Ranker",
     element: <ProfilingResultsPage />,
+    layout: "app",
+  },
+  {
+    path: "/test/random",
+    title: "Random API Test · Résumé Ranker",
+    element: <RandomTestPage />,
     layout: "app",
   },
   // Legacy redirects (can remove later)

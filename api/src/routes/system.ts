@@ -27,6 +27,18 @@ export const systemRoutes = new Elysia()
 		 * ONLY FOR DEVELOPMENT
 		 */
 		await Promise.all([
+			db.delete(schema.profilingSessionFile),
+			db.delete(schema.profilingSession),
+			db.delete(schema.resumeFile),
+		]);
+		return { status: "ok" };
+	})
+	.get("/api/clear/all", async () => {
+		/**
+		 * TODO: Remove this endpoint
+		 * ONLY FOR DEVELOPMENT
+		 */
+		await Promise.all([
 			db.delete(schema.user),
 			db.delete(schema.session),
 			db.delete(schema.account),

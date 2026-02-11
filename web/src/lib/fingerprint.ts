@@ -11,7 +11,7 @@ import xxhash from "xxhash-wasm"
 
 const hasher = await xxhash()
 
-export async function computeFingerprint(file: File): Promise<string> {
+export async function computeFingerprint(file: File) {
 	const buffer = await file.arrayBuffer()
 	const data = new Uint8Array(buffer)
 	const hash = hasher.h64Raw(data)

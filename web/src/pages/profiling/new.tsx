@@ -7,7 +7,6 @@ import {
 	ArrowRight,
 	CheckCircle2,
 	FileText,
-	Hash,
 	Layers,
 	Loader2,
 	RefreshCw,
@@ -72,9 +71,7 @@ const jdTemplates = [
 function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 	switch (status) {
 		case "selected":
-			return "Queued"
-		case "hashing":
-			return "Preparing..."
+			return "Getting ready..."
 		case "ready":
 			return "Ready"
 		case "uploading":
@@ -92,8 +89,6 @@ function fileStatusIcon(status: FileStatus) {
 	switch (status) {
 		case "selected":
 			return <FileText className="size-4 text-muted-foreground" />
-		case "hashing":
-			return <Hash className="size-4 animate-pulse text-amber-500" />
 		case "ready":
 			return <CheckCircle2 className="size-4 text-sky-500" />
 		case "uploading":
@@ -124,7 +119,7 @@ export default function NewProfilingPage() {
 		updateFileByName,
 		setPhase,
 		setSessionId,
-		hashFiles,
+		checkAndHash
 	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
@@ -144,16 +139,12 @@ export default function NewProfilingPage() {
 	})
 
 	useEffect(() => {
-		const hasUnhashed = files.some(f => f.status === "selected" && !f.fingerprint)
-		if (hasUnhashed) {
-			hashFiles()
-		}
+		checkAndHash()
 	}, [files])
 
 	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done" || f.status === "reused")
 	const failedFiles = files.filter(f => f.status === "failed")
-	const hashingFiles = files.filter(f => f.status === "hashing" || f.status === "selected")
-	const allFilesReady = files.length > 0 && hashingFiles.length === 0
+	const allFilesReady = files.length > 0 && files.every(f => f.status === "ready")
 	const isBusy = phase !== "idle" && phase !== "done" && phase !== "error"
 
 	const handleAddFiles = useCallback(
@@ -276,9 +267,12 @@ export default function NewProfilingPage() {
 	 */
 	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
 		const name = data.name as string | undefined
-		if (!name && event !== SSE_EVENTS.UPLOAD_COMPLETE) return
 
 		switch (event) {
+			case SSE_EVENTS.SESSION_CREATED:
+				setSessionId(data.sessionId as string)
+				break
+
 			case SSE_EVENTS.FILE_VALIDATING:
 				updateFileByName(name!, { status: "uploading" })
 				break
@@ -314,10 +308,30 @@ export default function NewProfilingPage() {
 
 			case SSE_EVENTS.UPLOAD_COMPLETE: {
 				const status = data.status as string
+				const sid = data.sessionId as string
 				if (status === "ready") {
 					setPhase("done")
+					toast.success("Session created successfully!")
+					setTimeout(() => {
+						clearAll()
+						navigate(`/profiling/${sid}`)
+					}, 1200)
 				} else {
-					setPhase("error")
+					const totalFailed = data.totalFailed as number
+					const totalConfirmed = (data.totalConfirmed as number) + (data.totalReused as number)
+					if (totalConfirmed > 0) {
+						setPhase("done")
+						toast.warning(
+							`Session created with ${totalConfirmed} file${totalConfirmed !== 1 ? "s" : ""}. ${totalFailed} file${totalFailed !== 1 ? "s" : ""} failed.`,
+						)
+						setTimeout(() => {
+							clearAll()
+							navigate(`/profiling/${sid}`)
+						}, 1200)
+					} else {
+						setPhase("error")
+						toast.error("No files were uploaded successfully")
+					}
 				}
 				break
 			}
@@ -337,76 +351,32 @@ export default function NewProfilingPage() {
 		}
 
 		try {
-			// ── Phase 1: Create session (metadata only) ─────────────
-			setPhase("creating")
-
-			const { data: createData, error: createError } = await api.api.sessions.post({
-				name: data.sessionName.trim(),
-				jobTitle: data.jobTitle.trim() || undefined,
-				jobDescription: data.jobDescription.trim(),
-			})
-
-			if (createError || !createData) {
-				throw new Error("Failed to create session")
-			}
-
-			const createdSessionId = createData.session.id
-			setSessionId(createdSessionId)
-
-			// ── Phase 2: Check duplicates ────────────────────────────
-			setPhase("checking")
-
-			const { data: dedupData, error: dedupError } = await api.api
-				.sessions({ id: createdSessionId })
-				["check-duplicates"]
-				.post({
-					files: filesToProcess.map(f => ({
-						name: f.originalName,
-						size: f.size,
-						mimeType: f.mimeType,
-						xxh64: f.fingerprint!,
-					})),
-				})
-
-			if (dedupError || !dedupData || dedupData.status !== "ok") {
-				throw new Error("Failed to check duplicates")
-			}
-
-			// Mark reused files in the store
-			for (const dup of dedupData.duplicates) {
-				updateFileByName(dup.name, {
-					status: "reused",
-					fileId: dup.existingFileId,
-				})
-			}
-
-			// Determine which files still need to be uploaded
-			const toUploadNames = new Set(dedupData.toUpload.map(f => f.name))
-			const filesToUpload = filesToProcess.filter(f => toUploadNames.has(f.originalName))
-
-			if (filesToUpload.length === 0) {
-				// All files were duplicates — session is ready
-				setPhase("done")
-				toast.success("Session created! All files were already on file.")
-				setTimeout(() => {
-					clearAll()
-					navigate(`/profiling/${createdSessionId}`)
-				}, 1200)
-				return
-			}
-
-			// ── Phase 3: Upload via multipart + SSE stream ──────────
 			setPhase("uploading")
 
+			// Build the hash manifest for batch dedup
+			const hashManifest = filesToProcess.map(f => ({
+				name: f.originalName,
+				size: f.size,
+				mimeType: f.mimeType,
+				xxh64: f.fingerprint!,
+			}))
+
+			// Single FormData with metadata + hashes + files
 			const formData = new FormData()
-			for (const f of filesToUpload) {
+			formData.append("name", data.sessionName.trim())
+			formData.append("jobDescription", data.jobDescription.trim())
+			if (data.jobTitle.trim()) {
+				formData.append("jobTitle", data.jobTitle.trim())
+			}
+			formData.append("hashes", JSON.stringify(hashManifest))
+			for (const f of filesToProcess) {
 				formData.append("files", f.file, f.originalName)
 			}
 
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			const response = await fetch(`${BASE_URL}/api/sessions/${createdSessionId}/upload`, {
+			const response = await fetch(`${BASE_URL}/api/sessions`, {
 				method: "POST",
 				body: formData,
 				credentials: "include",
@@ -417,35 +387,10 @@ export default function NewProfilingPage() {
 				throw new Error(`Upload failed with status ${response.status}`)
 			}
 
-			// Consume the SSE stream — this updates files in real-time
+			// Consume the SSE stream — events update files and handle navigation
 			await consumeSSEStream(response)
 
 			abortRef.current = null
-
-			// Check final state
-			const currentFiles = files
-			const doneCount = currentFiles.filter(f => f.status === "done" || f.status === "reused").length
-			const failedCount = currentFiles.filter(f => f.status === "failed").length
-
-			if (doneCount > 0) {
-				if (failedCount > 0) {
-					toast.warning(
-						`Session created with ${doneCount} file${doneCount !== 1 ? "s" : ""}. ${failedCount} file${failedCount !== 1 ? "s" : ""} failed.`,
-					)
-				}
-				else {
-					toast.success("Session created successfully!")
-				}
-
-				setTimeout(() => {
-					clearAll()
-					navigate(`/profiling/${createdSessionId}`)
-				}, 1200)
-			}
-			else {
-				setPhase("error")
-				toast.error("No files were uploaded successfully")
-			}
 		}
 		catch (err) {
 			if (err instanceof DOMException && err.name === "AbortError") {
@@ -463,8 +408,6 @@ export default function NewProfilingPage() {
 	const phaseLabel = {
 		idle: "",
 		hashing: "Preparing files...",
-		creating: "Setting up your session...",
-		checking: "Checking for duplicates...",
 		uploading: "Uploading files...",
 		done: "All done! Redirecting...",
 		error: "Something went wrong. You can retry.",
@@ -716,7 +659,6 @@ export default function NewProfilingPage() {
 										<Loader2 className="size-4 animate-spin text-sky-500" />
 									)}
 									{files.length} file{files.length !== 1 ? "s" : ""} in queue
-									{hashingFiles.length > 0 && ` — preparing ${hashingFiles.length}...`}
 									{allFilesReady && " — all ready"}
 								</p>
 								{failedFiles.length > 0 && (

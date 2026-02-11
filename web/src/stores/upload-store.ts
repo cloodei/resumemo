@@ -3,24 +3,18 @@ import { persist, createJSONStorage } from "zustand/middleware"
 import { MAX_FILES_PER_SESSION, MAX_FILE_BYTES, ALLOWED_MIME_TYPES_LIST } from "@/lib/constants"
 import { computeFingerprint } from "@/lib/fingerprint"
 
+var _counter = 0
+
 /**
  * Client-side file status — purely for UI state, never persisted to DB.
  *
  * Lifecycle:
  *   selected → hashing → ready → uploading → done | failed | reused
- *
- * - selected:   user added the file, not yet fingerprinted
- * - hashing:    computing the XXH64 fingerprint
- * - ready:      fingerprint computed, waiting for upload
- * - uploading:  server is processing this file (SSE stream active)
- * - done:       successfully uploaded to R2 and saved
- * - reused:     server/client detected a duplicate, no upload needed
- * - failed:     hashing or upload failed
  */
-export type FileStatus = "selected" | "hashing" | "ready" | "uploading" | "done" | "reused" | "failed"
+export type FileStatus = "selected" | "ready" | "uploading" | "done" | "reused" | "failed"
 
 export type UploadFile = {
-	id: string
+	id: number
 	file: File
 	originalName: string
 	size: number
@@ -28,38 +22,37 @@ export type UploadFile = {
 	status: FileStatus
 	fingerprint?: string
 	errorMessage?: string
-	/** Server-side file ID (set after upload or dedup match). */
+	/** Server-side file ID (set after upload completes or dedup match). */
 	fileId?: string
 }
 
 /**
  * Upload phase — overall orchestration state.
  *
- * idle     → user is adding files
- * hashing  → computing fingerprints (auto-triggered)
- * creating → POST /sessions (metadata only)
- * checking → POST /sessions/:id/check-duplicates
- * uploading → POST /sessions/:id/upload (SSE stream)
- * done     → all complete, navigating away
- * error    → something failed
+ * idle      → user is adding files
+ * hashing   → computing fingerprints (auto-triggered on file add)
+ * uploading → single multipart POST in flight (SSE stream active)
+ * done      → all complete, navigating away
+ * error     → something failed
  */
-export type UploadPhase = "idle" | "hashing" | "creating" | "checking" | "uploading" | "done" | "error"
+export type UploadPhase = "idle" | "hashing" | "uploading" | "done" | "error"
 
 interface UploadStore {
 	files: UploadFile[]
 	phase: UploadPhase
-	/** Session ID set after successful session creation. */
+	/** Session ID received from SSE session:created event. */
 	sessionId: string | null
 
 	actions: {
 		addFiles: (newFiles: File[]) => void
-		removeFile: (id: string) => void
+		removeFile: (id: number) => void
 		clearAll: () => void
-		updateFile: (id: string, updates: Partial<UploadFile>) => void
+		updateFileById: (id: number, updates: Partial<UploadFile>) => void
 		updateFileByName: (name: string, updates: Partial<UploadFile>) => void
 		setPhase: (phase: UploadPhase) => void
 		setSessionId: (id: string | null) => void
 		hashFiles: () => Promise<void>
+		checkAndHash: () => Promise<void>
 	}
 }
 
@@ -74,16 +67,25 @@ const uploadStore = create<UploadStore>()(
 				addFiles: (newFiles: File[]) => {
 					const currentFiles = get().files
 
-					if (currentFiles.length + newFiles.length > MAX_FILES_PER_SESSION) return
+					if (currentFiles.length + newFiles.length > MAX_FILES_PER_SESSION)
+						return
 
 					const validFiles: UploadFile[] = []
 					for (const file of newFiles) {
-						if (!ALLOWED_MIME_TYPES_LIST.includes(file.type as typeof ALLOWED_MIME_TYPES_LIST[number])) continue
-						if (file.size > MAX_FILE_BYTES) continue
-						if (currentFiles.some(f => f.originalName === file.name && f.size === file.size)) continue
+						if (file.size > MAX_FILE_BYTES)
+							continue
+						if (!ALLOWED_MIME_TYPES_LIST.includes(file.type as typeof ALLOWED_MIME_TYPES_LIST[number]))
+							continue
+
+						/**
+						 * TODO: implement duplicate file check
+						 * ASSUME PREVIOUSLY SELECTED FILES ARE NOT DUPLICATES
+						 */
+						// if (currentFiles.some(f => f.originalName === file.name && f.size === file.size))
+						// 	continue
 
 						validFiles.push({
-							id: crypto.randomUUID(),
+							id: ++_counter,
 							file,
 							originalName: file.name,
 							size: file.size,
@@ -95,7 +97,7 @@ const uploadStore = create<UploadStore>()(
 					set({ files: [...currentFiles, ...validFiles] })
 				},
 
-				removeFile: (id: string) => {
+				removeFile: (id: number) => {
 					const files = get().files.filter(f => f.id !== id)
 					set({ files })
 					if (files.length === 0) set({ phase: "idle", sessionId: null })
@@ -103,14 +105,6 @@ const uploadStore = create<UploadStore>()(
 
 				clearAll: () => {
 					set({ files: [], phase: "idle", sessionId: null })
-				},
-
-				updateFile: (id: string, updates: Partial<UploadFile>) => {
-					set({
-						files: get().files.map(f =>
-							f.id === id ? { ...f, ...updates } : f,
-						),
-					})
 				},
 
 				updateFileByName: (name: string, updates: Partial<UploadFile>) => {
@@ -129,10 +123,17 @@ const uploadStore = create<UploadStore>()(
 					set({ sessionId: id })
 				},
 
+				updateFileById: (id: number, updates: Partial<UploadFile>) => {
+					set({
+						files: get().files.map(f =>
+							f.id === id ? { ...f, ...updates } : f,
+						),
+					})
+				},
+
 				/**
 				 * Compute XXH64 fingerprints for all files that don't have one yet.
-				 * Runs in the background as soon as files are added so fingerprints
-				 * are ready when the user clicks "Upload".
+				 * Runs in the background as soon as files are added.
 				 */
 				hashFiles: async () => {
 					const { files, actions } = get()
@@ -140,17 +141,33 @@ const uploadStore = create<UploadStore>()(
 						const file = files[i]
 						if (file.status !== "selected") continue
 
-						actions.updateFile(file.id, { status: "hashing" })
-
 						try {
 							const fingerprint = await computeFingerprint(file.file)
-							actions.updateFile(file.id, { status: "ready", fingerprint })
-						} catch {
-							actions.updateFile(file.id, {
+							actions.updateFileById(file.id, { status: "ready", fingerprint })
+						}
+						catch {
+							actions.updateFileById(file.id, {
 								status: "failed",
 								errorMessage: "Could not read file",
 							})
 						}
+					}
+				},
+
+				checkAndHash: async () => {
+					const files = get().files
+
+					for (let i = 0; i < files.length; ++i) {
+						const file = files[i]
+						if (file.status !== "selected" || file.fingerprint)
+							continue
+
+						const fingerprint = await computeFingerprint(file.file)
+						set({
+							files: files.map(f =>
+								f.id === file.id ? { ...f, status: "ready", fingerprint } : f,
+							),
+						})
 					}
 				},
 			},
@@ -158,7 +175,6 @@ const uploadStore = create<UploadStore>()(
 		{
 			name: "resumemo-uploads",
 			storage: createJSONStorage(() => sessionStorage),
-			// Only persist serializable data (not File objects)
 			partialize: (state) => ({
 				phase: state.phase,
 				sessionId: state.sessionId,
@@ -174,7 +190,6 @@ const uploadStore = create<UploadStore>()(
 			}),
 			onRehydrateStorage: () => (state) => {
 				if (state) {
-					// Files without File objects can't be re-uploaded — keep only completed ones
 					state.files = state.files.filter(f =>
 						f.status === "done" || f.status === "reused",
 					)
