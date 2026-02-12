@@ -42,7 +42,7 @@ function toFileKey(fingerprint: string | null, mimeType: string | null, size: nu
 	return `${fingerprint ?? ""}:${mimeType ?? ""}:${size.toString()}`;
 }
 
-const sessionRoutesV1 = new Elysia({ prefix: "/api/sessions" })
+const sessionRoutesV1 = new Elysia({ prefix: "/api/v1/sessions" })
 	.use(authMiddleware)
 
 	/**
@@ -484,7 +484,7 @@ const sessionRoutesV1 = new Elysia({ prefix: "/api/sessions" })
 	)
 
 	/** Get a specific profiling session with its associated files. */
-	.get(
+		.get(
 		"/:id",
 		async ({ user, params, set }) => {
 			const [session] = await db
@@ -524,7 +524,6 @@ const sessionRoutesV1 = new Elysia({ prefix: "/api/sessions" })
 				})),
 			};
 		},
-		{ auth: true },
-	);
+		{ auth: true });
 
 export { sessionRoutesV1 };

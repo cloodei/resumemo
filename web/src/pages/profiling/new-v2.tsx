@@ -27,12 +27,10 @@ import {
 	MAX_FILE_BYTES,
 	ALLOWED_MIME_TYPES_LIST,
 	FILE_INPUT_ACCEPT,
-	SSE_EVENTS,
 } from "@/lib/constants"
 import {
 	useUploadFiles,
 	useUploadPhase,
-	useUploadSessionId,
 	useUploadActions,
 	type FileStatus,
 } from "@/stores/upload-store"
@@ -110,7 +108,6 @@ export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
-	const sessionId = useUploadSessionId()
 	const {
 		addFiles,
 		removeFile,
@@ -123,6 +120,9 @@ export default function NewProfilingPage() {
 
 	const [isDragging, setIsDragging] = useState(false)
 	const abortRef = useRef<AbortController | null>(null)
+	const xhrRefs = useRef<XMLHttpRequest[]>([])
+	const activeUploadIdRef = useRef<string | null>(null)
+	const activeIntentTokenRef = useRef<string | null>(null)
 
 	const {
 		register,
@@ -191,94 +191,68 @@ export default function NewProfilingPage() {
 		e.target.value = ""
 	}
 
-	/**
-	 * Cancel an in-progress upload: abort the fetch stream.
-	 * Since the session isn't created until the stream completes,
-	 * aborting is enough — there's nothing to clean up server-side.
-	 */
+	const uploadViaPresignedUrl = (args: {
+		uploadUrl: string
+		file: File
+		mimeType: string
+		signal: AbortSignal
+	}) => {
+		const { uploadUrl, file, mimeType, signal } = args
+
+		return new Promise<void>((resolve, reject) => {
+			const xhr = new XMLHttpRequest()
+			xhrRefs.current.push(xhr)
+
+			const abortListener = () => xhr.abort()
+			signal.addEventListener("abort", abortListener)
+
+			xhr.open("PUT", uploadUrl)
+			xhr.setRequestHeader("Content-Type", mimeType)
+
+			xhr.onload = () => {
+				signal.removeEventListener("abort", abortListener)
+				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				if (xhr.status >= 200 && xhr.status < 300) {
+					resolve()
+					return
+				}
+				reject(new Error(`Upload failed with status ${xhr.status}`))
+			}
+
+			xhr.onerror = () => {
+				signal.removeEventListener("abort", abortListener)
+				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				reject(new Error("Network error while uploading file"))
+			}
+
+			xhr.onabort = () => {
+				signal.removeEventListener("abort", abortListener)
+				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				reject(new DOMException("Upload aborted", "AbortError"))
+			}
+
+			xhr.send(file)
+		})
+	}
+
 	const handleCancel = () => {
 		abortRef.current?.abort()
+		xhrRefs.current.forEach((xhr) => xhr.abort())
+		xhrRefs.current = []
+
+		const activeUploadId = activeUploadIdRef.current
+		const activeIntentToken = activeIntentTokenRef.current
+		if (activeUploadId && activeIntentToken) {
+			void api.api.v2.sessions({ uploadId: activeUploadId }).cancel.post({
+				intentToken: activeIntentToken,
+			})
+		}
+
+		activeUploadIdRef.current = null
+		activeIntentTokenRef.current = null
 		abortRef.current = null
 		clearAll()
 		toast.info("Upload cancelled")
-	}
-
-	/**
-	 * Handle a single SSE chunk from the Eden Treaty async generator.
-	 * All per-file events use `clientId` (the store's numeric ID).
-	 */
-	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
-		const clientId = data.clientId as number | undefined
-
-		switch (event) {
-			case SSE_EVENTS.SESSION_CREATED:
-				setSessionId(data.sessionId as string)
-				break
-
-			case SSE_EVENTS.FILE_VALIDATING:
-				updateFileById(clientId!, { status: "uploading" })
-				break
-
-			case SSE_EVENTS.FILE_VALIDATED:
-			case SSE_EVENTS.FILE_UPLOADING:
-				break
-
-			case SSE_EVENTS.FILE_DONE:
-				updateFileById(clientId!, {
-					status: "done",
-					fileId: data.fileId as number | undefined,
-				})
-				break
-
-			case SSE_EVENTS.FILE_REUSED:
-				updateFileById(clientId!, {
-					status: "reused",
-					fileId: data.fileId as number,
-				})
-				break
-
-			case SSE_EVENTS.FILE_HASH_MISMATCH:
-				// v1 server flow currently does not emit hash-mismatch; keep no-op for compatibility.
-				break
-
-			case SSE_EVENTS.FILE_FAILED:
-				updateFileById(clientId!, {
-					status: "failed",
-					errorMessage: (data.reason as string) ?? "Upload failed",
-				})
-				break
-
-			case SSE_EVENTS.UPLOAD_COMPLETE: {
-				const status = data.status as string
-				const sid = (data.sessionId as string | null) ?? null
-				const fallbackSid = sid ?? sessionId
-				if (status === "ready" && sid) {
-					setPhase("done")
-					toast.success("Session created successfully!")
-					setTimeout(() => {
-						clearAll()
-						navigate(`/profiling/${sid}`)
-					}, 1200)
-				} else {
-					const totalFailed = data.totalFailed as number
-					const totalConfirmed = (data.totalConfirmed as number) + (data.totalReused as number)
-					if (totalConfirmed > 0 && fallbackSid) {
-						setPhase("done")
-						toast.warning(
-							`Session created with ${totalConfirmed} file${totalConfirmed !== 1 ? "s" : ""}. ${totalFailed} file${totalFailed !== 1 ? "s" : ""} failed.`,
-						)
-						setTimeout(() => {
-							clearAll()
-							navigate(`/profiling/${fallbackSid}`)
-						}, 1200)
-					} else {
-						setPhase("error")
-						toast.error("No files were uploaded successfully")
-					}
-				}
-				break
-			}
-		}
 	}
 
 	const onSubmit = async (formData: SessionFormData) => {
@@ -299,25 +273,78 @@ export default function NewProfilingPage() {
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			const { data, error } = await api.api.v1.sessions.post({
+			const { data: initData, error: initError } = await api.api.v2.sessions.init.post({
 				name: formData.sessionName.trim(),
 				jobDescription: formData.jobDescription.trim(),
 				jobTitle: formData.jobTitle.trim() || undefined,
-				hashes: filesToProcess.map(f => f.fingerprint!),
-				clientIds: filesToProcess.map(f => f.id),
-				files: filesToProcess.map(f => f.file),
+				files: filesToProcess.map(f => ({
+					clientId: f.id,
+					fileName: f.originalName,
+					mimeType: f.mimeType,
+					size: f.size,
+				})),
 			}, {
 				fetch: { signal: controller.signal },
 			})
 
-			if (error) {
-				throw new Error("Upload request failed")
+			if (initError || !initData || initData.status !== "ok") {
+				throw new Error("Could not initialize upload session")
 			}
 
-			// Consume the SSE stream via Eden Treaty's async generator
-			for await (const chunk of data) {
-				handleSSEEvent(chunk.event, chunk.data)
+			activeUploadIdRef.current = initData.uploadId
+			activeIntentTokenRef.current = initData.intentToken
+
+			for (const file of filesToProcess) {
+				const uploadTarget = initData.uploads.find(upload => upload.clientId === file.id)
+				if (!uploadTarget) {
+					throw new Error(`Missing upload target for ${file.originalName}`)
+				}
+
+				updateFileById(file.id, { status: "uploading", errorMessage: undefined })
+
+				try {
+					await uploadViaPresignedUrl({
+						uploadUrl: uploadTarget.uploadUrl,
+						file: file.file,
+						mimeType: file.mimeType,
+						signal: controller.signal,
+					})
+					updateFileById(file.id, { status: "done" })
+				}
+				catch (uploadError) {
+					updateFileById(file.id, {
+						status: "failed",
+						errorMessage: uploadError instanceof Error ? uploadError.message : "Upload failed",
+					})
+					throw uploadError
+				}
 			}
+
+			const { data: finishData, error: finishError } = await api.api.v2.sessions({ uploadId: initData.uploadId }).finish.post({
+				intentToken: initData.intentToken,
+			})
+
+			if (finishError || !finishData || finishData.status !== "ready") {
+				if (finishData && "failures" in finishData && Array.isArray(finishData.failures)) {
+					for (const failure of finishData.failures as Array<{ clientId: number; reason: string }>) {
+						updateFileById(failure.clientId, {
+							status: "failed",
+							errorMessage: failure.reason,
+						})
+					}
+				}
+				throw new Error("Upload verification failed")
+			}
+
+			setPhase("done")
+			toast.success("Session created successfully!")
+			setTimeout(() => {
+				clearAll()
+				navigate(`/profiling/${finishData.sessionId}`)
+			}, 1200)
+
+			activeUploadIdRef.current = null
+			activeIntentTokenRef.current = null
 
 			abortRef.current = null
 		}
@@ -326,9 +353,24 @@ export default function NewProfilingPage() {
 				// User cancelled — already handled by handleCancel
 				return
 			}
+
+			const activeUploadId = activeUploadIdRef.current
+			const activeIntentToken = activeIntentTokenRef.current
+			if (activeUploadId && activeIntentToken) {
+				void api.api.v2.sessions({ uploadId: activeUploadId }).cancel.post({
+					intentToken: activeIntentToken,
+				})
+			}
+			activeUploadIdRef.current = null
+			activeIntentTokenRef.current = null
+
 			setPhase("error")
 			toast.error(err instanceof Error ? err.message : "Something went wrong")
 			console.error(err)
+		}
+		finally {
+			xhrRefs.current = []
+			abortRef.current = null
 		}
 	}
 

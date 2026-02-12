@@ -1,4 +1,5 @@
 import { randomUUIDv7 } from "bun";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
@@ -43,6 +44,19 @@ async function uploadFile(storageKey: string, body: Buffer | string | Uint8Array
 }
 
 /**
+ * Generate a short-lived presigned URL for direct browser upload.
+ */
+async function generatePresignedUploadUrl(storageKey: string, contentType: string) {
+	const command = new PutObjectCommand({
+		Bucket: R2_BUCKET_NAME,
+		Key: storageKey,
+		ContentType: contentType,
+	});
+
+	return getSignedUrl(r2Client, command, { expiresIn: 60 * 15 });
+}
+
+/**
  * Delete a file from R2.
  */
 async function deleteFile(storageKey: string) {
@@ -66,4 +80,12 @@ async function headFile(storageKey: string) {
 	return r2Client.send(command);
 }
 
-export { r2Client, R2_BUCKET_NAME, generateStorageKey, uploadFile, deleteFile, headFile };
+export {
+	r2Client,
+	R2_BUCKET_NAME,
+	generateStorageKey,
+	uploadFile,
+	generatePresignedUploadUrl,
+	deleteFile,
+	headFile,
+};

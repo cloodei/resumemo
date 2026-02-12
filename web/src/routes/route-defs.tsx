@@ -2,6 +2,7 @@ import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
 import NewProfilingPage from "@/pages/profiling/new"
+import NewProfilingPageV2 from "@/pages/profiling/new-v2"
 import ProfilingResultsPage from "@/pages/profiling/session"
 import RandomTestPage from "@/pages/test/random"
 import NewJobPage from "@/pages/jobs/new-job"
@@ -30,6 +31,12 @@ export const ROUTES = [
     path: "/profiling/new",
     title: "New Profiling Session · Résumé Ranker",
     element: <NewProfilingPage />,
+    layout: "app",
+  },
+  {
+    path: "/profiling/new-v2",
+    title: "New Profiling Session V2 · Résumé Ranker",
+    element: <NewProfilingPageV2 />,
     layout: "app",
   },
   {
