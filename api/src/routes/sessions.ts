@@ -2,12 +2,12 @@ import { Elysia, sse, t } from "elysia";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import * as schema from "@shared/schemas";
-import { MAX_FILE_BYTES, MAX_FILES_PER_SESSION, SSE_EVENTS } from "@shared/constants/file-uploads";
+import { type ALLOWED_MIME_TYPES, MAX_FILE_BYTES, MAX_FILES_PER_SESSION, SSE_EVENTS } from "@shared/constants/file-uploads";
 
 import { db } from "../lib/db";
 import { computeSHA256 } from "../lib/hash";
 import { authMiddleware } from "../lib/auth";
-import { validateFileContent } from "../lib/upload-guard";
+import { validateFileContent, validateFileMetadata } from "../lib/upload-guard";
 import { deleteFile, generateStorageKey, uploadFile } from "../lib/storage";
 
 type UploadedFileRecord = {
@@ -26,17 +26,14 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 	 *
 	 * Accepts multipart/form-data with:
 	 *   - name, jobDescription, jobTitle (session metadata)
-	 *   - hashes: JSON string of hash manifest for batch dedup
+	 *   - hashes: SHA-256 hex strings, index-parallel to files
+	 *   - clientIds: client-side numeric IDs, index-parallel to files
 	 *   - files: the actual file blobs
 	 *
 	 * Returns an SSE stream. Session + file DB rows are only inserted
 	 * at the very end, in a single batch, on success.
 	 *
-	 * SSE events:
-	 *   1. file:reused          — per duplicate found via hash manifest
-	 *   2. file:validating / file:validated / file:uploading / file:done / file:failed / file:hash_mismatch — per new file
-	 *   3. session:created      — session ID (emitted near the end, after batch insert)
-	 *   4. upload:complete      — final summary
+	 * SSE events use `clientId` (the client-side numeric ID) to refer to files.
 	 */
 	.post(
 		"/",
@@ -45,92 +42,104 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				name,
 				jobTitle,
 				jobDescription,
-				hashes: hashManifest,
+				hashes,
+				clientIds,
 				files: rawFiles
 			} = body;
 
-			for (const file of rawFiles) {
-				if (file.size > MAX_FILE_BYTES) {
-					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { name: file.name, reason: "File too large" } });
-					return;
+			if (hashes.length !== rawFiles.length || clientIds.length !== rawFiles.length) {
+				yield sse({ event: SSE_EVENTS.UPLOAD_FAILED, data: { reason: "hashes, clientIds, and files must have the same length" } });
+				return;
+			}
+
+			let failcheck = 0;
+			for (let i = 0; i < rawFiles.length; i++) {
+				const file = rawFiles[i];
+				const check = validateFileMetadata({
+					fileName: file.name,
+					claimedMimeType: file.type,
+					size: file.size,
+				});
+				if (!check.ok) {
+					failcheck++;
+					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { clientId: clientIds[i], reason: check.message } });
 				}
 			}
 
-			const fingerprints = hashManifest.map(h => h.sha256);
+			if (failcheck > 0) {
+				yield sse({
+					event: SSE_EVENTS.UPLOAD_FAILED,
+					data: { reason: `${failcheck} file(s) failed metadata validation` },
+				});
+				return;
+			}
+
 			const existingFiles = await db.select()
 				.from(schema.resumeFile)
 				.where(and(
 					eq(schema.resumeFile.userId, user.id),
-					inArray(schema.resumeFile.fingerprint, fingerprints),
-				));
+					inArray(schema.resumeFile.fingerprint, hashes),
+				))
 
 			const lookup = new Map(
-				existingFiles.map(f => [`${f.fingerprint}:${f.size}:${f.mimeType}`, f]),
+				existingFiles.map(f => [`${f.fingerprint}:${f.size}:${f.mimeType}`, f.id]),
 			);
 
-			const reusedNames = new Set<string>();
-			const reusedFileIds: string[] = [];
-
-			for (const entry of hashManifest) {
-				const existing = lookup.get(`${entry.sha256}:${entry.size}:${entry.mimeType}`);
-				if (!existing) continue;
-
-				reusedNames.add(entry.name);
-				reusedFileIds.push(existing.id);
-
-				yield sse({
-					event: SSE_EVENTS.FILE_REUSED,
-					data: { name: entry.name, fileId: existing.id, sha256: entry.sha256 },
-				});
-			}
-
-			const filesToProcess = rawFiles.filter(f => !reusedNames.has(f.name));
-
+			const reusedFileIds: number[] = [];
 			const uploaded: UploadedFileRecord[] = [];
 			const uploadedKeys: string[] = [];
 			let totalFailed = 0;
 
-			for (const file of filesToProcess) {
-				const fileName = file.name;
+			for (let i = 0; i < rawFiles.length; i++) {
+				const file = rawFiles[i];
+				const clientHash = hashes[i];
+				const clientId = clientIds[i];
 
-				yield sse({
-					event: SSE_EVENTS.FILE_VALIDATING,
-					data: { name: fileName },
-				});
+				const existing = lookup.get(`${clientHash}:${file.size}:${file.type}`);
+				if (existing) {
+					reusedFileIds.push(existing);
+					yield sse({
+						event: SSE_EVENTS.FILE_REUSED,
+						data: { clientId, fileId: existing, sha256: clientHash },
+					});
+					continue;
+				}
+
+				yield sse({ event: SSE_EVENTS.FILE_VALIDATING, data: { clientId } });
 
 				let data: Uint8Array;
 				try {
 					data = await file.bytes();
 				}
 				catch {
-					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { name: fileName, reason: "Failed to read file data" } });
+					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { clientId, reason: "Failed to read file data" } });
 					totalFailed++;
 					continue;
 				}
 
-				const validation = validateFileContent({ fileName, claimedMimeType: file.type, data });
+				const validation = validateFileContent({ fileName: file.name, claimedMimeType: file.type as ALLOWED_MIME_TYPES, data });
 				if (!validation.ok) {
-					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { name: fileName, reason: validation.message } });
+					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { clientId, reason: validation.message } });
 					totalFailed++;
 					continue;
 				}
 
-				yield sse({ event: SSE_EVENTS.FILE_VALIDATED, data: { name: fileName } });
+				yield sse({ event: SSE_EVENTS.FILE_VALIDATED, data: { clientId } });
 				const sha256 = computeSHA256(data);
-				yield sse({ event: SSE_EVENTS.FILE_UPLOADING, data: { name: fileName } });
-				const storageKey = generateStorageKey(user.id, fileName);
+				yield sse({ event: SSE_EVENTS.FILE_UPLOADING, data: { clientId } });
 
+				const storageKey = generateStorageKey(user.id, file.name);
 				try {
 					await uploadFile(storageKey, data, file.type);
 				}
 				catch {
-					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { name: fileName, reason: "Failed to upload to storage" } });
+					yield sse({ event: SSE_EVENTS.FILE_FAILED, data: { clientId, reason: "Failed to upload to storage" } });
 					totalFailed++;
 					continue;
 				}
 
 				uploaded.push({
-					originalName: fileName,
+					originalName: file.name,
 					mimeType: file.type,
 					size: data.length,
 					storageKey,
@@ -138,7 +147,7 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				});
 				uploadedKeys.push(storageKey);
 
-				yield sse({ event: SSE_EVENTS.FILE_DONE, data: { name: fileName, sha256 } });
+				yield sse({ event: SSE_EVENTS.FILE_DONE, data: { clientId, sha256 } });
 			}
 
 			// ── 3. Batch insert: session + files + links ─────────────────
@@ -151,7 +160,7 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				}
 
 				yield sse({
-					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					event: SSE_EVENTS.UPLOAD_FAILED,
 					data: { sessionId: null, totalConfirmed: 0, totalFailed, totalReused: reusedFileIds.length, status: "failed" },
 				});
 				return;
@@ -171,7 +180,7 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 					.returning({ id: schema.profilingSession.id });
 
 				// Insert new file records
-				let newFileIds: string[] = [];
+				let newFileIds: number[] = [];
 				if (uploaded.length > 0) {
 					const insertedFiles = await db.insert(schema.resumeFile)
 						.values(uploaded.map(f => ({
@@ -190,7 +199,8 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				// Insert session-file links (reused + new)
 				const allFileIds = [...reusedFileIds, ...newFileIds];
 				if (allFileIds.length > 0) {
-					await db.insert(schema.profilingSessionFile)
+					await db
+						.insert(schema.profilingSessionFile)
 						.values(allFileIds.map(fileId => ({
 							sessionId: session.id,
 							fileId,
@@ -202,7 +212,6 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				yield sse({
 					event: SSE_EVENTS.UPLOAD_COMPLETE,
 					data: {
-						sessionId: session.id,
 						totalConfirmed: uploaded.length,
 						totalFailed,
 						totalReused: reusedFileIds.length,
@@ -217,7 +226,7 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				}
 
 				yield sse({
-					event: SSE_EVENTS.UPLOAD_COMPLETE,
+					event: SSE_EVENTS.UPLOAD_FAILED,
 					data: { sessionId: null, totalConfirmed: 0, totalFailed: totalFailed + uploaded.length, totalReused: 0, status: "failed" },
 				});
 			}
@@ -228,12 +237,8 @@ const sessionRoutes = new Elysia({ prefix: "/api/sessions" })
 				name: t.String({ minLength: 1, maxLength: 255 }),
 				jobDescription: t.String({ minLength: 1 }),
 				jobTitle: t.Optional(t.String({ maxLength: 255 })),
-				hashes: t.Array(t.Object({
-					name: t.String(),
-					sha256: t.String(),
-					size: t.Number(),
-					mimeType: t.String(),
-				})),
+				hashes: t.Array(t.String()),
+				clientIds: t.Array(t.Number()),
 				files: t.Files({
 					maxSize: MAX_FILE_BYTES,
 					maxItems: MAX_FILES_PER_SESSION,

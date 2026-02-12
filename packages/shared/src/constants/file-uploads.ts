@@ -66,4 +66,7 @@ export const SSE_EVENTS = {
 	FILE_REUSED: "file:reused",
 	FILE_HASH_MISMATCH: "file:hash_mismatch",
 	UPLOAD_COMPLETE: "upload:complete",
+	UPLOAD_FAILED: "upload:failed",
+	UPLOAD_CANCELLED: "upload:cancelled",
+	ERROR: "error",
 } as const

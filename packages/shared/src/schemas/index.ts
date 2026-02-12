@@ -1,6 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, bigint } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, bigint, bigserial } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -85,9 +84,7 @@ export const verification = pgTable("verification", {
 });
 
 export const resumeFile = pgTable("resume_file", {
-  id: uuid("id")
-    .$defaultFn(randomUUIDv7)
-    .primaryKey(),
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -95,20 +92,16 @@ export const resumeFile = pgTable("resume_file", {
   mimeType: varchar("mime_type", { length: 128 }).notNull(),
   size: bigint("size", { mode: "bigint" }).notNull(),
   storageKey: varchar("storage_key", { length: 1024 }).notNull(),
-  fingerprint: varchar("fingerprint", { length: 128 }).notNull(),
+  fingerprint: varchar("fingerprint", { length: 128 }).unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
+    .notNull()
 }, (table) => [
   index().on(table.userId),
-  index().on(table.fingerprint),
 ]);
 
-export const sessionStatusEnum = ["uploading", "ready", "processing", "completed", "failed"] as const;
+// export const sessionStatusEnum = ["uploading", "ready", "processing", "completed", "failed"] as const;
+export const sessionStatusEnum = ["ready", "processing", "completed", "failed"] as const;
 
 export const profilingSession = pgTable("profiling_session", {
   id: uuid("id")
@@ -120,7 +113,7 @@ export const profilingSession = pgTable("profiling_session", {
   name: varchar("name", { length: 255 }).notNull(),
   jobDescription: text("job_description").notNull(),
   jobTitle: varchar("job_title", { length: 255 }),
-  status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("uploading"),
+  status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("ready"),
   totalFiles: integer("total_files").notNull().default(0),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -142,7 +135,10 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
   sessionId: uuid("session_id")
     .notNull()
     .references(() => profilingSession.id, { onDelete: "cascade" }),
-  fileId: uuid("file_id")
+  // fileId: uuid("file_id")
+  //   .notNull()
+  //   .references(() => resumeFile.id, { onDelete: "cascade" }),
+  fileId: bigint("file_id", { mode: "number" })
     .notNull()
     .references(() => resumeFile.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -153,34 +149,34 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
   index().on(table.fileId),
 ]);
 
-export const userRelations = relations(user, ({ many }) => ({
-  resumeFiles: many(resumeFile),
-  profilingSessions: many(profilingSession),
-}));
+// export const userRelations = relations(user, ({ many }) => ({
+//   resumeFiles: many(resumeFile),
+//   profilingSessions: many(profilingSession),
+// }));
 
-export const resumeFileRelations = relations(resumeFile, ({ one, many }) => ({
-  user: one(user, {
-    fields: [resumeFile.userId],
-    references: [user.id],
-  }),
-  profilingSessions: many(profilingSessionFile),
-}));
+// export const resumeFileRelations = relations(resumeFile, ({ one, many }) => ({
+//   user: one(user, {
+//     fields: [resumeFile.userId],
+//     references: [user.id],
+//   }),
+//   profilingSessions: many(profilingSessionFile),
+// }));
 
-export const profilingSessionRelations = relations(profilingSession, ({ one, many }) => ({
-  user: one(user, {
-    fields: [profilingSession.userId],
-    references: [user.id],
-  }),
-  files: many(profilingSessionFile),
-}));
+// export const profilingSessionRelations = relations(profilingSession, ({ one, many }) => ({
+//   user: one(user, {
+//     fields: [profilingSession.userId],
+//     references: [user.id],
+//   }),
+//   files: many(profilingSessionFile),
+// }));
 
-export const profilingSessionFileRelations = relations(profilingSessionFile, ({ one }) => ({
-  session: one(profilingSession, {
-    fields: [profilingSessionFile.sessionId],
-    references: [profilingSession.id],
-  }),
-  file: one(resumeFile, {
-    fields: [profilingSessionFile.fileId],
-    references: [resumeFile.id],
-  }),
-}));
+// export const profilingSessionFileRelations = relations(profilingSessionFile, ({ one }) => ({
+//   session: one(profilingSession, {
+//     fields: [profilingSessionFile.sessionId],
+//     references: [profilingSession.id],
+//   }),
+//   file: one(resumeFile, {
+//     fields: [profilingSessionFile.fileId],
+//     references: [resumeFile.id],
+//   }),
+// }));

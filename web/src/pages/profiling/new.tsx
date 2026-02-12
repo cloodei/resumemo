@@ -114,7 +114,7 @@ export default function NewProfilingPage() {
 		addFiles,
 		removeFile,
 		clearAll,
-		updateFileByName,
+		updateFileById,
 		setPhase,
 		setSessionId,
 		checkAndHash
@@ -204,9 +204,10 @@ export default function NewProfilingPage() {
 
 	/**
 	 * Handle a single SSE chunk from the Eden Treaty async generator.
+	 * All per-file events use `clientId` (the store's numeric ID).
 	 */
 	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
-		const name = data.name as string | undefined
+		const clientId = data.clientId as number | undefined
 
 		switch (event) {
 			case SSE_EVENTS.SESSION_CREATED:
@@ -214,40 +215,36 @@ export default function NewProfilingPage() {
 				break
 
 			case SSE_EVENTS.FILE_VALIDATING:
-				updateFileByName(name!, { status: "uploading" })
+				updateFileById(clientId!, { status: "uploading" })
 				break
 
 			case SSE_EVENTS.FILE_VALIDATED:
-				// Still processing — keep uploading status
-				break
-
 			case SSE_EVENTS.FILE_UPLOADING:
-				// Already in uploading status
 				break
 
 			case SSE_EVENTS.FILE_DONE:
-				updateFileByName(name!, {
+				updateFileById(clientId!, {
 					status: "done",
 					fileId: data.fileId as string,
 				})
 				break
 
 			case SSE_EVENTS.FILE_REUSED:
-				updateFileByName(name!, {
+				updateFileById(clientId!, {
 					status: "reused",
 					fileId: data.fileId as string,
 				})
 				break
 
 			case SSE_EVENTS.FILE_HASH_MISMATCH:
-				updateFileByName(name!, {
+				updateFileById(clientId!, {
 					status: "failed",
 					errorMessage: "File content changed since hashing (hash mismatch)",
 				})
 				break
 
 			case SSE_EVENTS.FILE_FAILED:
-				updateFileByName(name!, {
+				updateFileById(clientId!, {
 					status: "failed",
 					errorMessage: (data.reason as string) ?? "Upload failed",
 				})
@@ -307,12 +304,8 @@ export default function NewProfilingPage() {
 				name: formData.sessionName.trim(),
 				jobDescription: formData.jobDescription.trim(),
 				jobTitle: formData.jobTitle.trim() || undefined,
-				hashes: filesToProcess.map(f => ({
-					name: f.originalName,
-					size: f.size,
-					mimeType: f.mimeType,
-					sha256: f.fingerprint!,
-				})),
+				hashes: filesToProcess.map(f => f.fingerprint!),
+				clientIds: filesToProcess.map(f => f.id),
 				files: filesToProcess.map(f => f.file),
 			}, {
 				fetch: { signal: controller.signal },
@@ -323,7 +316,7 @@ export default function NewProfilingPage() {
 			}
 
 			// Consume the SSE stream via Eden Treaty's async generator
-			for await (const chunk of data as AsyncIterable<{ event: string; data: Record<string, unknown> }>) {
+			for await (const chunk of data) {
 				handleSSEEvent(chunk.event, chunk.data)
 			}
 

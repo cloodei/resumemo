@@ -3,12 +3,15 @@ import {
 	MIME_EXTENSION_MAP,
 	ALLOWED_MIME_TYPES,
 	MAGIC_BYTES,
+	MAX_FILE_BYTES,
 } from "@shared/constants/file-uploads";
 
-function getExtension(fileName: string): string {
+function getExtension(fileName: string) {
 	const trimmed = fileName.trim().toLowerCase();
 	const dotIndex = trimmed.lastIndexOf(".");
-	if (dotIndex === -1) return "";
+	if (dotIndex === -1)
+		return "";
+
 	return trimmed.slice(dotIndex);
 }
 
@@ -16,7 +19,34 @@ function isAllowedMimeType(mimeType: string): mimeType is ALLOWED_MIME_TYPES {
 	return ALLOWED_MIME_TYPES_SET.has(mimeType as ALLOWED_MIME_TYPES);
 }
 
-function isExtensionValidForMime(fileName: string, mimeType: ALLOWED_MIME_TYPES): boolean {
+/**
+ * Cheap metadata-only validation. No file bytes are read.
+ *
+ * Checks:
+ * 1. MIME type is in the allowlist
+ * 2. File extension matches the claimed MIME type
+ * 3. Reported size is > 0 and within MAX_FILE_BYTES
+ */
+export function validateFileMetadata(args: {
+	fileName: string;
+	claimedMimeType: string;
+	size: number;
+}) {
+	const { fileName, claimedMimeType, size } = args;
+
+	if (!isAllowedMimeType(claimedMimeType))
+		return { ok: false as const, message: `Unsupported file type: ${claimedMimeType}` };
+	if (!isExtensionValidForMime(fileName, claimedMimeType))
+		return { ok: false as const, message: `File extension does not match type: ${fileName}` };
+	if (size <= 0)
+		return { ok: false as const, message: `File is empty: ${fileName}` };
+	if (size > MAX_FILE_BYTES)
+		return { ok: false as const, message: `File too large: ${fileName} (${size} bytes, max ${MAX_FILE_BYTES})` };
+
+	return { ok: true as const };
+}
+
+function isExtensionValidForMime(fileName: string, mimeType: ALLOWED_MIME_TYPES) {
 	const ext = getExtension(fileName);
 	const allowed: readonly string[] = MIME_EXTENSION_MAP[mimeType];
 	return allowed.includes(ext);
@@ -30,10 +60,9 @@ function isExtensionValidForMime(fileName: string, mimeType: ALLOWED_MIME_TYPES)
  * - DOCX: `PK\x03\x04` at offset 0 (ZIP archive)
  * - TXT:  no null bytes in first 8 KB + valid-ish UTF-8
  */
-function verifyMagicBytes(data: Uint8Array, mimeType: ALLOWED_MIME_TYPES): boolean {
-	if (mimeType === "text/plain") {
+function verifyMagicBytes(data: Uint8Array, mimeType: ALLOWED_MIME_TYPES) {
+	if (mimeType === "text/plain")
 		return isPlausibleText(data);
-	}
 
 	const sig = MAGIC_BYTES[mimeType];
 	if (!sig)
@@ -53,11 +82,12 @@ function verifyMagicBytes(data: Uint8Array, mimeType: ALLOWED_MIME_TYPES): boole
  * Heuristic for text/plain: scan the first 8 KB for null bytes.
  * Presence of `0x00` almost always indicates a binary file.
  */
-function isPlausibleText(data: Uint8Array): boolean {
+function isPlausibleText(data: Uint8Array) {
 	const scanLength = Math.min(data.length, 8192);
-	for (let i = 0; i < scanLength; i++) {
-		if (data[i] === 0x00) return false;
-	}
+	for (let i = 0; i < scanLength; i++)
+		if (data[i] === 0x00)
+			return false;
+
 	return true;
 }
 
@@ -72,19 +102,10 @@ function isPlausibleText(data: Uint8Array): boolean {
  */
 export function validateFileContent(args: {
 	fileName: string;
-	claimedMimeType: string;
+	claimedMimeType: ALLOWED_MIME_TYPES;
 	data: Uint8Array;
 }) {
 	const { fileName, claimedMimeType, data } = args;
-
-	if (data.length === 0)
-		return { ok: false as const, message: `File is empty: ${fileName}` };
-	// if (data.length > MAX_FILE_BYTES)
-	// 	return { ok: false, message: `File too large: ${fileName} (${data.length} bytes, max ${MAX_FILE_BYTES})` };
-	if (!isAllowedMimeType(claimedMimeType))
-		return { ok: false as const, message: `Unsupported file type: ${claimedMimeType}` };
-	if (!isExtensionValidForMime(fileName, claimedMimeType))
-		return { ok: false as const, message: `File extension does not match type: ${fileName}` };
 	if (!verifyMagicBytes(data, claimedMimeType))
 		return { ok: false as const, message: `File content does not match claimed type (${claimedMimeType}): ${fileName}` };
 
