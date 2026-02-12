@@ -23,7 +23,7 @@ export type UploadFile = {
 	fingerprint?: string
 	errorMessage?: string
 	/** Server-side file ID (set after upload completes or dedup match). */
-	fileId?: string
+	fileId?: number
 }
 
 /**

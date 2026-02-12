@@ -9,10 +9,8 @@ import {
 	FileText,
 	Loader2,
 	Mail,
-	RefreshCw,
 	Sparkles,
 	AlertCircle,
-	UploadCloud,
 } from "lucide-react"
 
 import { api } from "@/lib/api"
@@ -33,14 +31,14 @@ type ProfilingSession = {
 	name: string
 	jobTitle: string | null
 	jobDescription: string
-	status: "uploading" | "ready" | "processing" | "completed" | "failed"
+	status: "ready" | "processing" | "completed" | "failed"
 	totalFiles: number
 	errorMessage: string | null
 	createdAt: Date
 }
 
 type SessionFile = {
-	id: string
+	id: number
 	originalName: string
 	mimeType: string
 	size: number
@@ -48,8 +46,6 @@ type SessionFile = {
 
 function statusBadgeVariant(status: ProfilingSession["status"]) {
 	switch (status) {
-		case "uploading":
-			return "secondary"
 		case "ready":
 			return "outline"
 		case "processing":
@@ -138,7 +134,6 @@ export default function ProfilingResultsPage() {
 		return null
 	}
 
-	const isUploading = session.status === "uploading"
 	const isReady = session.status === "ready"
 	const isProcessing = session.status === "processing"
 	const isCompleted = session.status === "completed"
@@ -196,28 +191,6 @@ export default function ProfilingResultsPage() {
 					</Button>
 				</div>
 			</motion.section>
-
-			{/* Uploading state */}
-			{isUploading && (
-				<motion.section
-					initial={{ opacity: 0, scale: 0.95 }}
-					animate={{ opacity: 1, scale: 1 }}
-					className="flex flex-col items-center justify-center py-16 text-center"
-				>
-					<div className="size-20 rounded-full bg-sky-500/10 flex items-center justify-center mb-6">
-						<UploadCloud className="size-10 text-sky-500 animate-pulse" />
-					</div>
-					<h2 className="text-2xl font-semibold mb-2">Upload in Progress</h2>
-					<p className="text-muted-foreground max-w-md mb-6">
-						{session.totalFiles} file{session.totalFiles !== 1 ? "s" : ""} are being uploaded. This page
-						will update once the upload is confirmed.
-					</p>
-					<Button variant="outline" onClick={fetchSession} className="gap-2">
-						<RefreshCw className="size-4" />
-						Refresh
-					</Button>
-				</motion.section>
-			)}
 
 			{/* Ready state */}
 			{isReady && (

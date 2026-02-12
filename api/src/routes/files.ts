@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { and, desc, eq } from "drizzle-orm";
 
 import * as schema from "@shared/schemas";
@@ -61,6 +61,11 @@ const fileRoutes = new Elysia({ prefix: "/api/files" })
 			.where(eq(schema.resumeFile.id, params.id));
 
 		return { status: "ok" };
-	}, { auth: true });
+	}, {
+		auth: true,
+		params: t.Object({
+			id: t.Number(),
+		}),
+	});
 
 export { fileRoutes };

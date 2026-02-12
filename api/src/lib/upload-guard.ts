@@ -92,13 +92,11 @@ function isPlausibleText(data: Uint8Array) {
 }
 
 /**
- * Thorough server-side validation of an uploaded file's actual content.
+ * Server-side content validation using file bytes.
  *
  * Checks:
- * 1. Size is within limits and > 0
- * 2. MIME type is in the allowlist
- * 3. Extension matches claimed MIME type
- * 4. Magic bytes match claimed MIME type
+ * 1. Magic bytes match claimed MIME type for known binary formats
+ * 2. text/plain looks like text (no null bytes in first 8 KB)
  */
 export function validateFileContent(args: {
 	fileName: string;

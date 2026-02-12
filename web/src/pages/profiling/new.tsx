@@ -32,6 +32,7 @@ import {
 import {
 	useUploadFiles,
 	useUploadPhase,
+	useUploadSessionId,
 	useUploadActions,
 	type FileStatus,
 } from "@/stores/upload-store"
@@ -109,7 +110,7 @@ export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
-	// const sessionId = useUploadSessionId()
+	const sessionId = useUploadSessionId()
 	const {
 		addFiles,
 		removeFile,
@@ -225,22 +226,19 @@ export default function NewProfilingPage() {
 			case SSE_EVENTS.FILE_DONE:
 				updateFileById(clientId!, {
 					status: "done",
-					fileId: data.fileId as string,
+					fileId: data.fileId as number | undefined,
 				})
 				break
 
 			case SSE_EVENTS.FILE_REUSED:
 				updateFileById(clientId!, {
 					status: "reused",
-					fileId: data.fileId as string,
+					fileId: data.fileId as number,
 				})
 				break
 
 			case SSE_EVENTS.FILE_HASH_MISMATCH:
-				updateFileById(clientId!, {
-					status: "failed",
-					errorMessage: "File content changed since hashing (hash mismatch)",
-				})
+				// v1 server flow currently does not emit hash-mismatch; keep no-op for compatibility.
 				break
 
 			case SSE_EVENTS.FILE_FAILED:
@@ -252,7 +250,8 @@ export default function NewProfilingPage() {
 
 			case SSE_EVENTS.UPLOAD_COMPLETE: {
 				const status = data.status as string
-				const sid = data.sessionId as string | null
+				const sid = (data.sessionId as string | null) ?? null
+				const fallbackSid = sid ?? sessionId
 				if (status === "ready" && sid) {
 					setPhase("done")
 					toast.success("Session created successfully!")
@@ -263,14 +262,14 @@ export default function NewProfilingPage() {
 				} else {
 					const totalFailed = data.totalFailed as number
 					const totalConfirmed = (data.totalConfirmed as number) + (data.totalReused as number)
-					if (totalConfirmed > 0 && sid) {
+					if (totalConfirmed > 0 && fallbackSid) {
 						setPhase("done")
 						toast.warning(
 							`Session created with ${totalConfirmed} file${totalConfirmed !== 1 ? "s" : ""}. ${totalFailed} file${totalFailed !== 1 ? "s" : ""} failed.`,
 						)
 						setTimeout(() => {
 							clearAll()
-							navigate(`/profiling/${sid}`)
+							navigate(`/profiling/${fallbackSid}`)
 						}, 1200)
 					} else {
 						setPhase("error")
