@@ -29,7 +29,7 @@ export default function LoginPage() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <SocialButtons />
+              <SocialButtons variant="prominent" />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

@@ -1,12 +1,12 @@
 import { toast } from "sonner"
-import { Github, Sparkles } from "lucide-react"
+import { Github } from "lucide-react"
 import { useState } from "react"
 
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth"
-import { cn } from "@/lib/utils"
 
-const frontendURL = import.meta.env.VITE_FRONTEND_URL ?? "http://localhost:5000"
+const frontendURL = import.meta.env.VITE_FRONTEND_URL ?? "http://localhost:5173"
 
 const providers = [
   {
@@ -63,10 +63,10 @@ export function SocialButtons({ callbackURL = "/dashboard", className, variant =
   if (variant === "prominent") {
     return (
       <div className={cn("space-y-3", className)}>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+        {/* <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
           <Sparkles className="size-3.5 text-primary" />
           <span>Recommended — one-click sign in</span>
-        </div>
+        </div> */}
         {providers.map((provider) => (
           <Button
             key={provider.id}

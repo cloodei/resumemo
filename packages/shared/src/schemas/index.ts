@@ -135,9 +135,6 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
   sessionId: uuid("session_id")
     .notNull()
     .references(() => profilingSession.id, { onDelete: "cascade" }),
-  // fileId: uuid("file_id")
-  //   .notNull()
-  //   .references(() => resumeFile.id, { onDelete: "cascade" }),
   fileId: bigint("file_id", { mode: "number" })
     .notNull()
     .references(() => resumeFile.id, { onDelete: "cascade" }),
