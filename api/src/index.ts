@@ -1,12 +1,11 @@
-import cors from "@elysiajs/cors";
+import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { logger } from "@rasla/logify";
 import { openapi } from "@elysiajs/openapi";
 
 import { fileRoutes } from "./routes/files";
 import { systemRoutes } from "./routes/system";
-import { sessionRoutes } from "./routes/sessions";
-import { sessionRoutesV2 } from "./routes/sessions/v2";
+import { sessionRoutes, sessionRoutesV1 } from "./routes/sessions";
 // import { randomRoutes } from "./routes/random";
 import { authMiddleware } from "./lib/auth";
 
@@ -25,7 +24,7 @@ const app = new Elysia({ precompile: true })
 	.use(authMiddleware)
 	.use(systemRoutes)
 	.use(sessionRoutes)
-	.use(sessionRoutesV2)
+	.use(sessionRoutesV1)
 	.use(fileRoutes)
 	// .use(randomRoutes)
 	.listen({ hostname: "0.0.0.0", port: 8080 });

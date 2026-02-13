@@ -121,8 +121,6 @@ export default function NewProfilingPage() {
 	const [isDragging, setIsDragging] = useState(false)
 	const abortRef = useRef<AbortController | null>(null)
 	const xhrRefs = useRef<XMLHttpRequest[]>([])
-	const activeUploadIdRef = useRef<string | null>(null)
-	const activeIntentTokenRef = useRef<string | null>(null)
 
 	const {
 		register,
@@ -203,7 +201,7 @@ export default function NewProfilingPage() {
 			const xhr = new XMLHttpRequest()
 			xhrRefs.current.push(xhr)
 
-			const abortListener = () => xhr.abort()
+			const abortListener = xhr.abort
 			signal.addEventListener("abort", abortListener)
 
 			xhr.open("PUT", uploadUrl)
@@ -239,17 +237,6 @@ export default function NewProfilingPage() {
 		abortRef.current?.abort()
 		xhrRefs.current.forEach((xhr) => xhr.abort())
 		xhrRefs.current = []
-
-		const activeUploadId = activeUploadIdRef.current
-		const activeIntentToken = activeIntentTokenRef.current
-		if (activeUploadId && activeIntentToken) {
-			void api.api.v2.sessions({ uploadId: activeUploadId }).cancel.post({
-				intentToken: activeIntentToken,
-			})
-		}
-
-		activeUploadIdRef.current = null
-		activeIntentTokenRef.current = null
 		abortRef.current = null
 		clearAll()
 		toast.info("Upload cancelled")
@@ -273,10 +260,9 @@ export default function NewProfilingPage() {
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			const { data: initData, error: initError } = await api.api.v2.sessions.init.post({
-				name: formData.sessionName.trim(),
-				jobDescription: formData.jobDescription.trim(),
-				jobTitle: formData.jobTitle.trim() || undefined,
+			// const x = await api.api.
+			// Step 1: Get presigned URLs
+			const { data: presignData, error: presignError } = await api.api.v2.sessions.presign.post({
 				files: filesToProcess.map(f => ({
 					clientId: f.id,
 					fileName: f.originalName,
@@ -287,15 +273,13 @@ export default function NewProfilingPage() {
 				fetch: { signal: controller.signal },
 			})
 
-			if (initError || !initData || initData.status !== "ok") {
-				throw new Error("Could not initialize upload session")
+			if (presignError || !presignData || presignData.status !== "ok") {
+				throw new Error("Could not get presigned upload URLs")
 			}
 
-			activeUploadIdRef.current = initData.uploadId
-			activeIntentTokenRef.current = initData.intentToken
-
+			// Step 2: Upload each file to its presigned URL
 			for (const file of filesToProcess) {
-				const uploadTarget = initData.uploads.find(upload => upload.clientId === file.id)
+				const uploadTarget = presignData.uploads.find(u => u.clientId === file.id)
 				if (!uploadTarget) {
 					throw new Error(`Missing upload target for ${file.originalName}`)
 				}
@@ -320,49 +304,41 @@ export default function NewProfilingPage() {
 				}
 			}
 
-			const { data: finishData, error: finishError } = await api.api.v2.sessions({ uploadId: initData.uploadId }).finish.post({
-				intentToken: initData.intentToken,
+			// Step 3: Create session with storage keys
+			const { data: createData, error: createError } = await api.api.v2.sessions.create.post({
+				name: formData.sessionName.trim(),
+				jobDescription: formData.jobDescription.trim(),
+				jobTitle: formData.jobTitle.trim() || undefined,
+				files: presignData.uploads.map(u => {
+					const source = filesToProcess.find(f => f.id === u.clientId)!
+					return {
+						storageKey: u.storageKey,
+						fileName: source.originalName,
+						mimeType: source.mimeType,
+						size: source.size,
+					}
+				}),
+			}, {
+				fetch: { signal: controller.signal },
 			})
 
-			if (finishError || !finishData || finishData.status !== "ready") {
-				if (finishData && "failures" in finishData && Array.isArray(finishData.failures)) {
-					for (const failure of finishData.failures as Array<{ clientId: number; reason: string }>) {
-						updateFileById(failure.clientId, {
-							status: "failed",
-							errorMessage: failure.reason,
-						})
-					}
-				}
-				throw new Error("Upload verification failed")
+			if (createError || !createData || createData.status !== "ready") {
+				throw new Error("Session creation failed")
 			}
 
 			setPhase("done")
 			toast.success("Session created successfully!")
 			setTimeout(() => {
 				clearAll()
-				navigate(`/profiling/${finishData.sessionId}`)
+				navigate(`/profiling/${createData.sessionId}`)
 			}, 1200)
-
-			activeUploadIdRef.current = null
-			activeIntentTokenRef.current = null
 
 			abortRef.current = null
 		}
 		catch (err) {
 			if (err instanceof DOMException && err.name === "AbortError") {
-				// User cancelled — already handled by handleCancel
 				return
 			}
-
-			const activeUploadId = activeUploadIdRef.current
-			const activeIntentToken = activeIntentTokenRef.current
-			if (activeUploadId && activeIntentToken) {
-				void api.api.v2.sessions({ uploadId: activeUploadId }).cancel.post({
-					intentToken: activeIntentToken,
-				})
-			}
-			activeUploadIdRef.current = null
-			activeIntentTokenRef.current = null
 
 			setPhase("error")
 			toast.error(err instanceof Error ? err.message : "Something went wrong")
