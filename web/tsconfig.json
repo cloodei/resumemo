@@ -9,7 +9,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@shared/*": ["../packages/shared/src/*"],
-      "@api": ["../api/src/index.ts"]
+      "@api": ["../api/src/index.ts"],
+      "~/*": ["../api/src/*"]
     }
   }
 }

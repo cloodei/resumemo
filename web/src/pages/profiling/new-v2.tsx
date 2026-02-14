@@ -260,7 +260,6 @@ export default function NewProfilingPage() {
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			// const x = await api.api.
 			// Step 1: Get presigned URLs
 			const { data: presignData, error: presignError } = await api.api.v2.sessions.presign.post({
 				files: filesToProcess.map(f => ({

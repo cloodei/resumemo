@@ -24,17 +24,16 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.use(authMiddleware)
 	.post(
 		"/presign",
-		async ({ user, body, set }) => {
+		async ({ user, body, status }) => {
 			const { files } = body;
 
 			const distinctClientIds = new Set(files.map((file) => file.clientId));
 			if (distinctClientIds.size !== files.length) {
-				set.status = 400;
-				return {
+				return status(400, {
 					status: "error",
 					message: "Each file must have a unique clientId",
 					errors: null
-				};
+				});
 			}
 
 			const metadataErrors = files
@@ -55,12 +54,11 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				.filter((issue) => issue !== null);
 
 			if (metadataErrors.length > 0) {
-				set.status = 400;
-				return {
+				return status(400, {
 					status: "error",
 					message: "Metadata validation failed",
 					errors: metadataErrors,
-				};
+				});
 			}
 
 			const uploads = await Promise.all(
@@ -94,19 +92,23 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	// Step 2: Verify uploads landed in R2, then create session + file records
 	.post(
 		"/create",
-		async ({ user, body, set }) => {
+		async ({ user, body, status}) => {
 			const { name, jobDescription, jobTitle, files } = body;
 
 			if (files.length === 0) {
-				set.status = 400;
-				return { status: "error", message: "At least one file is required" };
+				return status(400, {
+					status: "error",
+					message: "At least one file is required"
+				});
 			}
 
 			// Verify every storageKey belongs to this user (keys are userId/…)
 			for (const file of files) {
 				if (!file.storageKey.startsWith(`${user.id}/`)) {
-					set.status = 403;
-					return { status: "error", message: "Storage key does not belong to this user" };
+					return status(403, {
+						status: "error",
+						message: "Storage key does not belong to this user"
+					});
 				}
 			}
 
@@ -138,12 +140,11 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (failures.length > 0) {
 				await cleanupUploadedKeys(files.map((f) => f.storageKey));
 
-				set.status = 400;
-				return {
+				return status(400, {
 					status: "error",
 					message: "Upload verification failed",
 					failures,
-				};
+				});
 			}
 
 			// All files verified — insert session + files in one transaction
