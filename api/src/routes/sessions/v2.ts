@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia";
+import { and, desc, eq } from "drizzle-orm";
 
 import * as schema from "@shared/schemas";
 import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
@@ -22,6 +23,8 @@ async function cleanupUploadedKeys(storageKeys: string[]) {
 
 export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.use(authMiddleware)
+
+	// ── Step 1: Get presigned upload URLs ──────────────────────────
 	.post(
 		"/presign",
 		async ({ user, body, status }) => {
@@ -67,7 +70,11 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					return {
 						clientId: file.clientId,
 						storageKey,
-						uploadUrl: await generatePresignedUploadUrl(storageKey, file.mimeType),
+						uploadUrl: await generatePresignedUploadUrl(
+							storageKey,
+							file.mimeType,
+							file.size,
+						),
 					};
 				}),
 			);
@@ -89,10 +96,11 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			}),
 		},
 	)
-	// Step 2: Verify uploads landed in R2, then create session + file records
+
+	// ── Step 2: Verify uploads landed in R2, then create session + file records ──
 	.post(
 		"/create",
-		async ({ user, body, status}) => {
+		async ({ user, body, status }) => {
 			const { name, jobDescription, jobTitle, files } = body;
 
 			if (files.length === 0) {
@@ -169,7 +177,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								mimeType: file.mimeType,
 								size: BigInt(file.size),
 								storageKey: file.storageKey,
-								// fingerprint: null,
 							})),
 						)
 						.returning({ id: schema.resumeFile.id }),
@@ -184,13 +191,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						})),
 					);
 				}
-
-				// if (insertedFiles.length !== files.length) {
-				// 	await tx
-				// 		.update(schema.profilingSession)
-				// 		.set({ totalFiles: insertedFiles.length })
-				// 		.where(eq(schema.profilingSession.id, sessionId));
-				// }
 			});
 
 			return {
@@ -203,7 +203,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			auth: true,
 			body: t.Object({
 				name: t.String({ minLength: 1, maxLength: 255 }),
-				jobDescription: t.String({ minLength: 1 }),
+				jobDescription: t.String({ minLength: 1, maxLength: 5000 }),
 				jobTitle: t.Optional(t.String({ maxLength: 255 })),
 				files: t.Array(
 					t.Object({
@@ -216,4 +216,96 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				),
 			}),
 		},
+	)
+
+	// ── List all profiling sessions for the authenticated user ────
+	.get(
+		"/",
+		async ({ user }) => {
+			const sessions = await db
+				.select()
+				.from(schema.profilingSession)
+				.where(eq(schema.profilingSession.userId, user.id))
+				.orderBy(desc(schema.profilingSession.createdAt));
+
+			return { sessions };
+		},
+		{ auth: true },
+	)
+
+	// ── Get a specific profiling session with its associated files ─
+	.get(
+		"/:id",
+		async ({ user, params, status }) => {
+			const [session] = await db
+				.select()
+				.from(schema.profilingSession)
+				.where(
+					and(
+						eq(schema.profilingSession.id, params.id),
+						eq(schema.profilingSession.userId, user.id),
+					),
+				);
+
+			if (!session) {
+				return status(404, { status: "error", message: "Session not found" });
+			}
+
+			const filesWithDetails = await db
+				.select({
+					sessionFile: schema.profilingSessionFile,
+					file: schema.resumeFile,
+				})
+				.from(schema.profilingSessionFile)
+				.innerJoin(
+					schema.resumeFile,
+					eq(schema.profilingSessionFile.fileId, schema.resumeFile.id),
+				)
+				.where(eq(schema.profilingSessionFile.sessionId, params.id));
+
+			return {
+				session,
+				files: filesWithDetails.map(({ file }) => ({
+					id: file.id,
+					originalName: file.originalName,
+					mimeType: file.mimeType,
+					size: Number(file.size),
+				})),
+			};
+		},
+		{ auth: true },
+	)
+
+	// ── Start profiling (transition ready → processing) ──────────
+	.post(
+		"/:id/start",
+		async ({ user, params, status }) => {
+			const [session] = await db
+				.select()
+				.from(schema.profilingSession)
+				.where(
+					and(
+						eq(schema.profilingSession.id, params.id),
+						eq(schema.profilingSession.userId, user.id),
+					),
+				);
+
+			if (!session) {
+				return status(404, { status: "error", message: "Session not found" });
+			}
+
+			if (session.status !== "ready") {
+				return status(409, { status: "error", message: "Session is not ready to start" });
+			}
+
+			await db
+				.update(schema.profilingSession)
+				.set({ status: "processing" })
+				.where(eq(schema.profilingSession.id, params.id));
+
+			// TODO: Trigger actual profiling service here.
+
+			return { status: "ok", message: "Profiling started" };
+		},
+		{ auth: true },
 	);

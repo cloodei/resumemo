@@ -73,7 +73,7 @@ export default function ProfilingResultsPage() {
 
 	const fetchSession = async () => {
 		try {
-			const { data, error } = await api.api.v1.sessions({ id: id! }).get()
+			const { data, error } = await api.api.v2.sessions({ id: id! }).get()
 
 			if (error || !data) {
 				if (
@@ -104,7 +104,7 @@ export default function ProfilingResultsPage() {
 
 		setIsStarting(true)
 		try {
-			const { data, error } = await api.api.v1.sessions({ id }).start.post()
+			const { data, error } = await api.api.v2.sessions({ id }).start.post()
 
 			if (error || !data) {
 				const errorData = error as { message?: string } | undefined

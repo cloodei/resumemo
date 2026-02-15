@@ -45,12 +45,21 @@ async function uploadFile(storageKey: string, body: Buffer | string | Uint8Array
 
 /**
  * Generate a short-lived presigned URL for direct browser upload.
+ *
+ * When `contentLength` is provided the signed URL will include a
+ * Content-Length condition so R2 rejects uploads that don't match
+ * the declared size — prevents oversized uploads at the storage level.
  */
-async function generatePresignedUploadUrl(storageKey: string, contentType: string) {
+async function generatePresignedUploadUrl(
+	storageKey: string,
+	contentType: string,
+	contentLength?: number,
+) {
 	const command = new PutObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
 		ContentType: contentType,
+		...(contentLength != null ? { ContentLength: contentLength } : {}),
 	});
 
 	return getSignedUrl(r2Client, command, { expiresIn: 60 * 15 });

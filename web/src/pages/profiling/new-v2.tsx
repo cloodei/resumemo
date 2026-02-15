@@ -2,7 +2,7 @@ import { toast } from "sonner"
 import { useForm } from "react-hook-form"
 import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import {
 	ArrowRight,
 	CheckCircle2,
@@ -31,9 +31,11 @@ import {
 import {
 	useUploadFiles,
 	useUploadPhase,
+	useUploadFormData,
 	useUploadActions,
 	type FileStatus,
-} from "@/stores/upload-store"
+	type SessionFormData,
+} from "@/stores/upload-store-v2"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 const steps = [
@@ -67,16 +69,12 @@ const jdTemplates = [
 
 function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 	switch (status) {
-		case "selected":
-			return "Getting ready..."
 		case "ready":
 			return "Ready"
 		case "uploading":
 			return "Uploading..."
 		case "done":
 			return "Uploaded"
-		case "reused":
-			return "Already on file"
 		case "failed":
 			return errorMessage ?? "Failed"
 	}
@@ -84,38 +82,38 @@ function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 
 function fileStatusIcon(status: FileStatus) {
 	switch (status) {
-		case "selected":
-			return <FileText className="size-4 text-muted-foreground" />
 		case "ready":
 			return <CheckCircle2 className="size-4 text-sky-500" />
 		case "uploading":
 			return <Loader2 className="size-4 animate-spin text-sky-500" />
 		case "done":
-		case "reused":
 			return <CheckCircle2 className="size-4 text-emerald-500" />
 		case "failed":
 			return <X className="size-4 text-destructive" />
 	}
 }
 
-type SessionFormData = {
-	sessionName: string
-	jobTitle: string
-	jobDescription: string
-}
+const phaseLabel = {
+	idle: "",
+	uploading: "Uploading files...",
+	creating: "Creating session...",
+	done: "All done! Redirecting...",
+	error: "Something went wrong. You can retry.",
+} as const
 
 export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
+	const storedFormData = useUploadFormData()
 	const {
 		addFiles,
 		removeFile,
 		clearAll,
+		clearFiles,
 		updateFileById,
 		setPhase,
-		setSessionId,
-		checkAndHash
+		setFormData,
 	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
@@ -126,23 +124,26 @@ export default function NewProfilingPage() {
 		register,
 		handleSubmit,
 		setValue,
+		watch,
 		formState: { errors },
 	} = useForm<SessionFormData>({
 		defaultValues: {
-			sessionName: "",
-			jobTitle: "",
-			jobDescription: "",
+			sessionName: storedFormData.sessionName,
+			jobTitle: storedFormData.jobTitle,
+			jobDescription: storedFormData.jobDescription,
 		},
 	})
 
+	// Sync form fields to the store on every change for persistence
+	const watchedFields = watch()
 	useEffect(() => {
-		checkAndHash()
-	}, [files])
+		setFormData(watchedFields)
+	}, [watchedFields.sessionName, watchedFields.jobTitle, watchedFields.jobDescription])
 
-	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done" || f.status === "reused")
+	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done")
 	const failedFiles = files.filter(f => f.status === "failed")
 	const allFilesReady = files.length > 0 && files.every(f => f.status === "ready")
-	const isBusy = phase !== "idle" && phase !== "done" && phase !== "error"
+	const isBusy = phase === "uploading" || phase === "creating"
 
 	const handleAddFiles = useCallback(
 		(newFiles: File[]) => {
@@ -174,7 +175,7 @@ export default function NewProfilingPage() {
 				addFiles(validFiles)
 			}
 		},
-		[files, isBusy]
+		[files, isBusy],
 	)
 
 	const handleDrop = (e: React.DragEvent) => {
@@ -194,22 +195,33 @@ export default function NewProfilingPage() {
 		file: File
 		mimeType: string
 		signal: AbortSignal
+		onProgress: (percent: number) => void
 	}) => {
-		const { uploadUrl, file, mimeType, signal } = args
+		const { uploadUrl, file, mimeType, signal, onProgress } = args
 
 		return new Promise<void>((resolve, reject) => {
 			const xhr = new XMLHttpRequest()
 			xhrRefs.current.push(xhr)
 
-			const abortListener = xhr.abort
-			signal.addEventListener("abort", abortListener)
+			const onAbort = () => xhr.abort()
+			signal.addEventListener("abort", onAbort)
+
+			const cleanup = () => {
+				signal.removeEventListener("abort", onAbort)
+				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+			}
 
 			xhr.open("PUT", uploadUrl)
 			xhr.setRequestHeader("Content-Type", mimeType)
 
+			xhr.upload.onprogress = (e) => {
+				if (e.lengthComputable) {
+					onProgress(Math.round((e.loaded / e.total) * 100))
+				}
+			}
+
 			xhr.onload = () => {
-				signal.removeEventListener("abort", abortListener)
-				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				cleanup()
 				if (xhr.status >= 200 && xhr.status < 300) {
 					resolve()
 					return
@@ -218,14 +230,12 @@ export default function NewProfilingPage() {
 			}
 
 			xhr.onerror = () => {
-				signal.removeEventListener("abort", abortListener)
-				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				cleanup()
 				reject(new Error("Network error while uploading file"))
 			}
 
 			xhr.onabort = () => {
-				signal.removeEventListener("abort", abortListener)
-				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+				cleanup()
 				reject(new DOMException("Upload aborted", "AbortError"))
 			}
 
@@ -235,10 +245,10 @@ export default function NewProfilingPage() {
 
 	const handleCancel = () => {
 		abortRef.current?.abort()
-		xhrRefs.current.forEach((xhr) => xhr.abort())
+		xhrRefs.current.forEach(xhr => xhr.abort())
 		xhrRefs.current = []
 		abortRef.current = null
-		clearAll()
+		clearFiles()
 		toast.info("Upload cancelled")
 	}
 
@@ -248,7 +258,7 @@ export default function NewProfilingPage() {
 			return
 		}
 
-		const filesToProcess = files.filter(f => f.status === "ready" && f.fingerprint)
+		const filesToProcess = files.filter(f => f.status === "ready")
 		if (filesToProcess.length === 0) {
 			toast.error("No files ready for upload")
 			return
@@ -257,6 +267,7 @@ export default function NewProfilingPage() {
 		try {
 			setPhase("uploading")
 
+			await new Promise(resolve => setTimeout(resolve, 10000))
 			const controller = new AbortController()
 			abortRef.current = controller
 
@@ -283,7 +294,7 @@ export default function NewProfilingPage() {
 					throw new Error(`Missing upload target for ${file.originalName}`)
 				}
 
-				updateFileById(file.id, { status: "uploading", errorMessage: undefined })
+				updateFileById(file.id, { status: "uploading", progress: 0, errorMessage: undefined })
 
 				try {
 					await uploadViaPresignedUrl({
@@ -291,12 +302,14 @@ export default function NewProfilingPage() {
 						file: file.file,
 						mimeType: file.mimeType,
 						signal: controller.signal,
+						onProgress: percent => updateFileById(file.id, { progress: percent }),
 					})
-					updateFileById(file.id, { status: "done" })
+					updateFileById(file.id, { status: "done", progress: 100 })
 				}
 				catch (uploadError) {
 					updateFileById(file.id, {
 						status: "failed",
+						progress: 0,
 						errorMessage: uploadError instanceof Error ? uploadError.message : "Upload failed",
 					})
 					throw uploadError
@@ -304,6 +317,7 @@ export default function NewProfilingPage() {
 			}
 
 			// Step 3: Create session with storage keys
+			setPhase("creating")
 			const { data: createData, error: createError } = await api.api.v2.sessions.create.post({
 				name: formData.sessionName.trim(),
 				jobDescription: formData.jobDescription.trim(),
@@ -350,14 +364,6 @@ export default function NewProfilingPage() {
 	}
 
 	const canCreate = allFilesReady && files.length > 0 && !isBusy
-
-	const phaseLabel = {
-		idle: "",
-		hashing: "Preparing files...",
-		uploading: "Uploading files...",
-		done: "All done! Redirecting...",
-		error: "Something went wrong. You can retry.",
-	}
 
 	return (
 		<div className="flex flex-col gap-8">
@@ -469,7 +475,7 @@ export default function NewProfilingPage() {
 								disabled={isBusy}
 								{...register("jobDescription", {
 									required: "Job description is required",
-									maxLength: { value: 2048, message: "Max 2048 characters" },
+									maxLength: { value: 5000, message: "Max 5000 characters" },
 								})}
 							/>
 							{errors.jobDescription && (
@@ -609,8 +615,8 @@ export default function NewProfilingPage() {
 								</p>
 								{failedFiles.length > 0 && (
 									<p className="mt-1 text-xs text-destructive">
-										{failedFiles.length} file{failedFiles.length !== 1 ? "s" : ""} could not be
-										read. Remove and re-add them.
+										{failedFiles.length} file{failedFiles.length !== 1 ? "s" : ""} failed.
+										Remove and re-add them.
 									</p>
 								)}
 							</div>
@@ -654,7 +660,7 @@ export default function NewProfilingPage() {
 											<Loader2 className="size-3 animate-spin" /> Working
 										</Badge>
 									)}
-									<Button variant="ghost" size="sm" onClick={clearAll} disabled={isBusy}>
+									<Button variant="ghost" size="sm" onClick={clearFiles} disabled={isBusy}>
 										Clear all
 									</Button>
 								</div>
@@ -701,7 +707,25 @@ export default function NewProfilingPage() {
 											<div className="mt-3">
 												<div className="flex justify-between text-[10px] text-muted-foreground">
 													<span>{fileStatusLabel(file.status, file.errorMessage)}</span>
+													{file.status === "uploading" && (
+														<span>{file.progress}%</span>
+													)}
 												</div>
+												{file.status === "uploading" && (
+													<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+														<motion.div
+															className="h-full rounded-full bg-sky-500"
+															initial={{ width: 0 }}
+															animate={{ width: `${file.progress}%` }}
+															transition={{ duration: 0.2, ease: "easeOut" }}
+														/>
+													</div>
+												)}
+												{file.status === "done" && (
+													<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+														<div className="h-full w-full rounded-full bg-emerald-500" />
+													</div>
+												)}
 											</div>
 										</motion.div>
 									))}
@@ -732,8 +756,8 @@ export default function NewProfilingPage() {
 											variant="secondary"
 											className="flex-1 sm:flex-none gap-2"
 											onClick={() => {
+												clearFiles()
 												setPhase("idle")
-												setSessionId(null)
 											}}
 										>
 											<RefreshCw className="size-4" />
