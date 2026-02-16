@@ -198,19 +198,17 @@ export default function NewProfilingPage() {
 		onProgress: (percent: number) => void
 	}) => {
 		const { uploadUrl, file, mimeType, signal, onProgress } = args
+		const xhr = new XMLHttpRequest()
+		xhrRefs.current.push(xhr)
+		const onAbort = xhr.abort
+		signal.addEventListener("abort", onAbort)
+		
+		const cleanup = () => {
+			signal.removeEventListener("abort", onAbort)
+			xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+		}
 
 		return new Promise<void>((resolve, reject) => {
-			const xhr = new XMLHttpRequest()
-			xhrRefs.current.push(xhr)
-
-			const onAbort = () => xhr.abort()
-			signal.addEventListener("abort", onAbort)
-
-			const cleanup = () => {
-				signal.removeEventListener("abort", onAbort)
-				xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
-			}
-
 			xhr.open("PUT", uploadUrl)
 			xhr.setRequestHeader("Content-Type", mimeType)
 
@@ -267,11 +265,9 @@ export default function NewProfilingPage() {
 		try {
 			setPhase("uploading")
 
-			await new Promise(resolve => setTimeout(resolve, 10000))
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			// Step 1: Get presigned URLs
 			const { data: presignData, error: presignError } = await api.api.v2.sessions.presign.post({
 				files: filesToProcess.map(f => ({
 					clientId: f.id,
@@ -283,47 +279,49 @@ export default function NewProfilingPage() {
 				fetch: { signal: controller.signal },
 			})
 
-			if (presignError || !presignData || presignData.status !== "ok") {
-				throw new Error("Could not get presigned upload URLs")
-			}
+			if (controller.signal.aborted)
+				return
+			if (presignError || !presignData || presignData.status !== "ok")
+				throw new Error(presignError?.value.message || "Could not get presigned upload URLs")
 
-			// Step 2: Upload each file to its presigned URL
-			for (const file of filesToProcess) {
-				const uploadTarget = presignData.uploads.find(u => u.clientId === file.id)
-				if (!uploadTarget) {
+			let batchUploads: Promise<void>[] = new Array(filesToProcess.length);
+			for (let i = 0; i < filesToProcess.length; i++) {
+				const file = filesToProcess[i]
+				const uploadTarget = file.id === presignData.uploads[i].clientId
+					? presignData.uploads[i]
+					: presignData.uploads.find(u => u.clientId === file.id)
+				if (!uploadTarget)
 					throw new Error(`Missing upload target for ${file.originalName}`)
-				}
 
 				updateFileById(file.id, { status: "uploading", progress: 0, errorMessage: undefined })
-
-				try {
-					await uploadViaPresignedUrl({
-						uploadUrl: uploadTarget.uploadUrl,
-						file: file.file,
-						mimeType: file.mimeType,
-						signal: controller.signal,
-						onProgress: percent => updateFileById(file.id, { progress: percent }),
+				batchUploads[i] = uploadViaPresignedUrl({
+					uploadUrl: uploadTarget.uploadUrl,
+					file: file.file,
+					mimeType: file.mimeType,
+					signal: controller.signal,
+					onProgress: percent => updateFileById(file.id, { progress: percent }),
+				})
+					.then(() => updateFileById(file.id, { status: "done", progress: 100 }))
+					.catch(err => {
+						updateFileById(file.id, {
+							status: "failed",
+							progress: 0,
+							errorMessage: err instanceof Error ? err.message : "Upload failed",
+						})
+						throw err
 					})
-					updateFileById(file.id, { status: "done", progress: 100 })
-				}
-				catch (uploadError) {
-					updateFileById(file.id, {
-						status: "failed",
-						progress: 0,
-						errorMessage: uploadError instanceof Error ? uploadError.message : "Upload failed",
-					})
-					throw uploadError
-				}
 			}
 
-			// Step 3: Create session with storage keys
+			await Promise.all(batchUploads)
 			setPhase("creating")
 			const { data: createData, error: createError } = await api.api.v2.sessions.create.post({
 				name: formData.sessionName.trim(),
 				jobDescription: formData.jobDescription.trim(),
 				jobTitle: formData.jobTitle.trim() || undefined,
-				files: presignData.uploads.map(u => {
-					const source = filesToProcess.find(f => f.id === u.clientId)!
+				files: presignData.uploads.map((u, i) => {
+					const source = filesToProcess[i].id === u.clientId
+						? filesToProcess[i]
+						: filesToProcess.find(f => f.id === u.clientId)!
 					return {
 						storageKey: u.storageKey,
 						fileName: source.originalName,
@@ -335,9 +333,10 @@ export default function NewProfilingPage() {
 				fetch: { signal: controller.signal },
 			})
 
-			if (createError || !createData || createData.status !== "ready") {
+			if (controller.signal.aborted)
+				return
+			if (createError || !createData || createData.status !== "ready")
 				throw new Error("Session creation failed")
-			}
 
 			setPhase("done")
 			toast.success("Session created successfully!")
@@ -349,12 +348,11 @@ export default function NewProfilingPage() {
 			abortRef.current = null
 		}
 		catch (err) {
-			if (err instanceof DOMException && err.name === "AbortError") {
+			if (err instanceof DOMException && err.name === "AbortError")
 				return
-			}
 
 			setPhase("error")
-			toast.error(err instanceof Error ? err.message : "Something went wrong")
+			toast.error(err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong")
 			console.error(err)
 		}
 		finally {
@@ -735,8 +733,17 @@ export default function NewProfilingPage() {
 								{/* Phase status banner */}
 								<div className="flex items-center gap-3 text-sm text-muted-foreground">
 									{isBusy && <Loader2 className="size-4 animate-spin text-sky-500" />}
-									{phase === "done" && <CheckCircle2 className="size-4 text-emerald-500" />}
-									{phase === "error" && <X className="size-4 text-destructive" />}
+									{phase === "done" ? (
+										<>
+											<CheckCircle2 className="size-4 text-emerald-500" />
+											<span>{phaseLabel[phase]}</span>
+										</>
+									) : phase === "error" && (
+										<>
+											<X className="size-4 text-destructive" />
+											<span>{phaseLabel[phase]}</span>
+										</>
+									)}
 									<span>{phaseLabel[phase]}</span>
 								</div>
 
@@ -776,7 +783,7 @@ export default function NewProfilingPage() {
 											</>
 										) : (
 											<>
-												Upload &amp; create session
+												Upload & create session
 												<ArrowRight className="size-4" />
 											</>
 										)}

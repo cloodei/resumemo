@@ -51,7 +51,7 @@ const EMPTY_FORM: SessionFormData = {
 	sessionName: "",
 	jobTitle: "",
 	jobDescription: "",
-}
+} as const
 
 interface UploadStoreV2 {
 	files: UploadFile[]

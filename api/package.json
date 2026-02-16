@@ -7,32 +7,28 @@
     "start": "./main",
     "build": "bun build --compile --minify --outfile main index.ts",
     "push": "bunx --bun drizzle-kit push",
-    "generate": "bunx --bun @better-auth/cli generate",
-    "bench": "bun --heap-prof-md run src/benchmark/run.ts",
-    "bench:fast": "bun run src/benchmark/run-fast.ts",
-    "bench:wasm": "bun run src/benchmark/run-wasm.ts",
-    "benchmark": "bun run bench"
+    "generate": "bunx --bun @better-auth/cli generate"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.978.0",
-    "@aws-sdk/s3-request-presigner": "^3.978.0",
+    "@aws-sdk/client-s3": "^3.990.0",
+    "@aws-sdk/s3-request-presigner": "^3.990.0",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.14",
     "@noble/hashes": "^2.0.1",
     "@node-rs/xxhash": "^1.7.6",
-    "@rasla/logify": "^5.1.3",
+    "@rasla/logify": "^5.2.1",
     "@shared": "workspace:*",
     "better-auth": "^1.4.18",
     "blake3": "2.1.7",
-    "elysia": "^1.4.22",
+    "elysia": "^1.4.25",
     "postgres": "^3.4.8",
-    "resend": "^6.9.1",
+    "resend": "^6.9.2",
     "xxh3-ts": "^2.0.1",
     "xxhash-wasm": "^1.1.0"
   },
   "devDependencies": {
     "bun-types": "latest",
-    "drizzle-kit": "^0.31.8"
+    "drizzle-kit": "^0.31.9"
   }
 }

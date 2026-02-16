@@ -50,7 +50,7 @@ async function uploadFile(storageKey: string, body: Buffer | string | Uint8Array
  * Content-Length condition so R2 rejects uploads that don't match
  * the declared size — prevents oversized uploads at the storage level.
  */
-async function generatePresignedUploadUrl(
+function generatePresignedUploadUrl(
 	storageKey: string,
 	contentType: string,
 	contentLength?: number,
@@ -80,7 +80,7 @@ async function deleteFile(storageKey: string) {
 /**
  * Fetch metadata for an uploaded object.
  */
-async function headFile(storageKey: string) {
+function headFile(storageKey: string) {
 	const command = new HeadObjectCommand({
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
