@@ -1,17 +1,10 @@
 import { Elysia } from "elysia";
 
 import { db } from "../lib/db";
-import { authMiddleware } from "../lib/auth";
 import * as schema from "@shared/schemas";
 
 export const systemRoutes = new Elysia()
-	.get("/", () => ({ status: "ok" }))
-	.use(authMiddleware)
-
-	.get("/api/me", ({ user, session }) => ({
-		user,
-		session,
-	}), { auth: true })
+	.get("/", () => process.env.JWT_SECRET)
 	.get("/api/test", async () => {
 		const [users, sessions, accounts, verifications] = await Promise.all([
 			db.select().from(schema.user),

@@ -1,0 +1,45 @@
+[project]
+name = "resumemo-pipeline"
+version = "0.1.0"
+description = "AI profiling pipeline for Resumemo — text extraction, structured parsing, scoring, and summarization of resumes."
+requires-python = ">=3.12"
+dependencies = [
+    # Task queue
+    "celery[amqp]>=5.4,<6",
+
+    # Text extraction
+    "pymupdf>=1.25,<2",
+    "python-docx>=1.1,<2",
+
+    # NLP
+    "spacy>=3.8,<4",
+
+    # Scoring
+    "scikit-learn>=1.6,<2",
+
+    # Data validation
+    "pydantic>=2.10,<3",
+
+    # R2/S3 file access
+    "boto3>=1.36,<2",
+
+    # HTTP callbacks
+    "httpx>=0.28,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9",
+    "pytest-cov>=6.0,<7",
+    "ruff>=0.9,<1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

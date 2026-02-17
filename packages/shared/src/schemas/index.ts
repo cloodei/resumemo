@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, bigint, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, integer, bigint, bigserial, numeric, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -144,6 +144,72 @@ export const profilingSessionFile = pgTable("profiling_session_file", {
 }, (table) => [
   index().on(table.sessionId),
   index().on(table.fileId),
+]);
+
+// ── Pipeline tables ──────────────────────────────────────────────
+
+export const pipelineJobStatusEnum = ["queued", "running", "completed", "failed"] as const;
+
+export const pipelineJob = pgTable("pipeline_job", {
+  id: uuid("id")
+    .$defaultFn(randomUUIDv7)
+    .primaryKey(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => profilingSession.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 32, enum: pipelineJobStatusEnum }).notNull().default("queued"),
+  pipelineVersion: varchar("pipeline_version", { length: 50 }).notNull(),
+  totalFiles: integer("total_files").notNull(),
+  processedFiles: integer("processed_files").notNull().default(0),
+  errorMessage: text("error_message"),
+  queuedAt: timestamp("queued_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+}, (table) => [
+  index().on(table.sessionId),
+  index().on(table.status),
+]);
+
+export const candidateResult = pgTable("candidate_result", {
+  id: uuid("id")
+    .$defaultFn(randomUUIDv7)
+    .primaryKey(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => profilingSession.id, { onDelete: "cascade" }),
+  fileId: bigint("file_id", { mode: "number" })
+    .notNull()
+    .references(() => resumeFile.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id")
+    .notNull()
+    .references(() => pipelineJob.id, { onDelete: "cascade" }),
+  candidateName: varchar("candidate_name", { length: 255 }),
+  candidateEmail: varchar("candidate_email", { length: 320 }),
+  candidatePhone: varchar("candidate_phone", { length: 50 }),
+  rawText: text("raw_text").notNull(),
+  parsedProfile: jsonb("parsed_profile").notNull(),
+  overallScore: numeric("overall_score", { precision: 5, scale: 2 }).notNull(),
+  scoreBreakdown: jsonb("score_breakdown").notNull(),
+  summary: text("summary").notNull(),
+  skillsMatched: jsonb("skills_matched").notNull().default([]),
+  pipelineVersion: varchar("pipeline_version", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+}, (table) => [
+  index().on(table.sessionId),
+  index().on(table.fileId),
+  index().on(table.overallScore),
+  uniqueIndex().on(table.sessionId, table.fileId),
 ]);
 
 // export const userRelations = relations(user, ({ many }) => ({

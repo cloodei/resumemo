@@ -6,6 +6,7 @@ import { openapi } from "@elysiajs/openapi";
 import { fileRoutes } from "./routes/files";
 import { systemRoutes } from "./routes/system";
 import { sessionRoutes } from "./routes/sessions";
+import { pipelineCallbackRoute } from "./routes/pipeline";
 // import { randomRoutes } from "./routes/random";
 import { authMiddleware } from "./lib/auth";
 
@@ -25,6 +26,7 @@ const app = new Elysia({ precompile: true })
 	.use(systemRoutes)
 	.use(sessionRoutes)
 	.use(fileRoutes)
+	.use(pipelineCallbackRoute)
 	// .use(randomRoutes)
 	.listen({ hostname: "0.0.0.0", port: 8080 });
 

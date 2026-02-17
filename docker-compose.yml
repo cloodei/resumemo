@@ -1,0 +1,35 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: resumemo
+      RABBITMQ_DEFAULT_PASS: resumemo
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pipeline-worker:
+    build: ./services/pipeline
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file: ./services/pipeline/.env
+    environment:
+      CELERY_BROKER_URL: amqp://resumemo:resumemo@rabbitmq:5672//
+    volumes:
+      - ./services/pipeline:/app
+    command: >
+      celery -A worker worker
+      --loglevel=info
+      --queues=profiling.jobs
+      --concurrency=2
+
+volumes:
+  rabbitmq_data:
