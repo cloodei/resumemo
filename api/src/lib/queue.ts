@@ -11,34 +11,36 @@ import amqplib, { type Connection, type ChannelModel, type Channel } from "amqpl
 const QUEUE_NAME = "profiling.jobs";
 const CELERY_TASK_NAME = "pipeline.process_session";
 
-let connection: Connection | null = null;
-let channel: Channel | null = null;
+export let connection: Connection | null = null;
+export let channel: Channel | null = null;
+export let channelModel: ChannelModel | null = null;
 
 async function getChannel() {
 	if (channel) return channel;
 
 	const url = process.env.CLOUDAMQP_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
 
-	const x = await amqplib.connect(url);
-	channel = await x.createChannel();
-	connection = x
+	channelModel = await amqplib.connect(url);
+	channel = await channelModel.createChannel();
+	connection = channelModel.connection;
 
-	// Ensure the queue exists (durable = survives broker restart)
 	await channel.assertQueue(QUEUE_NAME, { durable: true });
-
 	console.log(`[RabbitMQ] Connected and queue "${QUEUE_NAME}" asserted`);
 
-	// Handle connection errors
 	connection.on("error", (err) => {
-		console.error("[RabbitMQ] Connection error:", err.message);
+		channelModel = null;
 		channel = null;
 		connection = null;
+
+		console.error("[RabbitMQ] Connection error:", err.message);
 	});
 
 	connection.on("close", () => {
-		console.warn("[RabbitMQ] Connection closed, will reconnect on next publish");
+		channelModel = null;
 		channel = null;
 		connection = null;
+
+		console.warn("[RabbitMQ] Connection closed, will reconnect on next publish");
 	});
 
 	return channel;
@@ -127,12 +129,13 @@ export async function closeRabbitMQ() {
 	try {
 		if (channel)
 			await channel.close();
-		if (connection)
-			await connection.close();
+		if (channelModel)
+			await channelModel.close();
 	}
 	catch {
 		// Best-effort cleanup
 	}
+	channelModel = null;
 	channel = null;
 	connection = null;
 }
