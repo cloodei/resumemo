@@ -12,7 +12,7 @@ Recruiter-facing resume screening platform with AI-assisted ranking, search, and
 | **Backend** | ElysiaJS (Bun web framework) |
 | **Database** | PostgreSQL with Drizzle ORM |
 | **Auth** | Better Auth (email/password + OAuth) |
-| **AI Pipeline** | Python 3.12+ with Celery + spaCy + scikit-learn |
+| **AI Pipeline** | Python 3.12+ with Celery + spaCy + scikit-learn (uv) |
 | **Message Queue** | RabbitMQ (CloudAMQP) |
 | **Storage** | Cloudflare R2 (S3-compatible) |
 | **Monorepo** | Turborepo |
@@ -27,7 +27,7 @@ bun install
 bun run dev
 
 # Or start individually
-bun run web    # Frontend at http://localhost:5000
+bun run web    # Frontend at http://localhost:5173
 bun run api    # Backend at http://localhost:8080
 ```
 
