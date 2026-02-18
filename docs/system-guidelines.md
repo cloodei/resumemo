@@ -1,5 +1,7 @@
 # System Guidelines: AI Resume Screening Platform
 
+> ⚠️ **Early Development**: This document describes the product vision. The AI pipeline and core features are functional but undergoing active iteration.
+
 ## Purpose and Intent (Why)
 This system enables recruiters and hiring teams to ingest, analyze, and manage applicant resumes at scale. The primary capability is AI-assisted ranking via NLP pipelines and machine learning models, but the platform is intentionally broader: it delivers end-to-end resume workflow management, searchable candidate insights, and exportable outcomes to support hiring decisions.
 
@@ -78,10 +80,12 @@ Use the following guidelines when interpreting or extending system behavior.
 - Exports must align with the current recruiter’s filters and sorting.
 
 ## Interfaces and Components
-- **Recruiter UI**: Resume ingestion, search, review, export, dashboards.
+- **Recruiter UI** (Vite + React): Resume ingestion, search, review, export, dashboards.
 - **Admin Console**: Role and permission management, data governance.
-- **Scoring Service**: ML ranking, weight tuning, rule-based adjustment layer.
-- **Parsing Service**: Document processing, NLP extraction, storage.
+- **API Service** (ElysiaJS): Auth, file handling, session management, results serving.
+- **Pipeline Service** (Python + Celery): Document processing, NLP extraction, scoring.
+- **Message Queue** (RabbitMQ): Job distribution between API and pipeline workers.
+- **Storage** (Cloudflare R2): Raw resume file storage.
 
 ## Data & Security
 - Resumes are PII-heavy; enforce encryption at rest and in transit.
