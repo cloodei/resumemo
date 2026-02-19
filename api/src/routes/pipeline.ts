@@ -107,9 +107,9 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 
 			// Handle each callback type
 			switch (type) {
-				case "progress":
-					await handleProgress(body, job_id);
-					break;
+			case "progress":
+				await handleProgress(body, job_id, job.status);
+				break;
 				case "completion":
 					await handleCompletion(body, job_id, session_id);
 					break;
@@ -128,13 +128,15 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 async function handleProgress(
 	body: { processed_files: number; total_files: number },
 	jobId: string,
+	currentStatus: string,
 ) {
 	await db
 		.update(schema.pipelineJob)
 		.set({
 			status: "running",
 			processedFiles: body.processed_files,
-			startedAt: new Date(),
+			// Only set startedAt on first transition from queued → running
+			...(currentStatus === "queued" ? { startedAt: new Date() } : {}),
 		})
 		.where(eq(schema.pipelineJob.id, jobId));
 
@@ -206,6 +208,7 @@ async function handleCompletion(
 async function handleError(
 	body: {
 		error: string;
+		processed_files: number;
 		partial_results: Array<{
 			file_id: number;
 			candidate_name: string | null;
@@ -223,11 +226,33 @@ async function handleError(
 	sessionId: string,
 ) {
 	await db.transaction(async (tx) => {
+		// Persist any partial results that were successfully processed before failure
+		if (body.partial_results.length > 0) {
+			await tx.insert(schema.candidateResult).values(
+				body.partial_results.map((r) => ({
+					sessionId,
+					fileId: r.file_id,
+					jobId,
+					candidateName: r.candidate_name,
+					candidateEmail: r.candidate_email,
+					candidatePhone: r.candidate_phone,
+					rawText: r.raw_text,
+					parsedProfile: r.parsed_profile,
+					overallScore: String(r.overall_score),
+					scoreBreakdown: r.score_breakdown,
+					summary: r.summary,
+					skillsMatched: r.skills_matched,
+					pipelineVersion: "unknown",
+				})),
+			);
+		}
+
 		// Update pipeline job
 		await tx
 			.update(schema.pipelineJob)
 			.set({
 				status: "failed",
+				processedFiles: body.processed_files,
 				errorMessage: body.error,
 				completedAt: new Date(),
 			})
@@ -243,5 +268,5 @@ async function handleError(
 			.where(eq(schema.profilingSession.id, sessionId));
 	});
 
-	console.log(`[Pipeline Callback] Failed: ${body.error} for session ${sessionId}`);
+	console.log(`[Pipeline Callback] Failed: ${body.error} for session ${sessionId} (${body.partial_results.length} partial results saved)`);
 }

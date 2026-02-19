@@ -361,23 +361,25 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			try {
 				await publishPipelineJob(payload);
 			} catch (err) {
-				// Rollback: mark job as failed if we can't publish
-				await db
-					.update(schema.pipelineJob)
-					.set({
-						status: "failed",
-						errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
-						completedAt: new Date(),
-					})
-					.where(eq(schema.pipelineJob.id, pipelineJobRow.id));
+				// Rollback: mark both job and session as failed atomically
+				await db.transaction(async (tx) => {
+					await tx
+						.update(schema.pipelineJob)
+						.set({
+							status: "failed",
+							errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
+							completedAt: new Date(),
+						})
+						.where(eq(schema.pipelineJob.id, pipelineJobRow.id));
 
-				await db
-					.update(schema.profilingSession)
-					.set({
-						status: "failed",
-						errorMessage: "Failed to submit job to processing queue",
-					})
-					.where(eq(schema.profilingSession.id, params.id));
+					await tx
+						.update(schema.profilingSession)
+						.set({
+							status: "failed",
+							errorMessage: "Failed to submit job to processing queue",
+						})
+						.where(eq(schema.profilingSession.id, params.id));
+				});
 
 				return status(500, {
 					status: "error",
