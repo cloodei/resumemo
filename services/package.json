@@ -1,0 +1,9 @@
+{
+  "name": "services",
+  "private": true,
+  "scripts": {
+    "down": "cd pipeline && bun run down",
+    "dev": "cd pipeline && bun run dev",
+    "start": "bun dev"
+  }
+}
