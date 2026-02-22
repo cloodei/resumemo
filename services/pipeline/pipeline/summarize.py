@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 MAX_SUMMARY_LENGTH = 500
 
 
-def summarize_candidate(profile: "CandidateProfile", scoring: "ScoringResult") -> str:
+def summarize_candidate(profile: "CandidateProfile", scoring: "ScoringResult"):
     """Generate a concise 2-3 sentence candidate summary from parsed profile data.
 
     Uses template-based generation (no LLM). Constructs sentences from
@@ -40,7 +40,7 @@ def summarize_candidate(profile: "CandidateProfile", scoring: "ScoringResult") -
     return summary
 
 
-def _build_opening(profile: "CandidateProfile") -> str:
+def _build_opening(profile: "CandidateProfile"):
     """Build the opening sentence: name, title, experience, skills."""
     name = profile.name or "This candidate"
 
@@ -73,7 +73,7 @@ def _build_opening(profile: "CandidateProfile") -> str:
     return f"{name} is a {title}{exp_part}{skills_part}."
 
 
-def _build_education(profile: "CandidateProfile") -> str | None:
+def _build_education(profile: "CandidateProfile"):
     """Build the education sentence from the highest-level degree."""
     if not profile.education:
         return None
@@ -93,7 +93,7 @@ def _build_education(profile: "CandidateProfile") -> str | None:
     return f"Holds a {' '.join(parts)}."
 
 
-def _build_highlight(profile: "CandidateProfile", scoring: "ScoringResult") -> str | None:
+def _build_highlight(profile: "CandidateProfile", scoring: "ScoringResult"):
     """Build a highlight sentence based on certifications or scoring."""
     # Certifications
     if profile.certifications:

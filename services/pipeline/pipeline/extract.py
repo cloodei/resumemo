@@ -1,14 +1,12 @@
 """Stage 1: Text extraction from PDF, DOCX, and TXT files."""
-
 from __future__ import annotations
-
 import logging
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
 
-def extract_text(file_bytes: bytes, mime_type: str) -> str:
+def extract_text(file_bytes: bytes, mime_type: str):
     """Extract plain text from a file based on its MIME type.
 
     Args:
@@ -45,7 +43,7 @@ def extract_text(file_bytes: bytes, mime_type: str) -> str:
         return ""
 
 
-def _extract_pdf(file_bytes: bytes) -> str:
+def _extract_pdf(file_bytes: bytes):
     """Extract text from a PDF using PyMuPDF."""
     import pymupdf
 
@@ -57,7 +55,7 @@ def _extract_pdf(file_bytes: bytes) -> str:
     return "\n".join(pages).strip()
 
 
-def _extract_docx(file_bytes: bytes) -> str:
+def _extract_docx(file_bytes: bytes):
     """Extract text from a DOCX using python-docx."""
     from docx import Document
 
@@ -66,6 +64,6 @@ def _extract_docx(file_bytes: bytes) -> str:
     return "\n".join(paragraphs)
 
 
-def _extract_txt(file_bytes: bytes) -> str:
+def _extract_txt(file_bytes: bytes):
     """Extract text from a plain text file."""
     return file_bytes.decode("utf-8", errors="replace").strip()

@@ -6,23 +6,17 @@ requires-python = ">=3.12"
 dependencies = [
     # Task queue
     "celery[amqp]>=5.4,<6",
-
     # Text extraction
     "pymupdf>=1.25,<2",
     "python-docx>=1.1,<2",
-
     # NLP
     "spacy>=3.8,<4",
-
     # Scoring
     "scikit-learn>=1.6,<2",
-
     # Data validation
     "pydantic>=2.10,<3",
-
     # R2/S3 file access
     "boto3>=1.36,<2",
-
     # HTTP callbacks
     "httpx>=0.28,<1",
 ]

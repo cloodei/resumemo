@@ -11,8 +11,8 @@ import time
 from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded
 
+# from pipeline.config import PIPELINE_VERSION
 from pipeline.callback import send_progress, send_completion, send_error
-from pipeline.config import PIPELINE_VERSION
 from pipeline.extract import extract_text
 from pipeline.models import FileManifestItem, JobPayload, FileResult
 from pipeline.parse import parse_resume
@@ -34,7 +34,7 @@ app.config_from_object("celeryconfig")
     acks_late=True,
     reject_on_worker_lost=True,
 )
-def process_session(self, raw_payload: dict) -> None:
+def process_session(self, raw_payload: dict):
     """Process all resumes in a profiling session.
 
     Fetches files from R2, runs extract -> parse -> score -> summarize,
@@ -147,7 +147,7 @@ def process_session(self, raw_payload: dict) -> None:
         raise
 
 
-def _process_single_file(file: FileManifestItem, payload: JobPayload) -> dict:
+def _process_single_file(file: FileManifestItem, payload: JobPayload):
     """Run the full pipeline on a single resume file."""
     # Stage 1: Fetch and extract text
     file_bytes = fetch_file(file.storage_key)

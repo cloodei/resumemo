@@ -1,7 +1,6 @@
 """Stage 2: Structured parsing of resume text using spaCy NER and heuristics."""
 
 from __future__ import annotations
-
 import json
 import logging
 import re
@@ -14,7 +13,6 @@ from pipeline.models import CandidateProfile, EducationEntry, WorkEntry
 
 logger = logging.getLogger(__name__)
 
-# ── Lazy-loaded resources ─────────────────────────────────────────
 
 _nlp = None
 _skills_taxonomy: set[str] | None = None
@@ -31,7 +29,7 @@ def _get_nlp():
     return _nlp
 
 
-def _get_skills_taxonomy() -> set[str]:
+def _get_skills_taxonomy():
     """Lazily load the skills taxonomy."""
     global _skills_taxonomy
     if _skills_taxonomy is None:
@@ -45,8 +43,6 @@ def _get_skills_taxonomy() -> set[str]:
             _skills_taxonomy = set()
     return _skills_taxonomy
 
-
-# ── Regex patterns ────────────────────────────────────────────────
 
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 PHONE_PATTERN = re.compile(r"[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{7,15}")
@@ -90,10 +86,7 @@ DEGREE_PATTERN = re.compile(
 YEAR_PATTERN = re.compile(r"\b(19[7-9]\d|20[0-3]\d)\b")
 
 
-# ── Main entry point ──────────────────────────────────────────────
-
-
-def parse_resume(raw_text: str) -> CandidateProfile:
+def parse_resume(raw_text: str):
     """Parse raw resume text into a structured CandidateProfile.
 
     Uses spaCy NER for entity extraction, regex for contact info,
@@ -136,10 +129,7 @@ def parse_resume(raw_text: str) -> CandidateProfile:
     )
 
 
-# ── Extraction helpers ────────────────────────────────────────────
-
-
-def _extract_name(doc, lines: list[str]) -> str | None:
+def _extract_name(doc, lines: list[str]):
     """Extract candidate name from spaCy PERSON entities near the top of the document."""
     # Look for PERSON entities in the first 500 characters
     for ent in doc.ents:
@@ -158,13 +148,13 @@ def _extract_name(doc, lines: list[str]) -> str | None:
     return None
 
 
-def _extract_email(text: str) -> str | None:
+def _extract_email(text: str):
     """Extract the first email address found."""
     match = EMAIL_PATTERN.search(text)
     return match.group(0) if match else None
 
 
-def _extract_phone(text: str) -> str | None:
+def _extract_phone(text: str):
     """Extract the first phone number found."""
     match = PHONE_PATTERN.search(text)
     if match:
@@ -176,7 +166,7 @@ def _extract_phone(text: str) -> str | None:
     return None
 
 
-def _identify_sections(lines: list[str]) -> dict[str, list[str]]:
+def _identify_sections(lines: list[str]):
     """Split the resume into named sections based on header patterns."""
     sections: dict[str, list[str]] = {}
     current_section: str | None = None
@@ -212,7 +202,7 @@ def _identify_sections(lines: list[str]) -> dict[str, list[str]]:
     return sections
 
 
-def _extract_skills(raw_text: str, doc) -> list[str]:
+def _extract_skills(raw_text: str, doc):
     """Extract skills via taxonomy matching and NER."""
     taxonomy = _get_skills_taxonomy()
     found_skills: set[str] = set()
@@ -241,7 +231,7 @@ def _extract_skills(raw_text: str, doc) -> list[str]:
     return sorted(set(cased_skills), key=str.lower)
 
 
-def _extract_work_history(section_lines: list[str], doc) -> list[WorkEntry]:
+def _extract_work_history(section_lines: list[str], doc):
     """Extract work history entries from the experience section."""
     if not section_lines:
         return []
@@ -297,7 +287,7 @@ def _extract_work_history(section_lines: list[str], doc) -> list[WorkEntry]:
     return entries
 
 
-def _parse_date_range(date_str: str) -> tuple[str | None, str | None] | None:
+def _parse_date_range(date_str: str):
     """Parse a date range string into (start, end) year-month strings."""
     parts = re.split(r"\s*[-–—]\s*|\s+to\s+", date_str, maxsplit=1)
     if len(parts) < 2:
@@ -314,7 +304,7 @@ def _parse_date_range(date_str: str) -> tuple[str | None, str | None] | None:
     return (start, end)
 
 
-def _normalize_date(date_str: str) -> str | None:
+def _normalize_date(date_str: str):
     """Normalize a date string to YYYY or YYYY-MM format."""
     year_match = YEAR_PATTERN.search(date_str)
     if not year_match:
@@ -322,7 +312,7 @@ def _normalize_date(date_str: str) -> str | None:
     return year_match.group(0)
 
 
-def _extract_education(section_lines: list[str], doc) -> list[EducationEntry]:
+def _extract_education(section_lines: list[str], doc):
     """Extract education entries from the education section."""
     if not section_lines:
         return []
@@ -372,7 +362,7 @@ def _extract_education(section_lines: list[str], doc) -> list[EducationEntry]:
     return entries
 
 
-def _extract_certifications(section_lines: list[str]) -> list[str]:
+def _extract_certifications(section_lines: list[str]):
     """Extract certifications from the certifications section."""
     certs = []
     for line in section_lines:
@@ -382,7 +372,7 @@ def _extract_certifications(section_lines: list[str]) -> list[str]:
     return certs
 
 
-def _extract_projects(section_lines: list[str]) -> list[str]:
+def _extract_projects(section_lines: list[str]):
     """Extract project names/descriptions from the projects section."""
     projects = []
     for line in section_lines:
@@ -392,7 +382,7 @@ def _extract_projects(section_lines: list[str]) -> list[str]:
     return projects
 
 
-def _compute_experience_years(work_history: list[WorkEntry]) -> float | None:
+def _compute_experience_years(work_history: list[WorkEntry]):
     """Compute total years of experience from work history date ranges."""
     if not work_history:
         return None
@@ -424,7 +414,7 @@ def _compute_experience_years(work_history: list[WorkEntry]) -> float | None:
     return round(total_months / 12, 1)
 
 
-def _year_from_date(date_str: str | None) -> int | None:
+def _year_from_date(date_str: str | None):
     """Extract a year integer from a date string."""
     if not date_str:
         return None

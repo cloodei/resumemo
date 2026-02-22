@@ -1,12 +1,6 @@
 """Pydantic models for pipeline input, output, and intermediate data."""
-
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
-
-# ── Job input models ──────────────────────────────────────────────
-
 
 class FileManifestItem(BaseModel):
     """A single file in the job payload."""
@@ -31,9 +25,6 @@ class JobPayload(BaseModel):
     files: list[FileManifestItem]
 
 
-# ── Parsed profile models ────────────────────────────────────────
-
-
 class WorkEntry(BaseModel):
     """A single work history entry."""
 
@@ -43,14 +34,12 @@ class WorkEntry(BaseModel):
     end_date: str | None = None
     description: str | None = None
 
-
 class EducationEntry(BaseModel):
     """A single education entry."""
 
     degree: str | None = None
     institution: str | None = None
     year: int | None = None
-
 
 class CandidateProfile(BaseModel):
     """Structured data extracted from a resume."""
@@ -66,8 +55,6 @@ class CandidateProfile(BaseModel):
     total_experience_years: float | None = None
 
 
-# ── Scoring models ────────────────────────────────────────────────
-
 
 class SubScore(BaseModel):
     """A single scoring criterion result."""
@@ -76,7 +63,6 @@ class SubScore(BaseModel):
     weight: float = Field(ge=0, le=1)
     description: str
     details: dict | None = None
-
 
 class ScoringResult(BaseModel):
     """Complete scoring output for a single resume."""
@@ -91,8 +77,6 @@ class ScoringResult(BaseModel):
             return skill_sub.details.get("matched", [])
         return []
 
-
-# ── Result output model ──────────────────────────────────────────
 
 
 class FileResult(BaseModel):
