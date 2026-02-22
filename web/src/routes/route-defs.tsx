@@ -4,6 +4,7 @@ import DashboardPage from "@/pages/dashboard"
 // import NewProfilingPage from "@/pages/profiling/new"
 import NewProfilingPageV2 from "@/pages/profiling/new-v2"
 import ProfilingResultsPage from "@/pages/profiling/session"
+import ProfilingSessionsPage from "@/pages/profiling/list"
 // import RandomTestPage from "@/pages/test/random"
 import NewJobPage from "@/pages/jobs/new-job"
 import JobResultsPage from "@/pages/jobs/job-results"
@@ -33,6 +34,12 @@ export const ROUTES = [
   //   element: <NewProfilingPage />,
   //   layout: "app",
   // },
+  {
+    path: "/profiling",
+    title: "Profiling Sessions · Résumé Ranker",
+    element: <ProfilingSessionsPage />,
+    layout: "app",
+  },
   {
     path: "/profiling/new",
     title: "New Profiling Session · Résumé Ranker",

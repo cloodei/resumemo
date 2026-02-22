@@ -36,6 +36,7 @@ import {
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview & recent sessions" },
+  { href: "/profiling", label: "Sessions", icon: FilePlus2, description: "History & ongoing profiling" },
   { href: "/profiling/new", label: "New Session", icon: FilePlus2, description: "Upload resumes & start profiling" },
 ]
 

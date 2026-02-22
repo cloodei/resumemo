@@ -10,6 +10,7 @@ import boto3
 logger = logging.getLogger(__name__)
 
 _client = None
+bucket = os.environ["R2_BUCKET_NAME"]
 
 
 def _get_s3_client():
@@ -26,7 +27,7 @@ def _get_s3_client():
     return _client
 
 
-def fetch_file(storage_key: str) -> bytes:
+def fetch_file(storage_key: str):
     """Download a file from R2 and return its contents as bytes.
 
     Args:
@@ -38,7 +39,6 @@ def fetch_file(storage_key: str) -> bytes:
     Raises:
         Exception: If the file cannot be fetched (not found, access denied, etc.).
     """
-    bucket = os.environ["R2_BUCKET_NAME"]
     client = _get_s3_client()
 
     logger.info("Fetching file from R2", extra={"storage_key": storage_key, "bucket": bucket})
