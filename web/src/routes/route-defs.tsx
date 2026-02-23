@@ -1,11 +1,9 @@
 import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
-// import NewProfilingPage from "@/pages/profiling/new"
 import NewProfilingPageV2 from "@/pages/profiling/new-v2"
 import ProfilingResultsPage from "@/pages/profiling/session"
 import ProfilingSessionsPage from "@/pages/profiling/list"
-// import RandomTestPage from "@/pages/test/random"
 import NewJobPage from "@/pages/jobs/new-job"
 import JobResultsPage from "@/pages/jobs/job-results"
 
@@ -28,12 +26,6 @@ export const ROUTES = [
     element: <DashboardPage />,
     layout: "app",
   },
-  // {
-  //   path: "/profiling/new",
-  //   title: "New Profiling Session · Résumé Ranker",
-  //   element: <NewProfilingPage />,
-  //   layout: "app",
-  // },
   {
     path: "/profiling",
     title: "Profiling Sessions · Résumé Ranker",
@@ -52,12 +44,6 @@ export const ROUTES = [
     element: <ProfilingResultsPage />,
     layout: "app",
   },
-  // {
-  //   path: "/test/random",
-  //   title: "Random API Test · Résumé Ranker",
-  //   element: <RandomTestPage />,
-  //   layout: "app",
-  // },
   // Legacy redirects (can remove later)
   {
     path: "/jobs/new",
