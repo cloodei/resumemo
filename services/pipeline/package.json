@@ -1,6 +1,8 @@
 {
   "scripts": {
     "down": "uv sync && python -m spacy download en_core_web_md",
+    "sync": "uv sync",
+    "spacy": "python -m spacy download en_core_web_md",
     "dev": "uv run celery -A worker worker --loglevel=info --queues=profiling.jobs --concurrency=2",
     "start": "bun dev"
   }
