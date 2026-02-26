@@ -194,7 +194,7 @@ export const candidateResult = pgTable("candidate_result", {
     .references(() => pipelineJob.id, { onDelete: "cascade" }),
   candidateName: varchar("candidate_name", { length: 255 }),
   candidateEmail: varchar("candidate_email", { length: 320 }),
-  candidatePhone: varchar("candidate_phone", { length: 50 }),
+  candidatePhone: varchar("candidate_phone", { length: 32 }),
   rawText: text("raw_text").notNull(),
   parsedProfile: jsonb("parsed_profile").notNull(),
   overallScore: numeric("overall_score", { precision: 5, scale: 2 }).notNull(),

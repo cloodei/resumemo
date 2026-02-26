@@ -17,6 +17,7 @@ import {
 
 const PIPELINE_VERSION = "0.1.0";
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
+const callbackBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
 
 async function cleanupUploadedKeys(storageKeys: string[]) {
 	await Promise.all(storageKeys.map(async (storageKey) => {
@@ -340,8 +341,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				.where(eq(schema.profilingSession.id, params.id));
 
 			// 4. Build and publish the pipeline job payload
-			const callbackBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
-			const payload: PipelineJobPayload = {
+			const payload = {
 				session_id: params.id,
 				job_id: pipelineJobRow.id,
 				callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
