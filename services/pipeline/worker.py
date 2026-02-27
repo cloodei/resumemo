@@ -12,13 +12,13 @@ from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded
 
 # from pipeline.config import PIPELINE_VERSION
-from pipeline.utils.callback import send_progress, send_completion, send_error
-from pipeline.stages.extract import extract_text
-from pipeline.models import FileManifestItem, JobPayload, FileResult
-from pipeline.stages.parse import parse_resume
-from pipeline.stages.score import score_resume
-from pipeline.utils.storage import fetch_file
-from pipeline.stages.summarize import summarize_candidate
+from utils.callback import send_progress, send_completion, send_error
+from stages.extract import extract_text
+from models import FileManifestItem, JobPayload, FileResult
+from stages.parse import parse_resume
+from stages.score import score_resume
+from utils.storage import fetch_file
+from stages.summarize import summarize_candidate
 
 logger = logging.getLogger(__name__)
 

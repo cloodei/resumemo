@@ -8,8 +8,8 @@ from pathlib import Path
 
 import spacy
 
-from pipeline.config import SPACY_MODEL
-from pipeline.models import CandidateProfile, EducationEntry, WorkEntry
+from config import SPACY_MODEL
+from models import CandidateProfile, EducationEntry, WorkEntry
 
 logger = logging.getLogger(__name__)
 

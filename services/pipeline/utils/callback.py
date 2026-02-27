@@ -6,8 +6,8 @@ import logging
 import time
 import httpx
 
-from pipeline.config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_VERSION
-from pipeline.models import JobPayload
+from config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_VERSION
+from models import JobPayload
 
 logger = logging.getLogger(__name__)
 

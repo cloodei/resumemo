@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pipeline.models import CandidateProfile, ScoringResult
+from models import CandidateProfile, ScoringResult
 
 MAX_SUMMARY_LENGTH = 500
 
 
-def summarize_candidate(profile: "CandidateProfile", scoring: "ScoringResult"):
+def summarize_candidate(profile: CandidateProfile, scoring: ScoringResult):
     """Generate a concise 2-3 sentence candidate summary from parsed profile data.
 
     Uses template-based generation (no LLM). Constructs sentences from

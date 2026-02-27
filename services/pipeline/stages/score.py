@@ -4,22 +4,18 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from pipeline.config import (
+from config import (
     SCORING_WEIGHT_EXPERIENCE_FIT,
     SCORING_WEIGHT_SKILL_MATCH,
     SCORING_WEIGHT_TEXT_SIMILARITY,
     TFIDF_MAX_FEATURES,
     TFIDF_NGRAM_RANGE,
 )
-from pipeline.models import ScoringResult, SubScore
-
-if TYPE_CHECKING:
-    from pipeline.models import CandidateProfile
+from models import ScoringResult, SubScore, CandidateProfile
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +27,7 @@ EXPERIENCE_YEARS_PATTERN = re.compile(
 
 def score_resume(
     raw_text: str,
-    profile: "CandidateProfile",
+    profile: CandidateProfile,
     job_description: str,
     job_title: str | None = None,
 ) -> ScoringResult:
