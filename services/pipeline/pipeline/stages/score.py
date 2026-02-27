@@ -136,7 +136,7 @@ def _score_skill_match(
 
     Returns: (score, matched_skills, missing_skills, extra_skills)
     """
-    from pipeline.parse import _get_skills_taxonomy
+    from pipeline.stages.parse import _get_skills_taxonomy
 
     taxonomy = _get_skills_taxonomy()
     jd_lower = job_description.lower()

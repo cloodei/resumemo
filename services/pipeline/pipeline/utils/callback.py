@@ -4,19 +4,15 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
-
 import httpx
 
 from pipeline.config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_VERSION
-
-if TYPE_CHECKING:
-    from pipeline.models import JobPayload
+from pipeline.models import JobPayload
 
 logger = logging.getLogger(__name__)
 
 
-def _post_callback(payload: "JobPayload", body: dict) -> None:
+def _post_callback(payload: JobPayload, body: dict) -> None:
     """POST a callback to the Elysia API with retry logic."""
     headers = {
         "Authorization": f"Bearer {payload.callback_secret}",
@@ -68,11 +64,11 @@ def _post_callback(payload: "JobPayload", body: dict) -> None:
 
 
 def send_progress(
-    payload: "JobPayload",
+    payload: JobPayload,
     processed: int,
     total: int,
     current_file: str | None,
-) -> None:
+):
     """Send a progress update callback."""
     body = {
         "type": "progress",
@@ -90,7 +86,7 @@ def send_progress(
         logger.warning("Progress callback failed, continuing", extra={"job_id": payload.job_id})
 
 
-def send_completion(payload: "JobPayload", results: list[dict]) -> None:
+def send_completion(payload: JobPayload, results: list[dict]):
     """Send a completion callback with all results."""
     body = {
         "type": "completion",
@@ -106,10 +102,10 @@ def send_completion(payload: "JobPayload", results: list[dict]) -> None:
 
 
 def send_error(
-    payload: "JobPayload",
+    payload: JobPayload,
     error: str,
     partial_results: list[dict] | None = None,
-) -> None:
+):
     """Send an error callback."""
     body = {
         "type": "error",
