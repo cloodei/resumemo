@@ -1,15 +1,15 @@
 /**
  * Internal pipeline callback endpoint.
  *
- * Receives progress, completion, and error callbacks from the Celery worker.
+ * Receives completion and error callbacks from the Celery worker.
  * Authenticated by shared secret (PIPELINE_CALLBACK_SECRET), not user auth.
  */
 
 import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
 
-import * as schema from "@shared/schemas";
 import { db } from "~/lib/db";
+import * as schema from "@shared/schemas";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
 
@@ -26,8 +26,6 @@ function validateSecret(authHeader: string | null): boolean {
 	return token === PIPELINE_CALLBACK_SECRET;
 }
 
-// ── Schemas for callback payloads ────────────────────────────────
-
 const resultSchema = t.Object({
 	file_id: t.Number(),
 	candidate_name: t.Nullable(t.String()),
@@ -41,41 +39,29 @@ const resultSchema = t.Object({
 	skills_matched: t.Array(t.String()),
 });
 
-const progressBody = t.Object({
-	type: t.Literal("progress"),
-	session_id: t.String(),
-	job_id: t.String(),
-	status: t.Literal("running"),
-	processed_files: t.Number(),
-	total_files: t.Number(),
-	current_file: t.Nullable(t.String()),
-});
-
 const completionBody = t.Object({
 	type: t.Literal("completion"),
 	session_id: t.String(),
-	job_id: t.String(),
 	status: t.Literal("completed"),
 	pipeline_version: t.String(),
 	processed_files: t.Number(),
 	total_files: t.Number(),
 	results: t.Array(resultSchema),
 });
+type CompletionBody = typeof completionBody.static;
 
 const errorBody = t.Object({
 	type: t.Literal("error"),
 	session_id: t.String(),
-	job_id: t.String(),
 	status: t.Literal("failed"),
 	error: t.String(),
 	processed_files: t.Number(),
 	total_files: t.Number(),
 	partial_results: t.Array(resultSchema),
 });
+type ErrorBody = typeof errorBody.static;
 
-const callbackBody = t.Union([progressBody, completionBody, errorBody]);
-
-// ── Route ────────────────────────────────────────────────────────
+const callbackBody = t.Union([completionBody, errorBody]);
 
 export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipeline" })
 	.post(
@@ -87,34 +73,31 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 				return status(401, { status: "error", message: "Unauthorized" });
 			}
 
-			const { type, session_id, job_id } = body;
+			const { type, session_id } = body;
 
-			// Verify the pipeline job exists and isn't already finalized
-			const [job] = await db
-				.select()
-				.from(schema.pipelineJob)
-				.where(eq(schema.pipelineJob.id, job_id));
+			// Verify the session exists
+			const [session] = await db
+				.select({ id: schema.profilingSession.id, status: schema.profilingSession.status })
+				.from(schema.profilingSession)
+				.where(eq(schema.profilingSession.id, session_id));
 
-			if (!job) {
-				return status(404, { status: "error", message: "Pipeline job not found" });
+			if (!session) {
+				return status(404, { status: "error", message: "Session not found" });
 			}
 
-			// Idempotency guard: if job is already completed or failed, acknowledge but skip
-			if (job.status === "completed" || job.status === "failed") {
-				console.log(`[Pipeline Callback] Job ${job_id} already ${job.status}, skipping ${type} callback`);
+			// Idempotency guard: if session is already finalized, acknowledge but skip
+			if (session.status === "completed" || session.status === "failed") {
+				console.log(`[Pipeline Callback] Session ${session_id} already ${session.status}, skipping ${type} callback`);
 				return { status: "ok", skipped: true };
 			}
 
 			// Handle each callback type
 			switch (type) {
-			case "progress":
-				await handleProgress(body, job_id, job.status);
-				break;
 				case "completion":
-					await handleCompletion(body, job_id, session_id);
+					await handleCompletion(body, session_id);
 					break;
 				case "error":
-					await handleError(body, job_id, session_id);
+					await handleError(body, session_id);
 					break;
 			}
 
@@ -123,44 +106,8 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 		{ body: callbackBody },
 	);
 
-// ── Handlers ─────────────────────────────────────────────────────
-
-async function handleProgress(
-	body: { processed_files: number; total_files: number },
-	jobId: string,
-	currentStatus: string,
-) {
-	await db
-		.update(schema.pipelineJob)
-		.set({
-			status: "running",
-			processedFiles: body.processed_files,
-			// Only set startedAt on first transition from queued → running
-			...(currentStatus === "queued" ? { startedAt: new Date() } : {}),
-		})
-		.where(eq(schema.pipelineJob.id, jobId));
-
-	console.log(`[Pipeline Callback] Progress: ${body.processed_files}/${body.total_files} for job ${jobId}`);
-}
-
 async function handleCompletion(
-	body: {
-		pipeline_version: string;
-		processed_files: number;
-		results: Array<{
-			file_id: number;
-			candidate_name: string | null;
-			candidate_email: string | null;
-			candidate_phone: string | null;
-			raw_text: string;
-			parsed_profile: Record<string, unknown>;
-			overall_score: number;
-			score_breakdown: Record<string, unknown>;
-			summary: string;
-			skills_matched: string[];
-		}>;
-	},
-	jobId: string,
+	body: CompletionBody,
 	sessionId: string,
 ) {
 	await db.transaction(async (tx) => {
@@ -170,7 +117,6 @@ async function handleCompletion(
 				body.results.map((r) => ({
 					sessionId,
 					fileId: r.file_id,
-					jobId,
 					candidateName: r.candidate_name,
 					candidateEmail: r.candidate_email,
 					candidatePhone: r.candidate_phone,
@@ -185,16 +131,6 @@ async function handleCompletion(
 			);
 		}
 
-		// Update pipeline job
-		await tx
-			.update(schema.pipelineJob)
-			.set({
-				status: "completed",
-				processedFiles: body.processed_files,
-				completedAt: new Date(),
-			})
-			.where(eq(schema.pipelineJob.id, jobId));
-
 		// Update profiling session
 		await tx
 			.update(schema.profilingSession)
@@ -206,23 +142,7 @@ async function handleCompletion(
 }
 
 async function handleError(
-	body: {
-		error: string;
-		processed_files: number;
-		partial_results: Array<{
-			file_id: number;
-			candidate_name: string | null;
-			candidate_email: string | null;
-			candidate_phone: string | null;
-			raw_text: string;
-			parsed_profile: Record<string, unknown>;
-			overall_score: number;
-			score_breakdown: Record<string, unknown>;
-			summary: string;
-			skills_matched: string[];
-		}>;
-	},
-	jobId: string,
+	body: ErrorBody,
 	sessionId: string,
 ) {
 	await db.transaction(async (tx) => {
@@ -232,7 +152,6 @@ async function handleError(
 				body.partial_results.map((r) => ({
 					sessionId,
 					fileId: r.file_id,
-					jobId,
 					candidateName: r.candidate_name,
 					candidateEmail: r.candidate_email,
 					candidatePhone: r.candidate_phone,
@@ -246,17 +165,6 @@ async function handleError(
 				})),
 			);
 		}
-
-		// Update pipeline job
-		await tx
-			.update(schema.pipelineJob)
-			.set({
-				status: "failed",
-				processedFiles: body.processed_files,
-				errorMessage: body.error,
-				completedAt: new Date(),
-			})
-			.where(eq(schema.pipelineJob.id, jobId));
 
 		// Update profiling session
 		await tx

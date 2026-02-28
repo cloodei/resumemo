@@ -48,7 +48,6 @@ async function getChannel() {
 
 export type PipelineJobPayload = {
 	session_id: string;
-	job_id: string;
 	callback_url: string;
 	callback_secret: string;
 	job_description: string;

@@ -7,7 +7,7 @@ import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
 import { db } from "~/lib/db";
 import { authMiddleware } from "~/lib/auth";
 import { validateFileMetadata } from "~/lib/upload-guard";
-import { publishPipelineJob, type PipelineJobPayload } from "~/lib/queue";
+import { publishPipelineJob } from "~/lib/queue";
 import {
 	deleteFile,
 	generatePresignedUploadUrl,
@@ -29,7 +29,6 @@ async function cleanupUploadedKeys(storageKeys: string[]) {
 export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.use(authMiddleware)
 
-	// ── Step 1: Get presigned upload URLs ──────────────────────────
 	.post(
 		"/presign",
 		async ({ user, body, status }) => {
@@ -102,7 +101,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		},
 	)
 
-	// ── Step 2: Verify uploads landed in R2, then create session + file records ──
 	.post(
 		"/create",
 		async ({ user, body, status }) => {
@@ -160,43 +158,34 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				});
 			}
 
-			// All files verified — insert session + files in one transaction
-			let sessionId = "";
-			await db.transaction(async (tx) => {
-				const [[createdSession], insertedFiles] = await Promise.all([
-					tx.insert(schema.profilingSession)
-						.values({
-							userId: user.id,
-							name,
-							jobDescription,
-							jobTitle,
-							status: "ready",
-							totalFiles: files.length,
-						})
-						.returning({ id: schema.profilingSession.id }),
-					tx.insert(schema.resumeFile)
-						.values(
-							files.map((file) => ({
-								userId: user.id,
-								originalName: file.fileName,
-								mimeType: file.mimeType,
-								size: BigInt(file.size),
-								storageKey: file.storageKey,
-							})),
-						)
-						.returning({ id: schema.resumeFile.id }),
-					]);
+		// All files verified — insert session + files in one transaction
+		let sessionId = "";
+		await db.transaction(async (tx) => {
+			const [createdSession] = await tx.insert(schema.profilingSession)
+				.values({
+					userId: user.id,
+					name,
+					jobDescription,
+					jobTitle,
+					status: "ready",
+					totalFiles: files.length,
+				})
+				.returning({ id: schema.profilingSession.id });
 
-				sessionId = createdSession.id;
-				if (insertedFiles.length > 0) {
-					await tx.insert(schema.profilingSessionFile).values(
-						insertedFiles.map((file) => ({
-							sessionId,
-							fileId: file.id,
-						})),
-					);
-				}
-			});
+			sessionId = createdSession.id;
+
+			await tx.insert(schema.resumeFile)
+				.values(
+					files.map((file) => ({
+						userId: user.id,
+						sessionId,
+						originalName: file.fileName,
+						mimeType: file.mimeType,
+						size: BigInt(file.size),
+						storageKey: file.storageKey,
+					})),
+				);
+		});
 
 			return {
 				status: "ready",
@@ -223,7 +212,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		},
 	)
 
-	// ── List all profiling sessions for the authenticated user ────
 	.get(
 		"/",
 		async ({ user }) => {
@@ -238,7 +226,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		{ auth: true },
 	)
 
-	// ── Get a specific profiling session with its associated files ─
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
@@ -258,19 +245,17 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 			const filesWithDetails = await db
 				.select({
-					sessionFile: schema.profilingSessionFile,
-					file: schema.resumeFile,
+					id: schema.resumeFile.id,
+					originalName: schema.resumeFile.originalName,
+					mimeType: schema.resumeFile.mimeType,
+					size: schema.resumeFile.size,
 				})
-				.from(schema.profilingSessionFile)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.profilingSessionFile.fileId, schema.resumeFile.id),
-				)
-				.where(eq(schema.profilingSessionFile.sessionId, params.id));
+				.from(schema.resumeFile)
+				.where(eq(schema.resumeFile.sessionId, params.id));
 
 			return {
 				session,
-				files: filesWithDetails.map(({ file }) => ({
+				files: filesWithDetails.map((file) => ({
 					id: file.id,
 					originalName: file.originalName,
 					mimeType: file.mimeType,
@@ -281,7 +266,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		{ auth: true },
 	)
 
-	// ── Start profiling (transition ready → processing) ──────────
 	.post(
 		"/:id/start",
 		async ({ user, params, status }) => {
@@ -303,95 +287,67 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				return status(409, { status: "error", message: "Session is not ready to start" });
 			}
 
-			// 1. Query the session's files
-			const sessionFiles = await db
-				.select({
-					fileId: schema.resumeFile.id,
-					storageKey: schema.resumeFile.storageKey,
-					originalName: schema.resumeFile.originalName,
-					mimeType: schema.resumeFile.mimeType,
-					size: schema.resumeFile.size,
-				})
-				.from(schema.profilingSessionFile)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.profilingSessionFile.fileId, schema.resumeFile.id),
-				)
-				.where(eq(schema.profilingSessionFile.sessionId, params.id));
+		// 1. Query the session's files
+		const sessionFiles = await db
+			.select({
+				fileId: schema.resumeFile.id,
+				storageKey: schema.resumeFile.storageKey,
+				originalName: schema.resumeFile.originalName,
+				mimeType: schema.resumeFile.mimeType,
+				size: schema.resumeFile.size,
+			})
+			.from(schema.resumeFile)
+			.where(eq(schema.resumeFile.sessionId, params.id));
 
-			if (sessionFiles.length === 0) {
-				return status(400, { status: "error", message: "Session has no files" });
-			}
+		if (sessionFiles.length === 0) {
+			return status(400, { status: "error", message: "Session has no files" });
+		}
 
-			// 2. Insert a pipelineJob row
-			const [pipelineJobRow] = await db
-				.insert(schema.pipelineJob)
-				.values({
-					sessionId: params.id,
-					status: "queued",
-					pipelineVersion: PIPELINE_VERSION,
-					totalFiles: sessionFiles.length,
-				})
-				.returning({ id: schema.pipelineJob.id });
+		// 2. Transition session to processing
+		await db
+			.update(schema.profilingSession)
+			.set({ status: "processing", pipelineVersion: PIPELINE_VERSION })
+			.where(eq(schema.profilingSession.id, params.id));
 
-			// 3. Transition session to processing
+		// 3. Build and publish the pipeline job payload
+		const payload = {
+			session_id: params.id,
+			callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
+			callback_secret: PIPELINE_CALLBACK_SECRET,
+			job_description: session.jobDescription,
+			job_title: session.jobTitle ?? null,
+			pipeline_version: PIPELINE_VERSION,
+			files: sessionFiles.map((f) => ({
+				file_id: f.fileId,
+				storage_key: f.storageKey,
+				original_name: f.originalName,
+				mime_type: f.mimeType,
+				size: Number(f.size),
+			})),
+		};
+
+		try {
+			await publishPipelineJob(payload);
+		} catch (err) {
+			// Rollback: mark session as failed
 			await db
 				.update(schema.profilingSession)
-				.set({ status: "processing" })
+				.set({
+					status: "failed",
+					errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
+				})
 				.where(eq(schema.profilingSession.id, params.id));
 
-			// 4. Build and publish the pipeline job payload
-			const payload = {
-				session_id: params.id,
-				job_id: pipelineJobRow.id,
-				callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
-				callback_secret: PIPELINE_CALLBACK_SECRET,
-				job_description: session.jobDescription,
-				job_title: session.jobTitle ?? null,
-				pipeline_version: PIPELINE_VERSION,
-				files: sessionFiles.map((f) => ({
-					file_id: f.fileId,
-					storage_key: f.storageKey,
-					original_name: f.originalName,
-					mime_type: f.mimeType,
-					size: Number(f.size),
-				})),
-			};
+			return status(500, {
+				status: "error",
+				message: "Failed to submit job to processing queue",
+			});
+		}
 
-			try {
-				await publishPipelineJob(payload);
-			} catch (err) {
-				// Rollback: mark both job and session as failed atomically
-				await db.transaction(async (tx) => {
-					await tx
-						.update(schema.pipelineJob)
-						.set({
-							status: "failed",
-							errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
-							completedAt: new Date(),
-						})
-						.where(eq(schema.pipelineJob.id, pipelineJobRow.id));
-
-					await tx
-						.update(schema.profilingSession)
-						.set({
-							status: "failed",
-							errorMessage: "Failed to submit job to processing queue",
-						})
-						.where(eq(schema.profilingSession.id, params.id));
-				});
-
-				return status(500, {
-					status: "error",
-					message: "Failed to submit job to processing queue",
-				});
-			}
-
-			return {
-				status: "ok",
-				message: "Profiling started",
-				jobId: pipelineJobRow.id,
-			};
+		return {
+			status: "ok",
+			message: "Profiling started",
+		};
 		},
 		{ auth: true },
 	)
@@ -473,26 +429,25 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				return status(404, { status: "error", message: "Session not found" });
 			}
 
-			const [result] = await db
-				.select({
-					id: schema.candidateResult.id,
-					sessionId: schema.candidateResult.sessionId,
-					fileId: schema.candidateResult.fileId,
-					jobId: schema.candidateResult.jobId,
-					candidateName: schema.candidateResult.candidateName,
-					candidateEmail: schema.candidateResult.candidateEmail,
-					candidatePhone: schema.candidateResult.candidatePhone,
-					rawText: schema.candidateResult.rawText,
-					parsedProfile: schema.candidateResult.parsedProfile,
-					overallScore: schema.candidateResult.overallScore,
-					scoreBreakdown: schema.candidateResult.scoreBreakdown,
-					summary: schema.candidateResult.summary,
-					skillsMatched: schema.candidateResult.skillsMatched,
-					pipelineVersion: schema.candidateResult.pipelineVersion,
-					createdAt: schema.candidateResult.createdAt,
-					originalName: schema.resumeFile.originalName,
-					mimeType: schema.resumeFile.mimeType,
-				})
+		const [result] = await db
+			.select({
+				id: schema.candidateResult.id,
+				sessionId: schema.candidateResult.sessionId,
+				fileId: schema.candidateResult.fileId,
+				candidateName: schema.candidateResult.candidateName,
+				candidateEmail: schema.candidateResult.candidateEmail,
+				candidatePhone: schema.candidateResult.candidatePhone,
+				rawText: schema.candidateResult.rawText,
+				parsedProfile: schema.candidateResult.parsedProfile,
+				overallScore: schema.candidateResult.overallScore,
+				scoreBreakdown: schema.candidateResult.scoreBreakdown,
+				summary: schema.candidateResult.summary,
+				skillsMatched: schema.candidateResult.skillsMatched,
+				pipelineVersion: schema.candidateResult.pipelineVersion,
+				createdAt: schema.candidateResult.createdAt,
+				originalName: schema.resumeFile.originalName,
+				mimeType: schema.resumeFile.mimeType,
+			})
 				.from(schema.candidateResult)
 				.innerJoin(
 					schema.resumeFile,

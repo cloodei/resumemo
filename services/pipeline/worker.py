@@ -11,8 +11,7 @@ import time
 from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded
 
-# from pipeline.config import PIPELINE_VERSION
-from utils.callback import send_progress, send_completion, send_error
+from utils.callback import send_completion, send_error
 from stages.extract import extract_text
 from models import FileManifestItem, JobPayload, FileResult
 from stages.parse import parse_resume
@@ -45,7 +44,6 @@ def process_session(self, raw_payload: dict):
     logger.info(
         "Starting pipeline job",
         extra={
-            "job_id": payload.job_id,
             "session_id": payload.session_id,
             "total_files": len(payload.files),
             "pipeline_version": payload.pipeline_version,
@@ -56,14 +54,6 @@ def process_session(self, raw_payload: dict):
     errors: list[dict] = []
 
     try:
-        # Send initial progress
-        send_progress(
-            payload=payload,
-            processed=0,
-            total=len(payload.files),
-            current_file=None,
-        )
-
         for i, file in enumerate(payload.files):
             file_start = time.monotonic()
 
@@ -74,7 +64,7 @@ def process_session(self, raw_payload: dict):
                 logger.error(
                     "Failed to process file",
                     extra={
-                        "job_id": payload.job_id,
+                        "session_id": payload.session_id,
                         "file_id": file.file_id,
                         "original_name": file.original_name,
                         "error": str(e),
@@ -91,22 +81,15 @@ def process_session(self, raw_payload: dict):
             logger.info(
                 "File processed",
                 extra={
-                    "job_id": payload.job_id,
+                    "session_id": payload.session_id,
                     "file_id": file.file_id,
+                    "file_index": f"{i + 1}/{len(payload.files)}",
                     "duration_ms": round(elapsed * 1000),
                     "success": len(errors) == 0 or errors[-1].get("file_id") != file.file_id,
                 },
             )
 
-            # Send progress update
-            send_progress(
-                payload=payload,
-                processed=i + 1,
-                total=len(payload.files),
-                current_file=file.original_name,
-            )
-
-        # All files processed — send completion
+        # All files processed — send completion or error
         if results or not errors:
             send_completion(payload=payload, results=results)
         else:
@@ -120,7 +103,7 @@ def process_session(self, raw_payload: dict):
     except SoftTimeLimitExceeded:
         logger.error(
             "Pipeline job timed out",
-            extra={"job_id": payload.job_id, "session_id": payload.session_id},
+            extra={"session_id": payload.session_id},
         )
         send_error(
             payload=payload,
@@ -133,7 +116,6 @@ def process_session(self, raw_payload: dict):
         logger.error(
             "Pipeline job failed",
             extra={
-                "job_id": payload.job_id,
                 "session_id": payload.session_id,
                 "error": str(e),
             },

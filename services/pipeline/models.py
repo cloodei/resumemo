@@ -16,7 +16,6 @@ class JobPayload(BaseModel):
     """The full job message received from the queue."""
 
     session_id: str
-    job_id: str
     callback_url: str
     callback_secret: str
     job_description: str

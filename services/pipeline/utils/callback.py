@@ -1,4 +1,4 @@
-"""HTTP callback to the Elysia API for reporting pipeline progress and results."""
+"""HTTP callback to the Elysia API for reporting pipeline results."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def _post_callback(payload: JobPayload, body: dict) -> None:
             logger.info(
                 "Callback sent successfully",
                 extra={
-                    "job_id": payload.job_id,
+                    "session_id": payload.session_id,
                     "type": body.get("type"),
                     "attempt": attempt + 1,
                 },
@@ -44,7 +44,7 @@ def _post_callback(payload: JobPayload, body: dict) -> None:
                 logger.warning(
                     "Callback failed, retrying",
                     extra={
-                        "job_id": payload.job_id,
+                        "session_id": payload.session_id,
                         "attempt": attempt + 1,
                         "delay_s": delay,
                         "error": str(e),
@@ -55,7 +55,7 @@ def _post_callback(payload: JobPayload, body: dict) -> None:
     logger.error(
         "All callback attempts failed",
         extra={
-            "job_id": payload.job_id,
+            "session_id": payload.session_id,
             "type": body.get("type"),
             "error": str(last_error),
         },
@@ -63,35 +63,11 @@ def _post_callback(payload: JobPayload, body: dict) -> None:
     raise RuntimeError(f"Failed to send callback after {CALLBACK_RETRY_ATTEMPTS} attempts: {last_error}")
 
 
-def send_progress(
-    payload: JobPayload,
-    processed: int,
-    total: int,
-    current_file: str | None,
-):
-    """Send a progress update callback."""
-    body = {
-        "type": "progress",
-        "session_id": payload.session_id,
-        "job_id": payload.job_id,
-        "status": "running",
-        "processed_files": processed,
-        "total_files": total,
-        "current_file": current_file,
-    }
-    try:
-        _post_callback(payload, body)
-    except RuntimeError:
-        # Progress callbacks are best-effort — don't crash the pipeline
-        logger.warning("Progress callback failed, continuing", extra={"job_id": payload.job_id})
-
-
 def send_completion(payload: JobPayload, results: list[dict]):
     """Send a completion callback with all results."""
     body = {
         "type": "completion",
         "session_id": payload.session_id,
-        "job_id": payload.job_id,
         "status": "completed",
         "pipeline_version": PIPELINE_VERSION,
         "processed_files": len(results),
@@ -110,7 +86,6 @@ def send_error(
     body = {
         "type": "error",
         "session_id": payload.session_id,
-        "job_id": payload.job_id,
         "status": "failed",
         "error": error,
         "processed_files": len(partial_results) if partial_results else 0,
@@ -121,4 +96,4 @@ def send_error(
         _post_callback(payload, body)
     except RuntimeError:
         # If error callback itself fails, log and let Celery handle the retry
-        logger.error("Error callback failed", extra={"job_id": payload.job_id, "error": error})
+        logger.error("Error callback failed", extra={"session_id": payload.session_id, "error": error})

@@ -20,9 +20,8 @@ export const systemRoutes = new Elysia()
 		 * ONLY FOR DEVELOPMENT
 		 */
 		await Promise.all([
-			db.delete(schema.profilingSessionFile),
-			db.delete(schema.profilingSession),
 			db.delete(schema.resumeFile),
+			db.delete(schema.profilingSession),
 		]);
 		return { status: "ok" };
 	})
@@ -37,7 +36,6 @@ export const systemRoutes = new Elysia()
 			db.delete(schema.account),
 			db.delete(schema.verification),
 			db.delete(schema.resumeFile),
-			db.delete(schema.profilingSessionFile),
 			db.delete(schema.profilingSession),
 		]);
 		return { status: "ok" };
