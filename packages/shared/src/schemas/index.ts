@@ -104,7 +104,7 @@ export const resumeFile = pgTable("resume_file", {
 ]);
 
 // export const sessionStatusEnum = ["uploading", "ready", "processing", "completed", "failed"] as const;
-export const sessionStatusEnum = ["ready", "processing", "completed", "failed"] as const;
+export const sessionStatusEnum = ["ready", "processing", "completed", "failed"] as const; // "ready" is deprecated — sessions now go straight to "processing" on creation
 
 export const profilingSession = pgTable("profiling_session", {
 	id: uuid("id")

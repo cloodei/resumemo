@@ -6,8 +6,8 @@ import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
 
 import { db } from "~/lib/db";
 import { authMiddleware } from "~/lib/auth";
-import { validateFileMetadata } from "~/lib/upload-guard";
 import { publishPipelineJob } from "~/lib/queue";
+import { validateFileMetadata } from "~/lib/upload-guard";
 import {
 	deleteFile,
 	generatePresignedUploadUrl,
@@ -123,30 +123,36 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				}
 			}
 
-			// HEAD-check each file in R2
-			const failures: { storageKey: string; reason: string }[] = [];
-			for (const file of files) {
-				try {
-					const head = await headFile(file.storageKey);
-					const size = Number(head.ContentLength ?? 0);
-					const mimeType = head.ContentType ?? file.mimeType;
-					const check = validateFileMetadata({
-						fileName: file.fileName,
-						claimedMimeType: mimeType,
-						size,
-					});
+			// HEAD-check all files in R2 concurrently
+			const headResults = await Promise.all(
+				files.map(async (file) => {
+					try {
+						const head = await headFile(file.storageKey);
+						const size = Number(head.ContentLength ?? 0);
+						const mimeType = head.ContentType ?? file.mimeType;
+						const check = validateFileMetadata({
+							fileName: file.fileName,
+							claimedMimeType: mimeType,
+							size,
+						});
 
-					if (!check.ok) {
-						failures.push({ storageKey: file.storageKey, reason: check.message });
+						if (!check.ok)
+							return { storageKey: file.storageKey, reason: check.message };
+
+						return null;
 					}
-				}
-				catch {
-					failures.push({
-						storageKey: file.storageKey,
-						reason: "Uploaded object is missing or unreadable",
-					});
-				}
-			}
+					catch {
+						return {
+							storageKey: file.storageKey,
+							reason: "Uploaded object is missing or unreadable",
+						};
+					}
+				}),
+			);
+
+			const failures = headResults.filter(
+				(r): r is { storageKey: string; reason: string } => r !== null,
+			);
 
 			if (failures.length > 0) {
 				await cleanupUploadedKeys(files.map((f) => f.storageKey));
@@ -158,8 +164,14 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				});
 			}
 
-		// All files verified — insert session + files in one transaction
-		let sessionId = "";
+		let sessionId = "", sessionFiles: {
+			fileId: number;
+			storageKey: string;
+			originalName: string;
+			mimeType: string;
+			size: bigint;
+		}[] = [];
+
 		await db.transaction(async (tx) => {
 			const [createdSession] = await tx.insert(schema.profilingSession)
 				.values({
@@ -167,14 +179,15 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					name,
 					jobDescription,
 					jobTitle,
-					status: "ready",
+					status: "processing",
+					pipelineVersion: PIPELINE_VERSION,
 					totalFiles: files.length,
 				})
 				.returning({ id: schema.profilingSession.id });
 
 			sessionId = createdSession.id;
 
-			await tx.insert(schema.resumeFile)
+			sessionFiles = await tx.insert(schema.resumeFile)
 				.values(
 					files.map((file) => ({
 						userId: user.id,
@@ -184,11 +197,65 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						size: BigInt(file.size),
 						storageKey: file.storageKey,
 					})),
-				);
+				)
+				.returning({
+					fileId: schema.resumeFile.id,
+					storageKey: schema.resumeFile.storageKey,
+					originalName: schema.resumeFile.originalName,
+					mimeType: schema.resumeFile.mimeType,
+					size: schema.resumeFile.size,
+				});
 		});
 
+		// Query inserted files to get their IDs for the pipeline payload
+		// const sessionFiles = await db
+		// 	.select({
+		// 		fileId: schema.resumeFile.id,
+		// 		storageKey: schema.resumeFile.storageKey,
+		// 		originalName: schema.resumeFile.originalName,
+		// 		mimeType: schema.resumeFile.mimeType,
+		// 		size: schema.resumeFile.size,
+		// 	})
+		// 	.from(schema.resumeFile)
+		// 	.where(eq(schema.resumeFile.sessionId, sessionId));
+
+		// Build and publish the pipeline job
+		const payload = {
+			session_id: sessionId,
+			callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
+			callback_secret: PIPELINE_CALLBACK_SECRET,
+			job_description: jobDescription,
+			job_title: jobTitle ?? null,
+			pipeline_version: PIPELINE_VERSION,
+			files: sessionFiles.map((f) => ({
+				file_id: f.fileId,
+				storage_key: f.storageKey,
+				original_name: f.originalName,
+				mime_type: f.mimeType,
+				size: Number(f.size),
+			})),
+		};
+
+		try {
+			await publishPipelineJob(payload);
+		} catch (err) {
+			// Rollback: mark session as failed
+			await db
+				.update(schema.profilingSession)
+				.set({
+					status: "failed",
+					errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
+				})
+				.where(eq(schema.profilingSession.id, sessionId));
+
+			return status(500, {
+				status: "error",
+				message: "Failed to submit job to processing queue",
+			});
+		}
+
 			return {
-				status: "ready",
+				status: "processing",
 				sessionId,
 				totalConfirmed: files.length,
 			};
@@ -229,33 +296,38 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
-			const [session] = await db
-				.select()
-				.from(schema.profilingSession)
-				.where(
-					and(
-						eq(schema.profilingSession.id, params.id),
-						eq(schema.profilingSession.userId, user.id),
+			// Fire session and files queries concurrently
+			const [sessionRows, files] = await Promise.all([
+				db
+					.select()
+					.from(schema.profilingSession)
+					.where(
+						and(
+							eq(schema.profilingSession.id, params.id),
+							eq(schema.profilingSession.userId, user.id),
+						),
 					),
-				);
+				db
+					.select({
+						id: schema.resumeFile.id,
+						originalName: schema.resumeFile.originalName,
+						mimeType: schema.resumeFile.mimeType,
+						size: schema.resumeFile.size,
+					})
+					.from(schema.resumeFile)
+					.where(eq(schema.resumeFile.sessionId, params.id)),
+			]);
 
-			if (!session) {
+			const session = sessionRows[0];
+			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
-			}
 
-			const filesWithDetails = await db
-				.select({
-					id: schema.resumeFile.id,
-					originalName: schema.resumeFile.originalName,
-					mimeType: schema.resumeFile.mimeType,
-					size: schema.resumeFile.size,
-				})
-				.from(schema.resumeFile)
-				.where(eq(schema.resumeFile.sessionId, params.id));
+			if (files.length === 0)
+				return status(404, { status: "error", message: "Files not found" });
 
 			return {
 				session,
-				files: filesWithDetails.map((file) => ({
+				files: files.map((file) => ({
 					id: file.id,
 					originalName: file.originalName,
 					mimeType: file.mimeType,
@@ -268,132 +340,58 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 	.post(
 		"/:id/start",
-		async ({ user, params, status }) => {
-			const [session] = await db
-				.select()
-				.from(schema.profilingSession)
-				.where(
-					and(
-						eq(schema.profilingSession.id, params.id),
-						eq(schema.profilingSession.userId, user.id),
-					),
-				);
-
-			if (!session) {
-				return status(404, { status: "error", message: "Session not found" });
-			}
-
-			if (session.status !== "ready") {
-				return status(409, { status: "error", message: "Session is not ready to start" });
-			}
-
-		// 1. Query the session's files
-		const sessionFiles = await db
-			.select({
-				fileId: schema.resumeFile.id,
-				storageKey: schema.resumeFile.storageKey,
-				originalName: schema.resumeFile.originalName,
-				mimeType: schema.resumeFile.mimeType,
-				size: schema.resumeFile.size,
-			})
-			.from(schema.resumeFile)
-			.where(eq(schema.resumeFile.sessionId, params.id));
-
-		if (sessionFiles.length === 0) {
-			return status(400, { status: "error", message: "Session has no files" });
-		}
-
-		// 2. Transition session to processing
-		await db
-			.update(schema.profilingSession)
-			.set({ status: "processing", pipelineVersion: PIPELINE_VERSION })
-			.where(eq(schema.profilingSession.id, params.id));
-
-		// 3. Build and publish the pipeline job payload
-		const payload = {
-			session_id: params.id,
-			callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
-			callback_secret: PIPELINE_CALLBACK_SECRET,
-			job_description: session.jobDescription,
-			job_title: session.jobTitle ?? null,
-			pipeline_version: PIPELINE_VERSION,
-			files: sessionFiles.map((f) => ({
-				file_id: f.fileId,
-				storage_key: f.storageKey,
-				original_name: f.originalName,
-				mime_type: f.mimeType,
-				size: Number(f.size),
-			})),
-		};
-
-		try {
-			await publishPipelineJob(payload);
-		} catch (err) {
-			// Rollback: mark session as failed
-			await db
-				.update(schema.profilingSession)
-				.set({
-					status: "failed",
-					errorMessage: err instanceof Error ? err.message : "Failed to publish to queue",
-				})
-				.where(eq(schema.profilingSession.id, params.id));
-
-			return status(500, {
+		async ({ status }) => {
+			return status(410, {
 				status: "error",
-				message: "Failed to submit job to processing queue",
+				message: "This endpoint is deprecated. Sessions now start automatically on creation.",
 			});
-		}
-
-		return {
-			status: "ok",
-			message: "Profiling started",
-		};
 		},
 		{ auth: true },
 	)
 
-	// ── List candidate results for a session ─────────────────────
 	.get(
 		"/:id/results",
 		async ({ user, params, status, query }) => {
-			// Verify ownership
-			const [session] = await db
-				.select({ id: schema.profilingSession.id, status: schema.profilingSession.status })
-				.from(schema.profilingSession)
-				.where(
-					and(
-						eq(schema.profilingSession.id, params.id),
-						eq(schema.profilingSession.userId, user.id),
-					),
-				);
+			const sortDir = query.sort === "asc" ? schema.candidateResult.overallScore : desc(schema.candidateResult.overallScore);
 
+			// Fire ownership check and results query concurrently
+			const [sessionRows, results] = await Promise.all([
+				db
+					.select({ id: schema.profilingSession.id, status: schema.profilingSession.status })
+					.from(schema.profilingSession)
+					.where(
+						and(
+							eq(schema.profilingSession.id, params.id),
+							eq(schema.profilingSession.userId, user.id),
+						),
+					),
+				db
+					.select({
+						id: schema.candidateResult.id,
+						fileId: schema.candidateResult.fileId,
+						candidateName: schema.candidateResult.candidateName,
+						candidateEmail: schema.candidateResult.candidateEmail,
+						candidatePhone: schema.candidateResult.candidatePhone,
+						overallScore: schema.candidateResult.overallScore,
+						summary: schema.candidateResult.summary,
+						skillsMatched: schema.candidateResult.skillsMatched,
+						pipelineVersion: schema.candidateResult.pipelineVersion,
+						createdAt: schema.candidateResult.createdAt,
+						originalName: schema.resumeFile.originalName,
+					})
+					.from(schema.candidateResult)
+					.innerJoin(
+						schema.resumeFile,
+						eq(schema.candidateResult.fileId, schema.resumeFile.id),
+					)
+					.where(eq(schema.candidateResult.sessionId, params.id))
+					.orderBy(sortDir),
+			]);
+
+			const session = sessionRows[0];
 			if (!session) {
 				return status(404, { status: "error", message: "Session not found" });
 			}
-
-			const sortDir = query.sort === "asc" ? schema.candidateResult.overallScore : desc(schema.candidateResult.overallScore);
-
-			const results = await db
-				.select({
-					id: schema.candidateResult.id,
-					fileId: schema.candidateResult.fileId,
-					candidateName: schema.candidateResult.candidateName,
-					candidateEmail: schema.candidateResult.candidateEmail,
-					candidatePhone: schema.candidateResult.candidatePhone,
-					overallScore: schema.candidateResult.overallScore,
-					summary: schema.candidateResult.summary,
-					skillsMatched: schema.candidateResult.skillsMatched,
-					pipelineVersion: schema.candidateResult.pipelineVersion,
-					createdAt: schema.candidateResult.createdAt,
-					originalName: schema.resumeFile.originalName,
-				})
-				.from(schema.candidateResult)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.candidateResult.fileId, schema.resumeFile.id),
-				)
-				.where(eq(schema.candidateResult.sessionId, params.id))
-				.orderBy(sortDir);
 
 			return {
 				sessionId: params.id,
@@ -414,107 +412,102 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id/results/:resultId",
 		async ({ user, params, status }) => {
-			// Verify session ownership
-			const [session] = await db
-				.select({ id: schema.profilingSession.id })
-				.from(schema.profilingSession)
-				.where(
-					and(
-						eq(schema.profilingSession.id, params.id),
-						eq(schema.profilingSession.userId, user.id),
+			const [sessionRows, resultRows] = await Promise.all([
+				db.select({ id: schema.profilingSession.id })
+					.from(schema.profilingSession)
+					.where(
+						and(
+							eq(schema.profilingSession.id, params.id),
+							eq(schema.profilingSession.userId, user.id),
+						),
 					),
-				);
+				db
+					.select({
+						id: schema.candidateResult.id,
+						sessionId: schema.candidateResult.sessionId,
+						fileId: schema.candidateResult.fileId,
+						candidateName: schema.candidateResult.candidateName,
+						candidateEmail: schema.candidateResult.candidateEmail,
+						candidatePhone: schema.candidateResult.candidatePhone,
+						rawText: schema.candidateResult.rawText,
+						parsedProfile: schema.candidateResult.parsedProfile,
+						overallScore: schema.candidateResult.overallScore,
+						scoreBreakdown: schema.candidateResult.scoreBreakdown,
+						summary: schema.candidateResult.summary,
+						skillsMatched: schema.candidateResult.skillsMatched,
+						pipelineVersion: schema.candidateResult.pipelineVersion,
+						createdAt: schema.candidateResult.createdAt,
+						originalName: schema.resumeFile.originalName,
+						mimeType: schema.resumeFile.mimeType,
+					})
+					.from(schema.candidateResult)
+					.innerJoin(
+						schema.resumeFile,
+						eq(schema.candidateResult.fileId, schema.resumeFile.id),
+					)
+					.where(
+						and(
+							eq(schema.candidateResult.id, params.resultId),
+							eq(schema.candidateResult.sessionId, params.id),
+						),
+					),
+			]);
 
-			if (!session) {
+			if (!sessionRows[0])
 				return status(404, { status: "error", message: "Session not found" });
-			}
 
-		const [result] = await db
-			.select({
-				id: schema.candidateResult.id,
-				sessionId: schema.candidateResult.sessionId,
-				fileId: schema.candidateResult.fileId,
-				candidateName: schema.candidateResult.candidateName,
-				candidateEmail: schema.candidateResult.candidateEmail,
-				candidatePhone: schema.candidateResult.candidatePhone,
-				rawText: schema.candidateResult.rawText,
-				parsedProfile: schema.candidateResult.parsedProfile,
-				overallScore: schema.candidateResult.overallScore,
-				scoreBreakdown: schema.candidateResult.scoreBreakdown,
-				summary: schema.candidateResult.summary,
-				skillsMatched: schema.candidateResult.skillsMatched,
-				pipelineVersion: schema.candidateResult.pipelineVersion,
-				createdAt: schema.candidateResult.createdAt,
-				originalName: schema.resumeFile.originalName,
-				mimeType: schema.resumeFile.mimeType,
-			})
-				.from(schema.candidateResult)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.candidateResult.fileId, schema.resumeFile.id),
-				)
-				.where(
-					and(
-						eq(schema.candidateResult.id, params.resultId),
-						eq(schema.candidateResult.sessionId, params.id),
-					),
-				);
-
-			if (!result) {
+			const result = resultRows[0];
+			if (!result)
 				return status(404, { status: "error", message: "Result not found" });
-			}
 
 			return { result };
 		},
 		{ auth: true },
 	)
 
-	// ── Export session results as JSON or CSV ─────────────────────
 	.get(
 		"/:id/export",
 		async ({ user, params, status, query, set }) => {
-			// Verify session ownership
-			const [session] = await db
-				.select({
-					id: schema.profilingSession.id,
-					name: schema.profilingSession.name,
-					status: schema.profilingSession.status,
-				})
-				.from(schema.profilingSession)
-				.where(
-					and(
-						eq(schema.profilingSession.id, params.id),
-						eq(schema.profilingSession.userId, user.id),
+			const [sessionRows, results] = await Promise.all([
+				db
+					.select({
+						id: schema.profilingSession.id,
+						name: schema.profilingSession.name,
+						status: schema.profilingSession.status,
+					})
+					.from(schema.profilingSession)
+					.where(
+						and(
+							eq(schema.profilingSession.id, params.id),
+							eq(schema.profilingSession.userId, user.id),
+						),
 					),
-				);
+				db
+					.select({
+						candidateName: schema.candidateResult.candidateName,
+						candidateEmail: schema.candidateResult.candidateEmail,
+						candidatePhone: schema.candidateResult.candidatePhone,
+						overallScore: schema.candidateResult.overallScore,
+						scoreBreakdown: schema.candidateResult.scoreBreakdown,
+						summary: schema.candidateResult.summary,
+						skillsMatched: schema.candidateResult.skillsMatched,
+						pipelineVersion: schema.candidateResult.pipelineVersion,
+						originalName: schema.resumeFile.originalName,
+					})
+					.from(schema.candidateResult)
+					.innerJoin(
+						schema.resumeFile,
+						eq(schema.candidateResult.fileId, schema.resumeFile.id),
+					)
+					.where(eq(schema.candidateResult.sessionId, params.id))
+					.orderBy(desc(schema.candidateResult.overallScore)),
+			]);
 
-			if (!session) {
+			const session = sessionRows[0];
+			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
-			}
-
-			if (session.status !== "completed") {
+			if (session.status !== "completed")
 				return status(409, { status: "error", message: "Session is not completed yet" });
-			}
-
-			const results = await db
-				.select({
-					candidateName: schema.candidateResult.candidateName,
-					candidateEmail: schema.candidateResult.candidateEmail,
-					candidatePhone: schema.candidateResult.candidatePhone,
-					overallScore: schema.candidateResult.overallScore,
-					scoreBreakdown: schema.candidateResult.scoreBreakdown,
-					summary: schema.candidateResult.summary,
-					skillsMatched: schema.candidateResult.skillsMatched,
-					pipelineVersion: schema.candidateResult.pipelineVersion,
-					originalName: schema.resumeFile.originalName,
-				})
-				.from(schema.candidateResult)
-				.innerJoin(
-					schema.resumeFile,
-					eq(schema.candidateResult.fileId, schema.resumeFile.id),
-				)
-				.where(eq(schema.candidateResult.sessionId, params.id))
-				.orderBy(desc(schema.candidateResult.overallScore));
 
 			const format = query.format ?? "json";
 
@@ -573,9 +566,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 /**
  * Escape a value for safe CSV output.
  */
-function escapeCsv(value: string): string {
-	if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+function escapeCsv(value: string) {
+	if (value.includes(",") || value.includes('"') || value.includes("\n"))
 		return `"${value.replace(/"/g, '""')}"`;
-	}
+
 	return value;
 }

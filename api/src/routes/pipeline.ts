@@ -69,9 +69,8 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 		async ({ body, headers, status }) => {
 			// Authenticate by shared secret
 			const authHeader = headers.authorization ?? null;
-			if (!validateSecret(authHeader)) {
+			if (!validateSecret(authHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
-			}
 
 			const { type, session_id } = body;
 
@@ -81,9 +80,8 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 				.from(schema.profilingSession)
 				.where(eq(schema.profilingSession.id, session_id));
 
-			if (!session) {
+			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
-			}
 
 			// Idempotency guard: if session is already finalized, acknowledge but skip
 			if (session.status === "completed" || session.status === "failed") {
@@ -111,7 +109,12 @@ async function handleCompletion(
 	sessionId: string,
 ) {
 	await db.transaction(async (tx) => {
-		// Insert candidate results
+		const promise = tx
+			.update(schema.profilingSession)
+			.set({ status: "completed" })
+			.where(eq(schema.profilingSession.id, sessionId))
+			.catch((error) => console.error(`[Pipeline Callback] Failed to update session ${sessionId}:`, error));
+
 		if (body.results.length > 0) {
 			await tx.insert(schema.candidateResult).values(
 				body.results.map((r) => ({
@@ -131,11 +134,7 @@ async function handleCompletion(
 			);
 		}
 
-		// Update profiling session
-		await tx
-			.update(schema.profilingSession)
-			.set({ status: "completed" })
-			.where(eq(schema.profilingSession.id, sessionId));
+		await promise;
 	});
 
 	console.log(`[Pipeline Callback] Completed: ${body.results.length} results for session ${sessionId}`);
@@ -146,7 +145,15 @@ async function handleError(
 	sessionId: string,
 ) {
 	await db.transaction(async (tx) => {
-		// Persist any partial results that were successfully processed before failure
+		const promise = tx
+			.update(schema.profilingSession)
+			.set({
+				status: "failed",
+				errorMessage: body.error
+			})
+			.where(eq(schema.profilingSession.id, sessionId))
+			.catch((error) => console.error(`[Pipeline Callback] Failed to update session ${sessionId}:`, error));
+
 		if (body.partial_results.length > 0) {
 			await tx.insert(schema.candidateResult).values(
 				body.partial_results.map((r) => ({
@@ -166,15 +173,10 @@ async function handleError(
 			);
 		}
 
-		// Update profiling session
-		await tx
-			.update(schema.profilingSession)
-			.set({
-				status: "failed",
-				errorMessage: body.error,
-			})
-			.where(eq(schema.profilingSession.id, sessionId));
+		await promise;
 	});
 
-	console.log(`[Pipeline Callback] Failed: ${body.error} for session ${sessionId} (${body.partial_results.length} partial results saved)`);
+	console.log(
+		`[Pipeline Callback] Failed: ${body.error} for session ${sessionId} (${body.partial_results.length} partial results saved)`,
+	);
 }

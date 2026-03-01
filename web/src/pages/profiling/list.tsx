@@ -132,7 +132,6 @@ export default function ProfilingSessionsPage() {
 							<TabsTrigger value="all" className="rounded-md">All</TabsTrigger>
 							<TabsTrigger value="completed" className="rounded-md">Completed</TabsTrigger>
 							<TabsTrigger value="processing" className="rounded-md">Processing</TabsTrigger>
-							<TabsTrigger value="ready" className="rounded-md">Ready</TabsTrigger>
 							<TabsTrigger value="failed" className="rounded-md">Failed</TabsTrigger>
 						</TabsList>
 					</Tabs>

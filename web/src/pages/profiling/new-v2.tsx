@@ -335,11 +335,11 @@ export default function NewProfilingPage() {
 
 			if (controller.signal.aborted)
 				return
-			if (createError || !createData || createData.status !== "ready")
+			if (createError || !createData || createData.status !== "processing")
 				throw new Error("Session creation failed")
 
 			setPhase("done")
-			toast.success("Session created successfully!")
+			toast.success("Session created — profiling started!")
 			setTimeout(() => {
 				clearAll()
 				navigate(`/profiling/${createData.sessionId}`)
