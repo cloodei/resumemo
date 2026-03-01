@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "down": "uv sync && python -m spacy download en_core_web_md",
+    "down": "bun run down && bun run spacy",
     "sync": "uv sync",
-    "spacy": "python -m spacy download en_core_web_md",
+    "spacy": "uv add https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
     "dev": "uv run celery -A worker worker --loglevel=info --queues=profiling.jobs --concurrency=2",
     "start": "bun dev"
   }
