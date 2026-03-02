@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom"
 import { motion } from "motion/react"
-import { Briefcase, FileText, Search, Plus } from "lucide-react"
 import { useEffect, useState } from "react"
+import { Briefcase, FileText, Search, Plus } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -59,12 +59,12 @@ export default function ProfilingSessionsPage() {
 			}
 			
 			// Map dates correctly if coming as strings
-			const formattedSessions = data.sessions.map((s: any) => ({
-				...s,
-				createdAt: new Date(s.createdAt)
-			})) as ProfilingSession[]
-			
-			setSessions(formattedSessions)
+			// const formattedSessions = data.sessions.map((s: any) => ({
+			// 	...s,
+			// 	createdAt: new Date(s.createdAt)
+			// })) as ProfilingSession[]
+
+			setSessions(data.sessions)
 		} catch (err) {
 			console.error(err)
 		} finally {

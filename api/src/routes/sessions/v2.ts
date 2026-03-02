@@ -354,7 +354,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		async ({ user, params, status, query }) => {
 			const sortDir = query.sort === "asc" ? schema.candidateResult.overallScore : desc(schema.candidateResult.overallScore);
 
-			// Fire ownership check and results query concurrently
 			const [sessionRows, results] = await Promise.all([
 				db
 					.select({ id: schema.profilingSession.id, status: schema.profilingSession.status })

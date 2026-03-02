@@ -3,12 +3,9 @@ import { Elysia } from "elysia";
 import { logger } from "@rasla/logify";
 import { openapi } from "@elysiajs/openapi";
 
-import { fileRoutes } from "./routes/files";
 import { systemRoutes } from "./routes/system";
 import { sessionRoutes } from "./routes/sessions";
 import { pipelineCallbackRoute } from "./routes/pipeline";
-// import { randomRoutes } from "./routes/random";
-import { authMiddleware } from "./lib/auth";
 
 const app = new Elysia({ precompile: true })
 	.use(

@@ -531,9 +531,9 @@ export default function NewProfilingPage() {
 								Drop resumes to add them to your session.
 							</CardDescription>
 						</div>
-						<Badge variant="outline" className="flex items-center gap-1 text-xs">
+						{/* <Badge variant="outline" className="flex items-center gap-1 text-xs">
 							<UploadCloud className="size-3.5" /> Cloud Upload
-						</Badge>
+						</Badge> */}
 					</CardHeader>
 					<CardContent className="space-y-6">
 						<motion.div

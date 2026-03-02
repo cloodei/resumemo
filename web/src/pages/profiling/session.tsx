@@ -105,10 +105,10 @@ export default function ProfilingResultsPage() {
 			setSession(data.session as ProfilingSession)
 			setFiles((data.files || []))
 
-			// If completed, fetch results
 			if (data.session.status === "completed") {
 				void fetchResults()
-			} else {
+			}
+			else {
 				setIsLoading(false)
 			}
 		} catch (err) {
