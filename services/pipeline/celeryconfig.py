@@ -1,6 +1,6 @@
 import os
 
-broker_url = os.environ.get("CELERY_BROKER_URL", "amqp://resumemo:resumemo@localhost:5672//")
+broker_url = os.getenv("CELERY_BROKER_URL", "amqp://resumemo:resumemo@localhost:5672//")
 
 accept_content = ["json"]
 task_serializer = "json"

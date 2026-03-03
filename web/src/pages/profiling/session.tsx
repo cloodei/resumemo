@@ -105,36 +105,17 @@ export default function ProfilingResultsPage() {
 			setSession(data.session as ProfilingSession)
 			setFiles((data.files || []))
 
-			if (data.session.status === "completed") {
-				void fetchResults()
-			}
-			else {
-				setIsLoading(false)
+			// Results are included in the response when the session is completed
+			if (data.session.status === "completed" && data.results) {
+				const rankedResults = (data.results as any[]).map((r: any, index: number) => ({
+					...r,
+					rank: index + 1
+				})) as Required<CandidateResult>[]
+
+				setResults(rankedResults)
 			}
 		} catch (err) {
 			toast.error("Failed to load profiling session")
-			console.error(err)
-			setIsLoading(false)
-		}
-	}
-
-	const fetchResults = async () => {
-		try {
-			const { data, error } = await api.api.v2.sessions({ id: id! }).results.get({
-				query: { sort: "desc" }
-			})
-
-			if (error || !data) {
-				throw new Error("Failed to fetch results")
-			}
-
-			const rankedResults = data.results.map((r: any, index: number) => ({
-				...r,
-				rank: index + 1
-			})) as Required<CandidateResult>[]
-
-			setResults(rankedResults)
-		} catch (err) {
 			console.error(err)
 		} finally {
 			setIsLoading(false)

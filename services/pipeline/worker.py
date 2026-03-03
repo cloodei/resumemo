@@ -5,6 +5,10 @@ Start the worker with:
     celery -A worker worker --loglevel=info --queues=profiling.jobs
 """
 
+# Load .env before any project imports that read os.environ at module level
+from dotenv import load_dotenv
+load_dotenv()
+
 import logging
 import time
 

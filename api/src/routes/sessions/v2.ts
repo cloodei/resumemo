@@ -325,6 +325,45 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (files.length === 0)
 				return status(404, { status: "error", message: "Files not found" });
 
+			// If the session is completed, include ranked results in the same response
+			let results: {
+				id: string;
+				fileId: number;
+				candidateName: string | null;
+				candidateEmail: string | null;
+				candidatePhone: string | null;
+				overallScore: number;
+				summary: string;
+				skillsMatched: unknown;
+				pipelineVersion: string;
+				createdAt: Date | null;
+				originalName: string;
+			}[] | null = null;
+
+			if (session.status === "completed") {
+				results = await db
+					.select({
+						id: schema.candidateResult.id,
+						fileId: schema.candidateResult.fileId,
+						candidateName: schema.candidateResult.candidateName,
+						candidateEmail: schema.candidateResult.candidateEmail,
+						candidatePhone: schema.candidateResult.candidatePhone,
+						overallScore: schema.candidateResult.overallScore,
+						summary: schema.candidateResult.summary,
+						skillsMatched: schema.candidateResult.skillsMatched,
+						pipelineVersion: schema.candidateResult.pipelineVersion,
+						createdAt: schema.candidateResult.createdAt,
+						originalName: schema.resumeFile.originalName,
+					})
+					.from(schema.candidateResult)
+					.innerJoin(
+						schema.resumeFile,
+						eq(schema.candidateResult.fileId, schema.resumeFile.id),
+					)
+					.where(eq(schema.candidateResult.sessionId, params.id))
+					.orderBy(desc(schema.candidateResult.overallScore));
+			}
+
 			return {
 				session,
 				files: files.map((file) => ({
@@ -333,6 +372,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					mimeType: file.mimeType,
 					size: Number(file.size),
 				})),
+				results,
 			};
 		},
 		{ auth: true },
