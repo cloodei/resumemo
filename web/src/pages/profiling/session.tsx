@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -89,17 +90,13 @@ export default function ProfilingResultsPage() {
 			const { data, error } = await api.api.v2.sessions({ id: id! }).get()
 
 			if (error || !data) {
-				if (
-					typeof error === "object" &&
-					error !== null &&
-					"message" in error &&
-					(error as { message?: string }).message === "Session not found"
-				) {
-					toast.error("Profiling session not found")
+				const message = getEdenErrorMessage(error)
+				toast.error(message ?? "Could not load profiling session")
+				if (error?.status === 404) {
 					navigate("/dashboard")
 					return
 				}
-				throw new Error("Failed to fetch session")
+				return
 			}
 
 			setSession(data.session as ProfilingSession)
@@ -115,8 +112,8 @@ export default function ProfilingResultsPage() {
 				setResults(rankedResults)
 			}
 		} catch (err) {
-			toast.error("Failed to load profiling session")
-			console.error(err)
+			toast.error(getErrorMessage(err, "Failed to load profiling session"))
+			console.error("[ProfilingSession] Fetch error:", err)
 		} finally {
 			setIsLoading(false)
 		}
@@ -133,7 +130,14 @@ export default function ProfilingResultsPage() {
 				}
 			})
 
-			if (!res.ok) throw new Error("Failed to export")
+			if (!res.ok) {
+				let message = `Export failed (${res.status})`
+				try {
+					const body = await res.json()
+					if (body?.message) message = body.message
+				} catch { /* response wasn't JSON */ }
+				throw new Error(message)
+			}
 
 			const blob = await res.blob()
 			const url = window.URL.createObjectURL(blob)
@@ -148,8 +152,8 @@ export default function ProfilingResultsPage() {
 			toast.success("Results exported successfully")
 		}
 		catch (err) {
-			toast.error("Export failed")
-			console.error(err)
+			toast.error(getErrorMessage(err, "Export failed"))
+			console.error("[ProfilingSession] Export error:", err)
 		}
 		finally {
 			setIsExporting(false)

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import { toast } from "sonner"
 import { motion } from "motion/react"
 import { useEffect, useState } from "react"
 import { Briefcase, FileText, Search, Plus } from "lucide-react"
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -22,20 +24,21 @@ type ProfilingSession = {
 	createdAt: Date
 }
 
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
+
 function formatDistanceToNow(date: Date) {
-	const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
-	const daysDifference = Math.round((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-	
-	if (Math.abs(daysDifference) > 0) {
+	const now = Date.now()
+	const diff = date.getTime() - now
+	const daysDifference = Math.round(diff / (1000 * 60 * 60 * 24))
+
+	if (Math.abs(daysDifference) > 0)
 		return rtf.format(daysDifference, "day")
-	}
 
-	const hoursDifference = Math.round((date.getTime() - Date.now()) / (1000 * 60 * 60))
-	if (Math.abs(hoursDifference) > 0) {
+	const hoursDifference = Math.round(diff / (1000 * 60 * 60))
+	if (Math.abs(hoursDifference) > 0)
 		return rtf.format(hoursDifference, "hour")
-	}
 
-	const minutesDifference = Math.round((date.getTime() - Date.now()) / (1000 * 60))
+	const minutesDifference = Math.round(diff / (1000 * 60))
 	return rtf.format(minutesDifference, "minute")
 }
 
@@ -55,19 +58,18 @@ export default function ProfilingSessionsPage() {
 			const { data, error } = await api.api.v2.sessions.get()
 			
 			if (error || !data) {
-				throw new Error("Failed to fetch sessions")
+				const message = getEdenErrorMessage(error) ?? "Could not load sessions"
+				toast.error(message)
+				return
 			}
-			
-			// Map dates correctly if coming as strings
-			// const formattedSessions = data.sessions.map((s: any) => ({
-			// 	...s,
-			// 	createdAt: new Date(s.createdAt)
-			// })) as ProfilingSession[]
 
 			setSessions(data.sessions)
-		} catch (err) {
-			console.error(err)
-		} finally {
+		}
+		catch (err) {
+			toast.error(getErrorMessage(err, "Failed to load sessions"))
+			console.error("[ProfilingSessions] Fetch error:", err)
+		}
+		finally {
 			setIsLoading(false)
 		}
 	}

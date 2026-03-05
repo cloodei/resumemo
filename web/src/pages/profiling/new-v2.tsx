@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -282,7 +283,7 @@ export default function NewProfilingPage() {
 			if (controller.signal.aborted)
 				return
 			if (presignError || !presignData || presignData.status !== "ok")
-				throw new Error(presignError?.value.message || "Could not get presigned upload URLs")
+				throw new Error(getEdenErrorMessage(presignError) ?? "Could not get presigned upload URLs")
 
 			let batchUploads: Promise<void>[] = new Array(filesToProcess.length);
 			for (let i = 0; i < filesToProcess.length; i++) {
@@ -336,7 +337,7 @@ export default function NewProfilingPage() {
 			if (controller.signal.aborted)
 				return
 			if (createError || !createData || createData.status !== "processing")
-				throw new Error("Session creation failed")
+				throw new Error(getEdenErrorMessage(createError) ?? "Session creation failed")
 
 			setPhase("done")
 			toast.success("Session created — profiling started!")
@@ -352,8 +353,8 @@ export default function NewProfilingPage() {
 				return
 
 			setPhase("error")
-			toast.error(err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong")
-			console.error(err)
+			toast.error(getErrorMessage(err, "Something went wrong while creating the session"))
+			console.error("[NewSession] Submit error:", err)
 		}
 		finally {
 			xhrRefs.current = []

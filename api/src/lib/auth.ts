@@ -61,7 +61,7 @@ export const authMiddleware = new Elysia({ name: "auth" })
       async resolve({ status, request: { headers } }) {
         const session = await auth.api.getSession({ headers });
 
-        if (!session) return status(401, { message: "Unauthorized" });
+        if (!session) return status(401, { status: "error", message: "Unauthorized" });
 
         return {
           user: session.user,

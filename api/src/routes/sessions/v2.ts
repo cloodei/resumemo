@@ -332,7 +332,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				candidateName: string | null;
 				candidateEmail: string | null;
 				candidatePhone: string | null;
-				overallScore: number;
+				overallScore: string;
 				summary: string;
 				skillsMatched: unknown;
 				pipelineVersion: string;

@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -311,7 +312,7 @@ export default function NewProfilingPage() {
 			})
 
 			if (error) {
-				throw new Error("Upload request failed")
+				throw new Error(getEdenErrorMessage(error) ?? "Upload request failed")
 			}
 
 			// Consume the SSE stream via Eden Treaty's async generator
@@ -327,8 +328,8 @@ export default function NewProfilingPage() {
 				return
 			}
 			setPhase("error")
-			toast.error(err instanceof Error ? err.message : "Something went wrong")
-			console.error(err)
+			toast.error(getErrorMessage(err, "Something went wrong while creating the session"))
+			console.error("[NewSession] Submit error:", err)
 		}
 	}
 

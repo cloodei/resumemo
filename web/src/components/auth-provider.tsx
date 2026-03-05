@@ -60,15 +60,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await authClient.signOut()
     }
     catch (error) {
-      console.error(error)
+      console.error("[AuthProvider] Sign-out failed:", error)
+      throw error
     }
     finally {
       setIsSigningOut(false)
     }
-  }
-
-  const handleRefetch = async () => {
-    await refetch()
   }
 
   // Re-validate session when tab gains focus (catches expired sessions after inactivity)
@@ -90,7 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading,
         isAuthenticated,
         signOut: handleSignOut,
-        refetch: handleRefetch,
+        refetch,
       }}
     >
       {children}

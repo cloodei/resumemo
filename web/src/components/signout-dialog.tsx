@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
+import { getErrorMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -32,8 +33,8 @@ export function SignOutDialog({ trigger }: SignOutDialogProps) {
 			toast.success("Signed out")
 			navigate("/login")
 		}
-		catch {
-			toast.error("Unable to sign out")
+		catch (error) {
+			toast.error(getErrorMessage(error, "Unable to sign out"))
 		}
 		finally {
 			setIsSigningOut(false)

@@ -6,6 +6,7 @@ import { openapi } from "@elysiajs/openapi";
 import { systemRoutes } from "./routes/system";
 import { sessionRoutes } from "./routes/sessions";
 import { pipelineCallbackRoute } from "./routes/pipeline";
+import { authMiddleware } from "./lib/auth";
 
 const app = new Elysia({ precompile: true })
 	.use(
@@ -19,7 +20,7 @@ const app = new Elysia({ precompile: true })
 	)
 	.use(logger())
 	.use(openapi())
-	// .use(authMiddleware)
+	.use(authMiddleware)
 	.use(systemRoutes)
 	.use(sessionRoutes)
 	// .use(fileRoutes)
