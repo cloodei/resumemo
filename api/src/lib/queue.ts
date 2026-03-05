@@ -10,15 +10,15 @@ import amqplib, { type Connection, type ChannelModel, type Channel } from "amqpl
 
 const QUEUE_NAME = "profiling.jobs";
 const CELERY_TASK_NAME = "pipeline.process_session";
+const url = process.env.CELERY_BROKER_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
 
 export let connection: Connection | null = null;
 export let channel: Channel | null = null;
 export let channelModel: ChannelModel | null = null;
 
 async function getChannel() {
-	if (channel) return channel;
-
-	const url = process.env.CLOUDAMQP_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
+	if (channel)
+		return channel;
 
 	channelModel = await amqplib.connect(url);
 	channel = await channelModel.createChannel();

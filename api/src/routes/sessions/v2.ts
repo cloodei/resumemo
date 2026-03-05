@@ -238,7 +238,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 		try {
 			await publishPipelineJob(payload);
-		} catch (err) {
+		}
+		catch (err) {
 			// Rollback: mark session as failed
 			await db
 				.update(schema.profilingSession)

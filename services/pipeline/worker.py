@@ -32,7 +32,6 @@ app.config_from_object("celeryconfig")
 @app.task(
     name="pipeline.process_session",
     bind=True,
-    max_retries=3,
     default_retry_delay=60,
     acks_late=True,
     reject_on_worker_lost=True,

@@ -56,7 +56,7 @@ export default function ProfilingSessionsPage() {
 		try {
 			setIsLoading(true)
 			const { data, error } = await api.api.v2.sessions.get()
-			
+
 			if (error || !data) {
 				const message = getEdenErrorMessage(error) ?? "Could not load sessions"
 				toast.error(message)

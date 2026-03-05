@@ -132,8 +132,6 @@ export const profilingSession = pgTable("profiling_session", {
 	index().on(table.status),
 ]);
 
-// ── Pipeline tables ──────────────────────────────────────────────
-
 export const candidateResult = pgTable("candidate_result", {
 	id: uuid("id")
 		.$defaultFn(randomUUIDv7)
@@ -161,5 +159,4 @@ export const candidateResult = pgTable("candidate_result", {
 	index().on(table.sessionId),
 	index().on(table.fileId),
 	index().on(table.overallScore),
-	uniqueIndex().on(table.sessionId, table.fileId),
 ]);
