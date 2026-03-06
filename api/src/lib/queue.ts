@@ -9,7 +9,6 @@ import { randomUUIDv7 } from "bun";
 import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib";
 
 const QUEUE_NAME = "profiling.jobs";
-const CELERY_TASK_NAME = "pipeline.process_session";
 const url = process.env.CELERY_BROKER_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
 
 export let connection: Connection | null = null;
@@ -62,20 +61,19 @@ export type PipelineJobPayload = {
 	}[];
 };
 
-/**
- * Publish a pipeline job to the RabbitMQ queue in Celery-compatible format.
- *
- * The message follows Celery's wire protocol so that a Python Celery worker
- * can consume it directly without any adapter.
- */
-export async function publishPipelineJob(payload: PipelineJobPayload) {
+type CeleryTaskOptions = {
+	taskName: string;
+	args: unknown[];
+	logLabel: string;
+};
+
+async function publishCeleryTask({ taskName, args, logLabel }: CeleryTaskOptions) {
 	const ch = await getChannel();
 	const taskId = randomUUIDv7();
 
-	// Celery wire protocol v2 message body: [[args], {kwargs}, {embed}]
 	const body = JSON.stringify([
-		[payload],  // args
-		{},         // kwargs
+		args,
+		{},
 		{
 			callbacks: null,
 			errbacks: null,
@@ -95,7 +93,7 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 			replyTo: "",
 			headers: {
 				lang: "py",
-				task: CELERY_TASK_NAME,
+				task: taskName,
 				id: taskId,
 				root_id: taskId,
 				parent_id: null,
@@ -113,12 +111,33 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 		},
 	);
 
-	if (!sent) {
-		throw new Error("Failed to publish pipeline job — channel buffer full");
-	}
+	if (!sent)
+		throw new Error(`Failed to publish ${logLabel} — channel buffer full`);
 
-	console.log(`[RabbitMQ] Published pipeline job ${taskId} for session ${payload.session_id}`);
+	console.log(`[RabbitMQ] Published ${logLabel} as task ${taskId}`);
 	return taskId;
+}
+
+/**
+ * Publish a pipeline job to the RabbitMQ queue in Celery-compatible format.
+ *
+ * The message follows Celery's wire protocol so that a Python Celery worker
+ * can consume it directly without any adapter.
+ */
+export async function publishPipelineJob(payload: PipelineJobPayload) {
+	return publishCeleryTask({
+		taskName: "pipeline.process_session",
+		args: [payload],
+		logLabel: `pipeline job for session ${payload.session_id}`,
+	});
+}
+
+export async function publishPipelineDebugMessage(message: string) {
+	return publishCeleryTask({
+		taskName: "pipeline.debug_message",
+		args: [message],
+		logLabel: `debug message "${message}"`,
+	});
 }
 
 /**

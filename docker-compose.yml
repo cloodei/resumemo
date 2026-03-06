@@ -29,7 +29,7 @@ services:
       celery -A worker worker
       --loglevel=info
       --queues=profiling.jobs
-      --concurrency=2
+      --concurrency=1
 
 volumes:
   rabbitmq_data:

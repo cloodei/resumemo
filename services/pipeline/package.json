@@ -3,7 +3,7 @@
     "down": "bun run down && bun run spacy",
     "sync": "uv sync",
     "spacy": "uv add https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-    "dev": "uv run celery -A worker worker --loglevel=info --queues=profiling.jobs",
+    "dev": "uv run celery -A worker worker --loglevel=info --queues=profiling.jobs --pool=solo --concurrency=1 --without-mingle --without-gossip --without-heartbeat",
     "start": "bun dev"
   }
 }

@@ -9,21 +9,24 @@ import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
 
 import { db } from "~/lib/db";
+import { publishPipelineDebugMessage } from "~/lib/queue";
 import * as schema from "@shared/schemas";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
+const PIPELINE_SECRET_HEADER_NAME = process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret";
 
-/**
- * Validate the Bearer token from the Authorization header.
- */
-function validateSecret(authHeader: string | null): boolean {
+function getSecretHeaderValue(headers: Record<string, string | undefined>): string | null {
+	const headerName = PIPELINE_SECRET_HEADER_NAME.toLowerCase();
+	return headers[headerName] ?? null;
+}
+
+function validateSecret(secretHeader: string | null): boolean {
 	if (!PIPELINE_CALLBACK_SECRET) {
 		console.warn("[Pipeline Callback] PIPELINE_CALLBACK_SECRET is not set — rejecting all callbacks");
 		return false;
 	}
-	if (!authHeader) return false;
-	const token = authHeader.replace(/^Bearer\s+/i, "");
-	return token === PIPELINE_CALLBACK_SECRET;
+	if (!secretHeader) return false;
+	return secretHeader === PIPELINE_CALLBACK_SECRET;
 }
 
 const resultSchema = t.Object({
@@ -67,9 +70,8 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 	.post(
 		"/callback",
 		async ({ body, headers, status }) => {
-			// Authenticate by shared secret
-			const authHeader = headers.authorization ?? null;
-			if (!validateSecret(authHeader))
+			const secretHeader = getSecretHeaderValue(headers);
+			if (!validateSecret(secretHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
 
 			const { type, session_id } = body;
@@ -102,6 +104,27 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 			return { status: "ok" };
 		},
 		{ body: callbackBody },
+	)
+	.get(
+		"/debug/:message",
+		async ({ params, headers, status }) => {
+			const secretHeader = getSecretHeaderValue(headers);
+			// if (!validateSecret(secretHeader))
+			// 	return status(401, { status: "error", message: "Unauthorized" });
+
+			const taskId = await publishPipelineDebugMessage(params.message);
+
+			return {
+				status: "queued",
+				message: params.message,
+				taskId,
+			};
+		},
+		{
+			params: t.Object({
+				message: t.String({ minLength: 1, maxLength: 500 }),
+			}),
+		},
 	);
 
 async function handleCompletion(

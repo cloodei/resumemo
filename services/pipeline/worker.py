@@ -2,7 +2,7 @@
 Celery application and task definitions for the Resumemo profiling pipeline.
 
 Start the worker with:
-    celery -A worker worker --loglevel=info --queues=profiling.jobs
+    celery -A worker worker --loglevel=info --queues=profiling.jobs --pool=solo --concurrency=1
 """
 
 # Load .env before any project imports that read os.environ at module level
@@ -13,6 +13,7 @@ import logging
 import time
 
 from celery import Celery
+from celery.utils.log import get_task_logger
 from celery.exceptions import SoftTimeLimitExceeded
 
 from utils.callback import send_completion, send_error
@@ -24,6 +25,7 @@ from utils.storage import fetch_file
 from stages.summarize import summarize_candidate
 
 logger = logging.getLogger(__name__)
+task_logger = get_task_logger(__name__)
 
 app = Celery("pipeline")
 app.config_from_object("celeryconfig")
@@ -130,6 +132,13 @@ def process_session(self, raw_payload: dict):
             partial_results=results,
         )
         raise
+
+
+@app.task(name="pipeline.debug_message")
+def debug_message(message: str):
+    """Read a debug message from the queue and log it."""
+    task_logger.info("Pipeline debug message: %s", message)
+    return {"status": "received", "message": message}
 
 
 def _process_single_file(file: FileManifestItem, payload: JobPayload):

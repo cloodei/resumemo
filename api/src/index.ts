@@ -15,7 +15,7 @@ const app = new Elysia({ precompile: true })
 			origin: true,
 			methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 			credentials: true,
-			allowedHeaders: ["Content-Type", "Authorization"],
+			allowedHeaders: ["Content-Type", "Authorization", process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret"],
 		}),
 	)
 	.use(logger())

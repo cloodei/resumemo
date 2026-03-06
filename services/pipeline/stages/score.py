@@ -16,6 +16,7 @@ from config import (
     TFIDF_NGRAM_RANGE,
 )
 from models import ScoringResult, SubScore, CandidateProfile
+from stages.parse import _get_skills_taxonomy
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,6 @@ def _score_skill_match(
 
     Returns: (score, matched_skills, missing_skills, extra_skills)
     """
-    from pipeline.stages.parse import _get_skills_taxonomy
 
     taxonomy = _get_skills_taxonomy()
     jd_lower = job_description.lower()

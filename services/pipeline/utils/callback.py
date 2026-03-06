@@ -6,16 +6,16 @@ import logging
 import time
 import httpx
 
-from config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_VERSION
+from config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_SECRET_HEADER_NAME, PIPELINE_VERSION
 from models import JobPayload
 
 logger = logging.getLogger(__name__)
 
 
-def _post_callback(payload: JobPayload, body: dict) -> None:
+def _post_callback(payload: JobPayload, body: dict):
     """POST a callback to the Elysia API with retry logic."""
     headers = {
-        "Authorization": f"Bearer {payload.callback_secret}",
+        PIPELINE_SECRET_HEADER_NAME: payload.callback_secret,
         "Content-Type": "application/json",
     }
 
