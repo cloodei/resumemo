@@ -13,6 +13,9 @@ def summarize_candidate(profile: CandidateProfile, scoring: ScoringResult):
     Uses template-based generation (no LLM). Constructs sentences from
     structured fields and scoring highlights.
     """
+    if profile.name_confidence is not None and profile.name_confidence < 0.5:
+        return _build_fallback_summary(profile, scoring)
+
     sentences: list[str] = []
 
     # Sentence 1: Opening — name, title, experience, top skills
@@ -37,6 +40,18 @@ def summarize_candidate(profile: CandidateProfile, scoring: ScoringResult):
     return summary
 
 
+def _build_fallback_summary(profile: "CandidateProfile", scoring: "ScoringResult"):
+    matched_skills = []
+    skill_sub = scoring.breakdown.get("skill_match")
+    if skill_sub and skill_sub.details:
+        matched_skills = skill_sub.details.get("matched", [])[:3]
+
+    if matched_skills:
+        return f"Candidate details were partially extracted. Resume shows evidence of {', '.join(matched_skills)} experience; review the source file for confirmation."
+
+    return "Candidate details were only partially extracted from the resume. Review the source file to verify identity and experience."
+
+
 def _build_opening(profile: "CandidateProfile"):
     """Build the opening sentence: name, title, experience, skills."""
     name = profile.name or "This candidate"
@@ -45,6 +60,8 @@ def _build_opening(profile: "CandidateProfile"):
     title = None
     if profile.work_history:
         title = profile.work_history[0].title
+    if title and not _looks_like_role_title(title):
+        title = None
     title = title or "professional"
 
     # Experience years
@@ -68,6 +85,21 @@ def _build_opening(profile: "CandidateProfile"):
             skills_part = f" specializing in {', '.join(top_skills[:-1])}, and {top_skills[-1]}"
 
     return f"{name} is a {title}{exp_part}{skills_part}."
+
+
+def _looks_like_role_title(value: str) -> bool:
+    normalized = value.strip()
+    if not normalized:
+        return False
+    if "@" in normalized or any(char.isdigit() for char in normalized):
+        return False
+    if len(normalized) > 80:
+        return False
+    bad_phrases = ("summary", "objective", "curriculum vitae", "resume")
+    lowered = normalized.lower()
+    if any(phrase in lowered for phrase in bad_phrases):
+        return False
+    return True
 
 
 def _build_education(profile: "CandidateProfile"):

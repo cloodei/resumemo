@@ -47,17 +47,11 @@ async function getChannel() {
 
 export type PipelineJobPayload = {
 	session_id: string;
-	callback_url: string;
-	callback_secret: string;
 	job_description: string;
-	job_title: string | null;
-	pipeline_version: string;
 	files: {
 		file_id: number;
 		storage_key: string;
 		original_name: string;
-		mime_type: string;
-		size: number;
 	}[];
 };
 
@@ -129,14 +123,6 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 		taskName: "pipeline.process_session",
 		args: [payload],
 		logLabel: `pipeline job for session ${payload.session_id}`,
-	});
-}
-
-export async function publishPipelineDebugMessage(message: string) {
-	return publishCeleryTask({
-		taskName: "pipeline.debug_message",
-		args: [message],
-		logLabel: `debug message "${message}"`,
 	});
 }
 

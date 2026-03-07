@@ -103,8 +103,7 @@ export const resumeFile = pgTable("resume_file", {
 	index().on(table.sessionId),
 ]);
 
-// export const sessionStatusEnum = ["uploading", "ready", "processing", "completed", "failed"] as const;
-export const sessionStatusEnum = ["ready", "processing", "completed", "failed"] as const; // "ready" is deprecated — sessions now go straight to "processing" on creation
+export const sessionStatusEnum = ["processing", "completed", "failed"] as const;
 
 export const profilingSession = pgTable("profiling_session", {
 	id: uuid("id")
@@ -116,7 +115,7 @@ export const profilingSession = pgTable("profiling_session", {
 	name: varchar("name", { length: 255 }).notNull(),
 	jobDescription: text("job_description").notNull(),
 	jobTitle: varchar("job_title", { length: 255 }),
-	status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("ready"),
+	status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("processing"),
 	totalFiles: bigint("total_files", { mode: "number" }).notNull().default(0),
 	pipelineVersion: varchar("pipeline_version", { length: 50 }),
 	errorMessage: text("error_message"),

@@ -30,7 +30,6 @@ def score_resume(
     raw_text: str,
     profile: CandidateProfile,
     job_description: str,
-    job_title: str | None = None,
 ) -> ScoringResult:
     """Score a resume against a job description.
 

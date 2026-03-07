@@ -16,7 +16,6 @@ worker_concurrency = 1
 
 task_routes = {
     "pipeline.process_session": {"queue": "profiling.jobs"},
-    "pipeline.debug_message": {"queue": "profiling.jobs"},
 }
 
 task_default_retry_delay = 60

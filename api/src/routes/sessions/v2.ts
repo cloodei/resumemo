@@ -16,8 +16,6 @@ import {
 } from "~/lib/storage";
 
 const PIPELINE_VERSION = "0.1.0";
-const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
-const callbackBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
 
 async function cleanupUploadedKeys(storageKeys: string[]) {
 	await Promise.all(storageKeys.map(async (storageKey) => {
@@ -222,17 +220,11 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		// Build and publish the pipeline job
 		const payload = {
 			session_id: sessionId,
-			callback_url: `${callbackBaseUrl}/api/internal/pipeline/callback`,
-			callback_secret: PIPELINE_CALLBACK_SECRET,
 			job_description: jobDescription,
-			job_title: jobTitle ?? null,
-			pipeline_version: PIPELINE_VERSION,
 			files: sessionFiles.map((f) => ({
 				file_id: f.fileId,
 				storage_key: f.storageKey,
 				original_name: f.originalName,
-				mime_type: f.mimeType,
-				size: Number(f.size),
 			})),
 		};
 
@@ -333,6 +325,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				candidateName: string | null;
 				candidateEmail: string | null;
 				candidatePhone: string | null;
+				parsedProfile: unknown;
 				overallScore: string;
 				summary: string;
 				skillsMatched: unknown;
@@ -349,6 +342,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						candidateName: schema.candidateResult.candidateName,
 						candidateEmail: schema.candidateResult.candidateEmail,
 						candidatePhone: schema.candidateResult.candidatePhone,
+						parsedProfile: schema.candidateResult.parsedProfile,
 						overallScore: schema.candidateResult.overallScore,
 						summary: schema.candidateResult.summary,
 						skillsMatched: schema.candidateResult.skillsMatched,
@@ -379,17 +373,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		{ auth: true },
 	)
 
-	.post(
-		"/:id/start",
-		async ({ status }) => {
-			return status(410, {
-				status: "error",
-				message: "This endpoint is deprecated. Sessions now start automatically on creation.",
-			});
-		},
-		{ auth: true },
-	)
-
 	.get(
 		"/:id/results",
 		async ({ user, params, status, query }) => {
@@ -412,6 +395,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						candidateName: schema.candidateResult.candidateName,
 						candidateEmail: schema.candidateResult.candidateEmail,
 						candidatePhone: schema.candidateResult.candidatePhone,
+						parsedProfile: schema.candidateResult.parsedProfile,
 						overallScore: schema.candidateResult.overallScore,
 						summary: schema.candidateResult.summary,
 						skillsMatched: schema.candidateResult.skillsMatched,
@@ -527,6 +511,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						candidateName: schema.candidateResult.candidateName,
 						candidateEmail: schema.candidateResult.candidateEmail,
 						candidatePhone: schema.candidateResult.candidatePhone,
+						parsedProfile: schema.candidateResult.parsedProfile,
 						overallScore: schema.candidateResult.overallScore,
 						scoreBreakdown: schema.candidateResult.scoreBreakdown,
 						summary: schema.candidateResult.summary,
@@ -554,9 +539,13 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (format === "csv") {
 				const csvHeaders = [
 					"Rank",
+					"Display Name",
 					"Candidate Name",
 					"Email",
 					"Phone",
+					"Identity Source",
+					"Name Confidence",
+					"Parse Warnings",
 					"Overall Score",
 					"Summary",
 					"Skills Matched",
@@ -565,11 +554,15 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 				const csvRows = results.map((r, i) => [
 					String(i + 1),
+					escapeCsv(buildDisplayName(r.candidateName, r.originalName, r.parsedProfile)),
 					escapeCsv(r.candidateName ?? "Unknown"),
 					escapeCsv(r.candidateEmail ?? ""),
 					escapeCsv(r.candidatePhone ?? ""),
+					escapeCsv(getIdentitySource(r.parsedProfile)),
+					escapeCsv(getNameConfidence(r.parsedProfile)),
+					escapeCsv(getParseWarnings(r.parsedProfile)),
 					r.overallScore,
-					escapeCsv(r.summary),
+					escapeCsv(stripMarkup(r.summary)),
 					escapeCsv((r.skillsMatched as string[]).join("; ")),
 					escapeCsv(r.originalName),
 				].join(","));
@@ -611,4 +604,30 @@ function escapeCsv(value: string) {
 		return `"${value.replace(/"/g, '""')}"`;
 
 	return value;
+}
+
+function buildDisplayName(candidateName: string | null, originalName: string, parsedProfile: unknown) {
+	const confidence = Number((parsedProfile as { name_confidence?: number } | null)?.name_confidence ?? 0);
+	if (candidateName && confidence >= 0.5)
+		return candidateName;
+
+	return originalName;
+}
+
+function getIdentitySource(parsedProfile: unknown) {
+	return String((parsedProfile as { identity_source?: string } | null)?.identity_source ?? "unknown");
+}
+
+function getNameConfidence(parsedProfile: unknown) {
+	const confidence = (parsedProfile as { name_confidence?: number } | null)?.name_confidence;
+	return typeof confidence === "number" ? confidence.toFixed(2) : "0.00";
+}
+
+function getParseWarnings(parsedProfile: unknown) {
+	const warnings = (parsedProfile as { parse_warnings?: string[] } | null)?.parse_warnings ?? [];
+	return Array.isArray(warnings) ? warnings.join("; ") : "";
+}
+
+function stripMarkup(value: string) {
+	return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }

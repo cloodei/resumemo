@@ -3,6 +3,8 @@
 import os
 
 PIPELINE_VERSION = "0.1.0"
+PIPELINE_CALLBACK_URL = os.environ.get("PIPELINE_CALLBACK_URL", "http://localhost:8080/api/internal/pipeline/callback")
+PIPELINE_CALLBACK_SECRET = os.environ.get("PIPELINE_CALLBACK_SECRET", "")
 
 SCORING_WEIGHT_TEXT_SIMILARITY = float(os.environ.get("SCORING_WEIGHT_TEXT_SIMILARITY", "0.40"))
 SCORING_WEIGHT_SKILL_MATCH = float(os.environ.get("SCORING_WEIGHT_SKILL_MATCH", "0.35"))

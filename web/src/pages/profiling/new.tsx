@@ -1,8 +1,8 @@
 import { toast } from "sonner"
 import { useForm } from "react-hook-form"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import {
 	ArrowRight,
 	CheckCircle2,
@@ -28,14 +28,14 @@ import {
 	MAX_FILE_BYTES,
 	ALLOWED_MIME_TYPES_LIST,
 	FILE_INPUT_ACCEPT,
-	SSE_EVENTS,
 } from "@/lib/constants"
 import {
 	useUploadFiles,
 	useUploadPhase,
-	useUploadSessionId,
+	useUploadFormData,
 	useUploadActions,
 	type FileStatus,
+	type SessionFormData,
 } from "@/stores/upload-store"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -70,16 +70,12 @@ const jdTemplates = [
 
 function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 	switch (status) {
-		case "selected":
-			return "Getting ready..."
 		case "ready":
 			return "Ready"
 		case "uploading":
 			return "Uploading..."
 		case "done":
 			return "Uploaded"
-		case "reused":
-			return "Already on file"
 		case "failed":
 			return errorMessage ?? "Failed"
 	}
@@ -87,65 +83,69 @@ function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 
 function fileStatusIcon(status: FileStatus) {
 	switch (status) {
-		case "selected":
-			return <FileText className="size-4 text-muted-foreground" />
 		case "ready":
 			return <CheckCircle2 className="size-4 text-sky-500" />
 		case "uploading":
 			return <Loader2 className="size-4 animate-spin text-sky-500" />
 		case "done":
-		case "reused":
 			return <CheckCircle2 className="size-4 text-emerald-500" />
 		case "failed":
 			return <X className="size-4 text-destructive" />
 	}
 }
 
-type SessionFormData = {
-	sessionName: string
-	jobTitle: string
-	jobDescription: string
-}
+const phaseLabel = {
+	idle: "",
+	uploading: "Uploading files...",
+	creating: "Creating session...",
+	done: "All done! Redirecting...",
+	error: "Something went wrong. You can retry.",
+} as const
 
 export default function NewProfilingPage() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
-	const sessionId = useUploadSessionId()
+	const storedFormData = useUploadFormData()
 	const {
 		addFiles,
 		removeFile,
 		clearAll,
+		clearFiles,
 		updateFileById,
 		setPhase,
-		setSessionId,
-		checkAndHash
+		setFormData,
 	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
 	const abortRef = useRef<AbortController | null>(null)
+	const xhrRefs = useRef<XMLHttpRequest[]>([])
 
 	const {
 		register,
 		handleSubmit,
 		setValue,
+		watch,
 		formState: { errors },
 	} = useForm<SessionFormData>({
 		defaultValues: {
-			sessionName: "",
-			jobTitle: "",
-			jobDescription: "",
+			sessionName: storedFormData.sessionName,
+			jobTitle: storedFormData.jobTitle,
+			jobDescription: storedFormData.jobDescription,
 		},
 	})
 
+	// Sync form fields to the store on every change for persistence
+	const watchedFields = watch()
 	useEffect(() => {
-		checkAndHash()
-	}, [files])
+		setFormData(watchedFields)
+	}, [watchedFields.sessionName, watchedFields.jobTitle, watchedFields.jobDescription])
 
-	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done" || f.status === "reused")
+	const readyFiles = files.filter(f => f.status === "ready" || f.status === "done")
 	const failedFiles = files.filter(f => f.status === "failed")
 	const allFilesReady = files.length > 0 && files.every(f => f.status === "ready")
-	const isBusy = phase !== "idle" && phase !== "done" && phase !== "error"
+	const isBusy = phase === "uploading" || phase === "creating"
+	const canImportFromLibrary = false
 
 	const handleAddFiles = useCallback(
 		(newFiles: File[]) => {
@@ -177,7 +177,7 @@ export default function NewProfilingPage() {
 				addFiles(validFiles)
 			}
 		},
-		[files, isBusy]
+		[files, isBusy],
 	)
 
 	const handleDrop = (e: React.DragEvent) => {
@@ -192,94 +192,64 @@ export default function NewProfilingPage() {
 		e.target.value = ""
 	}
 
-	/**
-	 * Cancel an in-progress upload: abort the fetch stream.
-	 * Since the session isn't created until the stream completes,
-	 * aborting is enough — there's nothing to clean up server-side.
-	 */
-	const handleCancel = () => {
-		abortRef.current?.abort()
-		abortRef.current = null
-		clearAll()
-		toast.info("Upload cancelled")
+	const uploadViaPresignedUrl = (args: {
+		uploadUrl: string
+		file: File
+		mimeType: string
+		signal: AbortSignal
+		onProgress: (percent: number) => void
+	}) => {
+		const { uploadUrl, file, mimeType, signal, onProgress } = args
+		const xhr = new XMLHttpRequest()
+		xhrRefs.current.push(xhr)
+		const onAbort = xhr.abort
+		signal.addEventListener("abort", onAbort)
+		
+		const cleanup = () => {
+			signal.removeEventListener("abort", onAbort)
+			xhrRefs.current = xhrRefs.current.filter(item => item !== xhr)
+		}
+
+		return new Promise<void>((resolve, reject) => {
+			xhr.open("PUT", uploadUrl)
+			xhr.setRequestHeader("Content-Type", mimeType)
+
+			xhr.upload.onprogress = (e) => {
+				if (e.lengthComputable) {
+					onProgress(Math.round((e.loaded / e.total) * 100))
+				}
+			}
+
+			xhr.onload = () => {
+				cleanup()
+				if (xhr.status >= 200 && xhr.status < 300) {
+					resolve()
+					return
+				}
+				reject(new Error(`Upload failed with status ${xhr.status}`))
+			}
+
+			xhr.onerror = () => {
+				cleanup()
+				reject(new Error("Network error while uploading file"))
+			}
+
+			xhr.onabort = () => {
+				cleanup()
+				reject(new DOMException("Upload aborted", "AbortError"))
+			}
+
+			xhr.send(file)
+		})
 	}
 
-	/**
-	 * Handle a single SSE chunk from the Eden Treaty async generator.
-	 * All per-file events use `clientId` (the store's numeric ID).
-	 */
-	const handleSSEEvent = (event: string, data: Record<string, unknown>) => {
-		const clientId = data.clientId as number | undefined
-
-		switch (event) {
-			case SSE_EVENTS.SESSION_CREATED:
-				setSessionId(data.sessionId as string)
-				break
-
-			case SSE_EVENTS.FILE_VALIDATING:
-				updateFileById(clientId!, { status: "uploading" })
-				break
-
-			case SSE_EVENTS.FILE_VALIDATED:
-			case SSE_EVENTS.FILE_UPLOADING:
-				break
-
-			case SSE_EVENTS.FILE_DONE:
-				updateFileById(clientId!, {
-					status: "done",
-					fileId: data.fileId as number | undefined,
-				})
-				break
-
-			case SSE_EVENTS.FILE_REUSED:
-				updateFileById(clientId!, {
-					status: "reused",
-					fileId: data.fileId as number,
-				})
-				break
-
-			case SSE_EVENTS.FILE_HASH_MISMATCH:
-				// v1 server flow currently does not emit hash-mismatch; keep no-op for compatibility.
-				break
-
-			case SSE_EVENTS.FILE_FAILED:
-				updateFileById(clientId!, {
-					status: "failed",
-					errorMessage: (data.reason as string) ?? "Upload failed",
-				})
-				break
-
-			case SSE_EVENTS.UPLOAD_COMPLETE: {
-				const status = data.status as string
-				const sid = (data.sessionId as string | null) ?? null
-				const fallbackSid = sid ?? sessionId
-				if (status === "ready" && sid) {
-					setPhase("done")
-					toast.success("Session created successfully!")
-					setTimeout(() => {
-						clearAll()
-						navigate(`/profiling/${sid}`)
-					}, 1200)
-				} else {
-					const totalFailed = data.totalFailed as number
-					const totalConfirmed = (data.totalConfirmed as number) + (data.totalReused as number)
-					if (totalConfirmed > 0 && fallbackSid) {
-						setPhase("done")
-						toast.warning(
-							`Session created with ${totalConfirmed} file${totalConfirmed !== 1 ? "s" : ""}. ${totalFailed} file${totalFailed !== 1 ? "s" : ""} failed.`,
-						)
-						setTimeout(() => {
-							clearAll()
-							navigate(`/profiling/${fallbackSid}`)
-						}, 1200)
-					} else {
-						setPhase("error")
-						toast.error("No files were uploaded successfully")
-					}
-				}
-				break
-			}
-		}
+	const handleCancel = () => {
+		abortRef.current?.abort()
+		xhrRefs.current.forEach(xhr => xhr.abort())
+		xhrRefs.current = []
+		abortRef.current = null
+		clearFiles()
+		toast.info("Upload cancelled")
 	}
 
 	const onSubmit = async (formData: SessionFormData) => {
@@ -288,7 +258,7 @@ export default function NewProfilingPage() {
 			return
 		}
 
-		const filesToProcess = files.filter(f => f.status === "ready" && f.fingerprint)
+		const filesToProcess = files.filter(f => f.status === "ready")
 		if (filesToProcess.length === 0) {
 			toast.error("No files ready for upload")
 			return
@@ -300,48 +270,100 @@ export default function NewProfilingPage() {
 			const controller = new AbortController()
 			abortRef.current = controller
 
-			const { data, error } = await api.api.v1.sessions.post({
-				name: formData.sessionName.trim(),
-				jobDescription: formData.jobDescription.trim(),
-				jobTitle: formData.jobTitle.trim() || undefined,
-				hashes: filesToProcess.map(f => f.fingerprint!),
-				clientIds: filesToProcess.map(f => f.id),
-				files: filesToProcess.map(f => f.file),
+			const { data: presignData, error: presignError } = await api.api.v2.sessions.presign.post({
+				files: filesToProcess.map(f => ({
+					clientId: f.id,
+					fileName: f.originalName,
+					mimeType: f.mimeType,
+					size: f.size,
+				})),
 			}, {
 				fetch: { signal: controller.signal },
 			})
 
-			if (error) {
-				throw new Error(getEdenErrorMessage(error) ?? "Upload request failed")
+			if (controller.signal.aborted)
+				return
+			if (presignError || !presignData || presignData.status !== "ok")
+				throw new Error(getEdenErrorMessage(presignError) ?? "Could not get presigned upload URLs")
+
+			let batchUploads: Promise<void>[] = new Array(filesToProcess.length);
+			for (let i = 0; i < filesToProcess.length; i++) {
+				const file = filesToProcess[i]
+				const uploadTarget = file.id === presignData.uploads[i].clientId
+					? presignData.uploads[i]
+					: presignData.uploads.find(u => u.clientId === file.id)
+				if (!uploadTarget)
+					throw new Error(`Missing upload target for ${file.originalName}`)
+
+				updateFileById(file.id, { status: "uploading", progress: 0, errorMessage: undefined })
+				batchUploads[i] = uploadViaPresignedUrl({
+					uploadUrl: uploadTarget.uploadUrl,
+					file: file.file,
+					mimeType: file.mimeType,
+					signal: controller.signal,
+					onProgress: percent => updateFileById(file.id, { progress: percent }),
+				})
+					.then(() => updateFileById(file.id, { status: "done", progress: 100 }))
+					.catch(err => {
+						updateFileById(file.id, {
+							status: "failed",
+							progress: 0,
+							errorMessage: err instanceof Error ? err.message : "Upload failed",
+						})
+						throw err
+					})
 			}
 
-			// Consume the SSE stream via Eden Treaty's async generator
-			for await (const chunk of data) {
-				handleSSEEvent(chunk.event, chunk.data)
-			}
+			await Promise.all(batchUploads)
+			setPhase("creating")
+			const { data: createData, error: createError } = await api.api.v2.sessions.create.post({
+				name: formData.sessionName.trim(),
+				jobDescription: formData.jobDescription.trim(),
+				jobTitle: formData.jobTitle.trim() || undefined,
+				files: presignData.uploads.map((u, i) => {
+					const source = filesToProcess[i].id === u.clientId
+						? filesToProcess[i]
+						: filesToProcess.find(f => f.id === u.clientId)!
+					return {
+						storageKey: u.storageKey,
+						fileName: source.originalName,
+						mimeType: source.mimeType,
+						size: source.size,
+					}
+				}),
+			}, {
+				fetch: { signal: controller.signal },
+			})
+
+			if (controller.signal.aborted)
+				return
+			if (createError || !createData || createData.status !== "processing")
+				throw new Error(getEdenErrorMessage(createError) ?? "Session creation failed")
+
+			setPhase("done")
+			toast.success("Session created — profiling started!")
+			setTimeout(() => {
+				clearAll()
+				navigate(`/profiling/${createData.sessionId}`)
+			}, 1200)
 
 			abortRef.current = null
 		}
 		catch (err) {
-			if (err instanceof DOMException && err.name === "AbortError") {
-				// User cancelled — already handled by handleCancel
+			if (err instanceof DOMException && err.name === "AbortError")
 				return
-			}
+
 			setPhase("error")
 			toast.error(getErrorMessage(err, "Something went wrong while creating the session"))
 			console.error("[NewSession] Submit error:", err)
 		}
+		finally {
+			xhrRefs.current = []
+			abortRef.current = null
+		}
 	}
 
 	const canCreate = allFilesReady && files.length > 0 && !isBusy
-
-	const phaseLabel = {
-		idle: "",
-		hashing: "Preparing files...",
-		uploading: "Uploading files...",
-		done: "All done! Redirecting...",
-		error: "Something went wrong. You can retry.",
-	}
 
 	return (
 		<div className="flex flex-col gap-8">
@@ -400,7 +422,7 @@ export default function NewProfilingPage() {
 								Paste your job description or choose from templates.
 							</CardDescription>
 						</div>
-						<Button variant="outline" size="sm" className="shadow-m hover:shadow-l transition-all">
+						<Button variant="outline" size="sm" className="shadow-m hover:shadow-l transition-all" disabled={!canImportFromLibrary}>
 							Import from library
 						</Button>
 					</CardHeader>
@@ -453,7 +475,7 @@ export default function NewProfilingPage() {
 								disabled={isBusy}
 								{...register("jobDescription", {
 									required: "Job description is required",
-									maxLength: { value: 2048, message: "Max 2048 characters" },
+									maxLength: { value: 5000, message: "Max 5000 characters" },
 								})}
 							/>
 							{errors.jobDescription && (
@@ -463,13 +485,13 @@ export default function NewProfilingPage() {
 
 						<Tabs defaultValue="templates" className="pt-2">
 							<TabsList>
-								<TabsTrigger className="border-none cursor-pointer" value="templates">
-									Templates
-								</TabsTrigger>
-								<TabsTrigger className="border-none cursor-pointer" value="history">
-									Recent sessions
-								</TabsTrigger>
-							</TabsList>
+							<TabsTrigger className="border-none cursor-pointer" value="templates">
+								Templates
+							</TabsTrigger>
+							<TabsTrigger className="border-none cursor-pointer" value="history">
+								Deprecated
+							</TabsTrigger>
+						</TabsList>
 							<TabsContent value="templates" className="mt-4 grid gap-3 md:grid-cols-2">
 								{jdTemplates.map((template) => (
 									<div
@@ -491,10 +513,7 @@ export default function NewProfilingPage() {
 								))}
 							</TabsContent>
 							<TabsContent value="history" className="mt-4 space-y-3 text-sm text-muted-foreground">
-								<p>Recently launched sessions will appear here to quickly duplicate configurations.</p>
-								<Button size="sm" variant="outline" className="h-9 px-3">
-									View session history
-								</Button>
+								<p>Session history duplication is deprecated for now while the new profiling flow stabilizes.</p>
 							</TabsContent>
 						</Tabs>
 					</CardContent>
@@ -511,9 +530,9 @@ export default function NewProfilingPage() {
 								Drop resumes to add them to your session.
 							</CardDescription>
 						</div>
-						<Badge variant="outline" className="flex items-center gap-1 text-xs">
+						{/* <Badge variant="outline" className="flex items-center gap-1 text-xs">
 							<UploadCloud className="size-3.5" /> Cloud Upload
-						</Badge>
+						</Badge> */}
 					</CardHeader>
 					<CardContent className="space-y-6">
 						<motion.div
@@ -593,8 +612,8 @@ export default function NewProfilingPage() {
 								</p>
 								{failedFiles.length > 0 && (
 									<p className="mt-1 text-xs text-destructive">
-										{failedFiles.length} file{failedFiles.length !== 1 ? "s" : ""} could not be
-										read. Remove and re-add them.
+										{failedFiles.length} file{failedFiles.length !== 1 ? "s" : ""} failed.
+										Remove and re-add them.
 									</p>
 								)}
 							</div>
@@ -602,10 +621,7 @@ export default function NewProfilingPage() {
 					</CardContent>
 					<CardFooter className="justify-between">
 						<div className="text-xs text-muted-foreground">
-							Need help?{" "}
-							<Link to="/support" className="underline">
-								Check the upload guide
-							</Link>
+							Need help? Check the upload guide in project docs.
 						</div>
 					</CardFooter>
 				</Card>
@@ -638,7 +654,7 @@ export default function NewProfilingPage() {
 											<Loader2 className="size-3 animate-spin" /> Working
 										</Badge>
 									)}
-									<Button variant="ghost" size="sm" onClick={clearAll} disabled={isBusy}>
+									<Button variant="ghost" size="sm" onClick={clearFiles} disabled={isBusy}>
 										Clear all
 									</Button>
 								</div>
@@ -685,7 +701,25 @@ export default function NewProfilingPage() {
 											<div className="mt-3">
 												<div className="flex justify-between text-[10px] text-muted-foreground">
 													<span>{fileStatusLabel(file.status, file.errorMessage)}</span>
+													{file.status === "uploading" && (
+														<span>{file.progress}%</span>
+													)}
 												</div>
+												{file.status === "uploading" && (
+													<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+														<motion.div
+															className="h-full rounded-full bg-sky-500"
+															initial={{ width: 0 }}
+															animate={{ width: `${file.progress}%` }}
+															transition={{ duration: 0.2, ease: "easeOut" }}
+														/>
+													</div>
+												)}
+												{file.status === "done" && (
+													<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+														<div className="h-full w-full rounded-full bg-emerald-500" />
+													</div>
+												)}
 											</div>
 										</motion.div>
 									))}
@@ -695,8 +729,17 @@ export default function NewProfilingPage() {
 								{/* Phase status banner */}
 								<div className="flex items-center gap-3 text-sm text-muted-foreground">
 									{isBusy && <Loader2 className="size-4 animate-spin text-sky-500" />}
-									{phase === "done" && <CheckCircle2 className="size-4 text-emerald-500" />}
-									{phase === "error" && <X className="size-4 text-destructive" />}
+									{phase === "done" ? (
+										<>
+											<CheckCircle2 className="size-4 text-emerald-500" />
+											<span>{phaseLabel[phase]}</span>
+										</>
+									) : phase === "error" && (
+										<>
+											<X className="size-4 text-destructive" />
+											<span>{phaseLabel[phase]}</span>
+										</>
+									)}
 									<span>{phaseLabel[phase]}</span>
 								</div>
 
@@ -716,8 +759,8 @@ export default function NewProfilingPage() {
 											variant="secondary"
 											className="flex-1 sm:flex-none gap-2"
 											onClick={() => {
+												clearFiles()
 												setPhase("idle")
-												setSessionId(null)
 											}}
 										>
 											<RefreshCw className="size-4" />
@@ -736,7 +779,7 @@ export default function NewProfilingPage() {
 											</>
 										) : (
 											<>
-												Upload &amp; create session
+												Upload & create session
 												<ArrowRight className="size-4" />
 											</>
 										)}

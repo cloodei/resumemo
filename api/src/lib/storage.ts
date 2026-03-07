@@ -27,23 +27,6 @@ function generateStorageKey(userId: string, originalName: string) {
 }
 
 /**
- * Upload a file buffer directly to R2.
- *
- * This replaces the old presigned-URL flow — the server now receives
- * the file bytes and performs the upload itself.
- */
-async function uploadFile(storageKey: string, body: Buffer | string | Uint8Array, contentType: string) {
-	const command = new PutObjectCommand({
-		Bucket: R2_BUCKET_NAME,
-		Key: storageKey,
-		Body: body,
-		ContentType: contentType,
-	});
-
-	await r2Client.send(command);
-}
-
-/**
  * Generate a short-lived presigned URL for direct browser upload.
  *
  * When `contentLength` is provided the signed URL will include a
@@ -93,7 +76,6 @@ export {
 	r2Client,
 	R2_BUCKET_NAME,
 	generateStorageKey,
-	uploadFile,
 	generatePresignedUploadUrl,
 	deleteFile,
 	headFile,

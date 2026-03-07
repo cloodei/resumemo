@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { BASE_URL } from "@/lib/constants"
 import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -53,10 +54,28 @@ type CandidateResult = {
 	candidateName: string | null
 	candidateEmail: string | null
 	candidatePhone: string | null
+	parsedProfile?: {
+		identity_source?: string | null
+		name_confidence?: number | null
+		parse_warnings?: string[] | null
+	} | null
 	overallScore: number
 	summary: string
 	skillsMatched: string[] | null
 	originalName: string
+}
+
+function getDisplayCandidateName(candidate: CandidateResult) {
+	const confidence = Number(candidate.parsedProfile?.name_confidence ?? 0)
+	if (candidate.candidateName && confidence >= 0.5)
+		return candidate.candidateName
+
+	return candidate.originalName
+}
+
+function hasLowConfidenceIdentity(candidate: CandidateResult) {
+	const confidence = Number(candidate.parsedProfile?.name_confidence ?? 0)
+	return !candidate.candidateName || confidence < 0.5
 }
 
 function statusBadgeVariant(status: ProfilingSession["status"]) {
@@ -106,6 +125,7 @@ export default function ProfilingResultsPage() {
 			if (data.session.status === "completed" && data.results) {
 				const rankedResults = (data.results as any[]).map((r: any, index: number) => ({
 					...r,
+					overallScore: Number(r.overallScore),
 					rank: index + 1
 				})) as Required<CandidateResult>[]
 
@@ -124,10 +144,8 @@ export default function ProfilingResultsPage() {
 		setIsExporting(true)
 
 		try {
-			const res = await fetch(`/api/v2/sessions/${id}/export?format=csv`, {
-				headers: {
-					Authorization: `Bearer ${localStorage.getItem("resumemo_auth_token") || ""}`
-				}
+			const res = await fetch(`${BASE_URL}/api/v2/sessions/${id}/export?format=csv`, {
+				credentials: "include",
 			})
 
 			if (!res.ok) {
@@ -140,6 +158,11 @@ export default function ProfilingResultsPage() {
 			}
 
 			const blob = await res.blob()
+			const contentType = res.headers.get("content-type") || ""
+			if (!contentType.includes("text/csv")) {
+				const text = await blob.text()
+				throw new Error(text.slice(0, 200) || "Export response was not a CSV file")
+			}
 			const url = window.URL.createObjectURL(blob)
 			const a = document.createElement("a")
 			a.href = url
@@ -374,12 +397,20 @@ export default function ProfilingResultsPage() {
 														</Badge>
 													</TableCell>
 													<TableCell className="space-y-1">
-														<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
-															{candidate.candidateName || "Unknown Candidate"}
-														</p>
-														<p className="text-xs text-muted-foreground">Score {candidate.overallScore}/100</p>
-														{candidate.candidateEmail && (
-															<p className="text-xs text-muted-foreground flex items-center gap-1.5">
+									<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
+										{getDisplayCandidateName(candidate)}
+									</p>
+									<p className="text-xs text-muted-foreground">Score {candidate.overallScore}/100</p>
+									<p className="text-xs text-muted-foreground" title={candidate.originalName}>
+										Resume: {candidate.originalName}
+									</p>
+									{hasLowConfidenceIdentity(candidate) && (
+										<p className="text-[11px] text-amber-600">
+											Name hidden due to low extraction confidence
+										</p>
+									)}
+									{candidate.candidateEmail && (
+										<p className="text-xs text-muted-foreground flex items-center gap-1.5">
 																<Mail className="size-3" />
 																{candidate.candidateEmail}
 															</p>
@@ -445,8 +476,9 @@ export default function ProfilingResultsPage() {
 								<CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
 									{results.slice(0, 2).map((candidate) => (
 										<div key={candidate.id} className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer">
-											<p className="text-sm font-semibold text-foreground">{candidate.candidateName || "Top Candidate"}</p>
+											<p className="text-sm font-semibold text-foreground">{getDisplayCandidateName(candidate)}</p>
 											<p className="mt-1 text-xs">Score {candidate.overallScore}/100 • Rank #{candidate.rank}</p>
+											<p className="mt-1 text-xs text-muted-foreground" title={candidate.originalName}>{candidate.originalName}</p>
 											<p className="mt-3 text-xs leading-relaxed line-clamp-3">{candidate.summary}</p>
 											<Button size="sm" variant="ghost" className="mt-4 gap-2">
 												View resume

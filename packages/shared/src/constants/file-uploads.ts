@@ -54,19 +54,3 @@ export const MAGIC_BYTES = {
 		offset: 0,
 	},
 } as const
-
-/** SSE event types emitted during the upload stream. */
-export const SSE_EVENTS = {
-	SESSION_CREATED: "session:created",
-	FILE_VALIDATING: "file:validating",
-	FILE_VALIDATED: "file:validated",
-	FILE_UPLOADING: "file:uploading",
-	FILE_DONE: "file:done",
-	FILE_FAILED: "file:failed",
-	FILE_REUSED: "file:reused",
-	FILE_HASH_MISMATCH: "file:hash_mismatch",
-	UPLOAD_COMPLETE: "upload:complete",
-	UPLOAD_FAILED: "upload:failed",
-	UPLOAD_CANCELLED: "upload:cancelled",
-	ERROR: "error",
-} as const

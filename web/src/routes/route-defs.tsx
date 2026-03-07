@@ -1,11 +1,9 @@
 import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
-import NewProfilingPageV2 from "@/pages/profiling/new-v2"
+import NewProfilingPage from "@/pages/profiling/new"
 import ProfilingResultsPage from "@/pages/profiling/session"
 import ProfilingSessionsPage from "@/pages/profiling/list"
-import NewJobPage from "@/pages/jobs/new-job"
-import JobResultsPage from "@/pages/jobs/job-results"
 
 export const ROUTES = [
   {
@@ -35,26 +33,13 @@ export const ROUTES = [
   {
     path: "/profiling/new",
     title: "New Profiling Session · Résumé Ranker",
-    element: <NewProfilingPageV2 />,
+    element: <NewProfilingPage />,
     layout: "app",
   },
   {
     path: "/profiling/:id",
     title: "Profiling Results · Résumé Ranker",
     element: <ProfilingResultsPage />,
-    layout: "app",
-  },
-  // Legacy redirects (can remove later)
-  {
-    path: "/jobs/new",
-    title: "Upload Resumes · Résumé Ranker",
-    element: <NewJobPage />,
-    layout: "app",
-  },
-  {
-    path: "/jobs/:id",
-    title: "Profiling Results · Résumé Ranker",
-    element: <JobResultsPage />,
     layout: "app",
   },
   {

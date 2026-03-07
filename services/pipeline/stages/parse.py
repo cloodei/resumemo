@@ -1,6 +1,7 @@
 """Stage 2: Structured parsing of resume text using spaCy NER and heuristics."""
 
 from __future__ import annotations
+from datetime import datetime
 import json
 import logging
 import re
@@ -84,6 +85,15 @@ DEGREE_PATTERN = re.compile(
 )
 
 YEAR_PATTERN = re.compile(r"\b(19[7-9]\d|20[0-3]\d)\b")
+HEADER_LIKE_PATTERN = re.compile(
+    r"\b(?:summary|professional summary|profile|objective|resume|curriculum vitae|experience|education|skills|contact)\b",
+    re.IGNORECASE,
+)
+NAME_TOKEN_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'\-.]+$")
+ROLE_HEADER_PATTERN = re.compile(
+    r"\b(?:summary|objective|contact|curriculum vitae|resume|references|profile)\b",
+    re.IGNORECASE,
+)
 
 
 def parse_resume(raw_text: str):
@@ -99,7 +109,7 @@ def parse_resume(raw_text: str):
     lines = raw_text.split("\n")
 
     # Extract contact info
-    name = _extract_name(doc, lines)
+    name, identity_source, name_confidence, name_warnings = _extract_name(doc, lines)
     email = _extract_email(raw_text)
     phone = _extract_phone(raw_text)
 
@@ -109,6 +119,7 @@ def parse_resume(raw_text: str):
     # Extract structured fields
     skills = _extract_skills(raw_text, doc)
     work_history = _extract_work_history(sections.get("experience", []), doc)
+    work_history, work_warnings = _sanitize_work_history(work_history)
     education = _extract_education(sections.get("education", []), doc)
     certifications = _extract_certifications(sections.get("certifications", []))
     projects = _extract_projects(sections.get("projects", []))
@@ -118,6 +129,8 @@ def parse_resume(raw_text: str):
 
     return CandidateProfile(
         name=name,
+        identity_source=identity_source,
+        name_confidence=name_confidence,
         email=email,
         phone=phone,
         skills=skills,
@@ -126,26 +139,58 @@ def parse_resume(raw_text: str):
         certifications=certifications,
         projects=projects,
         total_experience_years=total_years,
+        parse_warnings=[*name_warnings, *work_warnings],
     )
 
 
 def _extract_name(doc, lines: list[str]):
     """Extract candidate name from spaCy PERSON entities near the top of the document."""
+    warnings: list[str] = []
+
     # Look for PERSON entities in the first 500 characters
     for ent in doc.ents:
         if ent.label_ == "PERSON" and ent.start_char < 500:
             name = ent.text.strip()
-            # Basic validation: at least 2 characters, contains a space (first + last)
-            if len(name) >= 2:
-                return name
+            if _looks_like_person_name(name):
+                return name, "ner", 0.95, warnings
 
-    # Fallback: use the first non-empty line
+    warnings.append("name_ner_not_confident")
+
+    # Fallback: use a validated top line only
     for line in lines[:5]:
         stripped = line.strip()
-        if stripped and len(stripped) >= 2 and len(stripped) <= 100:
-            return stripped
+        if not stripped or len(stripped) > 100:
+            continue
+        if _looks_like_person_name(stripped):
+            return stripped, "top_line", 0.65, warnings
 
-    return None
+    warnings.append("name_missing_or_invalid")
+    return None, "unknown", 0.0, warnings
+
+
+def _looks_like_person_name(value: str) -> bool:
+    candidate = re.sub(r"\s+", " ", value.strip())
+    if len(candidate) < 3 or len(candidate) > 60:
+        return False
+    if "@" in candidate or any(char.isdigit() for char in candidate):
+        return False
+    if HEADER_LIKE_PATTERN.search(candidate):
+        return False
+    if ":" in candidate or "," in candidate or "|" in candidate or "/" in candidate:
+        return False
+
+    tokens = [token for token in candidate.split(" ") if token]
+    if len(tokens) < 2 or len(tokens) > 4:
+        return False
+
+    alpha_tokens = 0
+    for token in tokens:
+        if not NAME_TOKEN_PATTERN.match(token):
+            return False
+        if len(token) > 1:
+            alpha_tokens += 1
+
+    return alpha_tokens >= 2
 
 
 def _extract_email(text: str):
@@ -287,6 +332,57 @@ def _extract_work_history(section_lines: list[str], doc):
     return entries
 
 
+def _sanitize_work_history(work_history: list[WorkEntry]) -> tuple[list[WorkEntry], list[str]]:
+    warnings: list[str] = []
+    sanitized: list[WorkEntry] = []
+
+    for entry in work_history:
+        title = entry.title.strip() if entry.title else None
+        company = entry.company.strip() if entry.company else None
+
+        if title and _looks_like_invalid_role_text(title):
+            title = None
+            warnings.append("invalid_work_title_removed")
+
+        if company and _looks_like_invalid_company_text(company):
+            company = None
+            warnings.append("invalid_company_removed")
+
+        sanitized.append(
+            WorkEntry(
+                title=title,
+                company=company,
+                start_date=entry.start_date,
+                end_date=entry.end_date,
+                description=entry.description,
+            )
+        )
+
+    return sanitized, warnings
+
+
+def _looks_like_invalid_role_text(value: str) -> bool:
+    if len(value) > 80:
+        return True
+    if "@" in value or any(char.isdigit() for char in value):
+        return True
+    if ROLE_HEADER_PATTERN.search(value):
+        return True
+    if value.count(",") >= 2 or value.count(":") >= 1:
+        return True
+    return False
+
+
+def _looks_like_invalid_company_text(value: str) -> bool:
+    if len(value) > 120:
+        return True
+    if "@" in value:
+        return True
+    if ROLE_HEADER_PATTERN.search(value):
+        return True
+    return False
+
+
 def _parse_date_range(date_str: str):
     """Parse a date range string into (start, end) year-month strings."""
     parts = re.split(r"\s*[-–—]\s*|\s+to\s+", date_str, maxsplit=1)
@@ -396,8 +492,8 @@ def _compute_experience_years(work_history: list[WorkEntry]):
             continue
 
         if entry.end_date is None:
-            # Current position — use 2026 as reference
-            end_year = 2026
+            # Current position — use the current UTC year as reference
+            end_year = datetime.utcnow().year
         else:
             end_year = _year_from_date(entry.end_date)
             if end_year is None:

@@ -9,23 +9,20 @@ import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
 
 import { db } from "~/lib/db";
-import { publishPipelineDebugMessage } from "~/lib/queue";
 import * as schema from "@shared/schemas";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
 const PIPELINE_SECRET_HEADER_NAME = process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret";
 
-function getSecretHeaderValue(headers: Record<string, string | undefined>): string | null {
+function getSecretHeaderValue(headers: Record<string, string | undefined>) {
 	const headerName = PIPELINE_SECRET_HEADER_NAME.toLowerCase();
 	return headers[headerName] ?? null;
 }
 
-function validateSecret(secretHeader: string | null): boolean {
-	if (!PIPELINE_CALLBACK_SECRET) {
-		console.warn("[Pipeline Callback] PIPELINE_CALLBACK_SECRET is not set — rejecting all callbacks");
+function validateSecret(secretHeader: string | null) {
+	if (!PIPELINE_CALLBACK_SECRET || !secretHeader)
 		return false;
-	}
-	if (!secretHeader) return false;
+
 	return secretHeader === PIPELINE_CALLBACK_SECRET;
 }
 
@@ -47,8 +44,6 @@ const completionBody = t.Object({
 	session_id: t.String(),
 	status: t.Literal("completed"),
 	pipeline_version: t.String(),
-	processed_files: t.Number(),
-	total_files: t.Number(),
 	results: t.Array(resultSchema),
 });
 type CompletionBody = typeof completionBody.static;
@@ -58,8 +53,6 @@ const errorBody = t.Object({
 	session_id: t.String(),
 	status: t.Literal("failed"),
 	error: t.String(),
-	processed_files: t.Number(),
-	total_files: t.Number(),
 	partial_results: t.Array(resultSchema),
 });
 type ErrorBody = typeof errorBody.static;
@@ -104,27 +97,6 @@ export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipelin
 			return { status: "ok" };
 		},
 		{ body: callbackBody },
-	)
-	.get(
-		"/debug/:message",
-		async ({ params, headers, status }) => {
-			const secretHeader = getSecretHeaderValue(headers);
-			// if (!validateSecret(secretHeader))
-			// 	return status(401, { status: "error", message: "Unauthorized" });
-
-			const taskId = await publishPipelineDebugMessage(params.message);
-
-			return {
-				status: "queued",
-				message: params.message,
-				taskId,
-			};
-		},
-		{
-			params: t.Object({
-				message: t.String({ minLength: 1, maxLength: 500 }),
-			}),
-		},
 	);
 
 async function handleCompletion(

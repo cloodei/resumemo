@@ -8,19 +8,13 @@ class FileManifestItem(BaseModel):
     file_id: int
     storage_key: str
     original_name: str
-    mime_type: str
-    size: int
 
 
 class JobPayload(BaseModel):
     """The full job message received from the queue."""
 
     session_id: str
-    callback_url: str
-    callback_secret: str
     job_description: str
-    job_title: str | None = None
-    pipeline_version: str
     files: list[FileManifestItem]
 
 
@@ -44,6 +38,8 @@ class CandidateProfile(BaseModel):
     """Structured data extracted from a resume."""
 
     name: str | None = None
+    identity_source: str | None = None
+    name_confidence: float | None = None
     email: str | None = None
     phone: str | None = None
     skills: list[str] = Field(default_factory=list)
@@ -52,6 +48,7 @@ class CandidateProfile(BaseModel):
     certifications: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
     total_experience_years: float | None = None
+    parse_warnings: list[str] = Field(default_factory=list)
 
 
 

@@ -13,7 +13,6 @@ import logging
 import time
 
 from celery import Celery
-from celery.utils.log import get_task_logger
 from celery.exceptions import SoftTimeLimitExceeded
 
 from utils.callback import send_completion, send_error
@@ -25,7 +24,6 @@ from utils.storage import fetch_file
 from stages.summarize import summarize_candidate
 
 logger = logging.getLogger(__name__)
-task_logger = get_task_logger(__name__)
 
 app = Celery("pipeline")
 app.config_from_object("celeryconfig")
@@ -51,7 +49,6 @@ def process_session(self, raw_payload: dict):
         extra={
             "session_id": payload.session_id,
             "total_files": len(payload.files),
-            "pipeline_version": payload.pipeline_version,
         },
     )
 
@@ -132,20 +129,11 @@ def process_session(self, raw_payload: dict):
             partial_results=results,
         )
         raise
-
-
-@app.task(name="pipeline.debug_message")
-def debug_message(message: str):
-    """Read a debug message from the queue and log it."""
-    task_logger.info("Pipeline debug message: %s", message)
-    return {"status": "received", "message": message}
-
-
 def _process_single_file(file: FileManifestItem, payload: JobPayload):
     """Run the full pipeline on a single resume file."""
     # Stage 1: Fetch and extract text
     file_bytes = fetch_file(file.storage_key)
-    raw_text = extract_text(file_bytes, file.mime_type)
+    raw_text = extract_text(file_bytes, file.original_name)
 
     if not raw_text.strip():
         return FileResult(
@@ -169,7 +157,6 @@ def _process_single_file(file: FileManifestItem, payload: JobPayload):
         raw_text=raw_text,
         profile=profile,
         job_description=payload.job_description,
-        job_title=payload.job_title,
     )
 
     # Stage 4: Generate summary

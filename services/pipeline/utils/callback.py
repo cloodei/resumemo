@@ -6,7 +6,14 @@ import logging
 import time
 import httpx
 
-from config import CALLBACK_RETRY_ATTEMPTS, CALLBACK_RETRY_BACKOFF, PIPELINE_SECRET_HEADER_NAME, PIPELINE_VERSION
+from config import (
+    CALLBACK_RETRY_ATTEMPTS,
+    CALLBACK_RETRY_BACKOFF,
+    PIPELINE_CALLBACK_SECRET,
+    PIPELINE_CALLBACK_URL,
+    PIPELINE_SECRET_HEADER_NAME,
+    PIPELINE_VERSION,
+)
 from models import JobPayload
 
 logger = logging.getLogger(__name__)
@@ -15,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _post_callback(payload: JobPayload, body: dict):
     """POST a callback to the Elysia API with retry logic."""
     headers = {
-        PIPELINE_SECRET_HEADER_NAME: payload.callback_secret,
+        PIPELINE_SECRET_HEADER_NAME: PIPELINE_CALLBACK_SECRET,
         "Content-Type": "application/json",
     }
 
@@ -24,7 +31,7 @@ def _post_callback(payload: JobPayload, body: dict):
     for attempt in range(CALLBACK_RETRY_ATTEMPTS):
         try:
             with httpx.Client(timeout=30) as client:
-                response = client.post(payload.callback_url, json=body, headers=headers)
+                response = client.post(PIPELINE_CALLBACK_URL, json=body, headers=headers)
                 response.raise_for_status()
 
             logger.info(
@@ -70,8 +77,6 @@ def send_completion(payload: JobPayload, results: list[dict]):
         "session_id": payload.session_id,
         "status": "completed",
         "pipeline_version": PIPELINE_VERSION,
-        "processed_files": len(results),
-        "total_files": len(payload.files),
         "results": results,
     }
     _post_callback(payload, body)
@@ -88,8 +93,6 @@ def send_error(
         "session_id": payload.session_id,
         "status": "failed",
         "error": error,
-        "processed_files": len(partial_results) if partial_results else 0,
-        "total_files": len(payload.files),
         "partial_results": partial_results or [],
     }
     try:

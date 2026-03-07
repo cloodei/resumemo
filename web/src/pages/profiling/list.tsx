@@ -18,7 +18,7 @@ type ProfilingSession = {
 	name: string
 	jobTitle: string | null
 	jobDescription: string
-	status: "ready" | "processing" | "completed" | "failed"
+	status: "processing" | "completed" | "failed"
 	totalFiles: number
 	errorMessage: string | null
 	createdAt: Date

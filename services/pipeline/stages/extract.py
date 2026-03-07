@@ -2,42 +2,44 @@
 from __future__ import annotations
 import logging
 from io import BytesIO
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-def extract_text(file_bytes: bytes, mime_type: str):
-    """Extract plain text from a file based on its MIME type.
+def extract_text(file_bytes: bytes, file_name: str):
+    """Extract plain text from a file based on its filename extension.
 
     Args:
         file_bytes: Raw file contents.
-        mime_type: The MIME type of the file.
+        file_name: Original file name.
 
     Returns:
         Extracted plain text, or empty string if extraction fails.
     """
+    extension = Path(file_name).suffix.lower()
     extractors = {
-        "application/pdf": _extract_pdf,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": _extract_docx,
-        "text/plain": _extract_txt,
+        ".pdf": _extract_pdf,
+        ".docx": _extract_docx,
+        ".txt": _extract_txt,
     }
 
-    extractor = extractors.get(mime_type)
+    extractor = extractors.get(extension)
     if extractor is None:
-        logger.warning("Unsupported MIME type for extraction", extra={"mime_type": mime_type})
+        logger.warning("Unsupported file extension for extraction", extra={"file_name": file_name, "extension": extension})
         return ""
 
     try:
         text = extractor(file_bytes)
         logger.info(
             "Text extracted",
-            extra={"mime_type": mime_type, "text_length": len(text)},
+            extra={"file_name": file_name, "extension": extension, "text_length": len(text)},
         )
         return text
     except Exception as e:
         logger.error(
             "Text extraction failed",
-            extra={"mime_type": mime_type, "error": str(e)},
+            extra={"file_name": file_name, "extension": extension, "error": str(e)},
             exc_info=True,
         )
         return ""
