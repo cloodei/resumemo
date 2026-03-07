@@ -154,29 +154,25 @@ This section traces a single profiling session from start to finish.
 
 ### 4.1 Trigger
 
-**Precondition**: A profiling session exists in `profiling_session` with status `ready`. It has associated files in `resume_file` linked through `profiling_session_file`.
+**Precondition**: The recruiter submits a new profiling session through the create flow. Sessions are created directly in `processing` state.
 
-1. Recruiter clicks "Start Profiling" in the UI.
-2. Frontend calls `POST /api/v2/sessions/:id/start`.
+1. Recruiter fills out the new profiling form and uploads resumes.
+2. Frontend calls `POST /api/v2/sessions/create`.
 3. Elysia handler:
-   a. Verifies the session belongs to the authenticated user and has status `ready`.
-   b. Updates `profiling_session.status` to `processing`.
-   c. Inserts a row in `pipeline_job` with status `queued`.
-   d. Queries the session's files (joins `profiling_session_file` + `resume_file`) to build the file manifest.
-   e. Publishes a job message to RabbitMQ queue `profiling.jobs`.
-   f. Returns `{ status: "ok", message: "Profiling started" }` to the frontend.
+   a. Creates the `profiling_session` row with status `processing`.
+   b. Persists uploaded file metadata in `resume_file`.
+   c. Publishes a minimal job message to RabbitMQ queue `profiling.jobs`.
+   d. Returns `{ status: "processing", sessionId: "..." }` to the frontend.
 
 ### 4.2 Processing
 
 4. Celery worker receives the job message from RabbitMQ.
-5. Worker sends a **progress callback** to Elysia: `{ status: "running", processed: 0, total: N }`.
 6. For each file in the manifest:
-   a. **Extract**: Fetch the file from R2 by `storage_key`. Detect format. Extract raw text.
+   a. **Extract**: Fetch the file from R2 by `storage_key`. Detect format from the filename extension. Extract raw text.
    b. **Parse**: Run spaCy NER and regex patterns over the raw text. Produce a structured `CandidateProfile`.
-   c. **Score**: Vectorize the job description and resume text with TF-IDF. Compute cosine similarity. Apply skill-match and experience bonuses. Produce a `ScoringResult`.
+   c. **Score**: Compute a hybrid score using lexical TF-IDF similarity, spaCy vector similarity, skill overlap, and experience fit. Produce a `ScoringResult`.
    d. **Summarize**: Generate a template-based candidate summary from the parsed profile.
    e. Append the file's results to the batch.
-   f. Send a **progress callback**: `{ status: "running", processed: i, total: N }`.
 7. After all files are processed, worker sends a **completion callback** with the full results array.
 
 ### 4.3 Finalization
@@ -184,9 +180,8 @@ This section traces a single profiling session from start to finish.
 8. Elysia callback handler receives the completion payload.
 9. Handler validates the shared secret and payload structure.
 10. Handler inserts one `candidate_result` row per file.
-11. Handler updates `pipeline_job`: status `completed`, `completed_at` timestamp, `processed_files` count.
-12. Handler updates `profiling_session.status` to `completed`.
-13. If any error occurred, handler sets status to `failed` and records `error_message`.
+11. Handler updates `profiling_session.status` to `completed`.
+12. If any error occurred, handler sets status to `failed` and records `error_message`.
 
 ### 4.4 Display
 
@@ -217,19 +212,12 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
 ```json
 {
   "session_id": "019450a1-b2c3-7def-8901-234567890abc",
-  "job_id": "019450a1-ffff-7def-8901-234567890abc",
-  "callback_url": "https://api.resumemo.com/api/internal/pipeline/callback",
-  "callback_secret": "hmac-shared-secret",
   "job_description": "We are looking for a senior software engineer with 5+ years of experience in Python, distributed systems, and cloud infrastructure...",
-  "job_title": "Senior Software Engineer",
-  "pipeline_version": "0.1.0",
   "files": [
     {
       "file_id": 42,
       "storage_key": "019450a1-b2c3-7def/resume-john-doe.pdf",
-      "original_name": "resume-john-doe.pdf",
-      "mime_type": "application/pdf",
-      "size": 245891
+      "original_name": "resume-john-doe.pdf"
     }
   ]
 }
@@ -240,48 +228,22 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
 | Field | Type | Description |
 |-------|------|-------------|
 | `session_id` | UUID string | The profiling session this job belongs to. |
-| `job_id` | UUID string | The `pipeline_job` row ID for tracking. |
-| `callback_url` | URL string | Where the worker POSTs results and progress updates. |
-| `callback_secret` | string | HMAC secret for authenticating callbacks. Sent as `Authorization: Bearer <secret>` header. |
 | `job_description` | string | The full job description text to score against. |
-| `job_title` | string or null | Optional job title for additional context. |
-| `pipeline_version` | string | Semver of the pipeline code. Stored with results for reproducibility. |
 | `files` | array | Manifest of files to process. |
 | `files[].file_id` | number | The `resume_file.id` primary key. Used to link results back. |
 | `files[].storage_key` | string | The R2 object key to fetch the file. |
 | `files[].original_name` | string | Original filename for logging and display. |
-| `files[].mime_type` | string | MIME type (`application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/plain`). |
-| `files[].size` | number | File size in bytes. |
 
-### 5.2 Progress Callback (Worker -> Elysia)
+### 5.2 Completion Callback (Worker -> Elysia)
 
-`POST {callback_url}` with `Authorization: Bearer {callback_secret}`.
-
-```json
-{
-  "type": "progress",
-  "session_id": "019450a1-b2c3-7def-8901-234567890abc",
-  "job_id": "019450a1-ffff-7def-8901-234567890abc",
-  "status": "running",
-  "processed_files": 3,
-  "total_files": 10,
-  "current_file": "resume-jane-smith.pdf"
-}
-```
-
-### 5.3 Completion Callback (Worker -> Elysia)
-
-`POST {callback_url}` with `Authorization: Bearer {callback_secret}`.
+`POST /api/internal/pipeline/callback` with the configured pipeline secret header.
 
 ```json
 {
   "type": "completion",
   "session_id": "019450a1-b2c3-7def-8901-234567890abc",
-  "job_id": "019450a1-ffff-7def-8901-234567890abc",
   "status": "completed",
   "pipeline_version": "0.1.0",
-  "processed_files": 10,
-  "total_files": 10,
   "results": [
     {
       "file_id": 42,
@@ -318,12 +280,17 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
       "score_breakdown": {
         "text_similarity": {
           "score": 82.1,
-          "weight": 0.4,
-          "description": "TF-IDF cosine similarity between resume and job description"
+          "weight": 0.25,
+          "description": "Lexical TF-IDF similarity between the resume and job description"
+        },
+        "semantic_similarity": {
+          "score": 86.4,
+          "weight": 0.25,
+          "description": "Semantic similarity using spaCy document vectors"
         },
         "skill_match": {
           "score": 90.0,
-          "weight": 0.35,
+          "weight": 0.30,
           "matched": ["Python", "Kubernetes", "AWS"],
           "missing": ["Terraform"],
           "extra": ["Docker", "PostgreSQL"],
@@ -331,7 +298,7 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
         },
         "experience_fit": {
           "score": 95.0,
-          "weight": 0.25,
+          "weight": 0.20,
           "required_years": 5,
           "candidate_years": 6.5,
           "description": "Experience duration relative to requirement"
@@ -343,19 +310,16 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
 }
 ```
 
-### 5.4 Error Callback (Worker -> Elysia)
+### 5.3 Error Callback (Worker -> Elysia)
 
-`POST {callback_url}` with `Authorization: Bearer {callback_secret}`.
+`POST /api/internal/pipeline/callback` with the configured pipeline secret header.
 
 ```json
 {
   "type": "error",
   "session_id": "019450a1-b2c3-7def-8901-234567890abc",
-  "job_id": "019450a1-ffff-7def-8901-234567890abc",
   "status": "failed",
   "error": "Failed to fetch file from R2: AccessDenied",
-  "processed_files": 3,
-  "total_files": 10,
   "partial_results": []
 }
 ```

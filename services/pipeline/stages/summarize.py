@@ -13,7 +13,7 @@ def summarize_candidate(profile: CandidateProfile, scoring: ScoringResult):
     Uses template-based generation (no LLM). Constructs sentences from
     structured fields and scoring highlights.
     """
-    if profile.name_confidence is not None and profile.name_confidence < 0.5:
+    if _requires_fallback_summary(profile):
         return _build_fallback_summary(profile, scoring)
 
     sentences: list[str] = []
@@ -52,6 +52,15 @@ def _build_fallback_summary(profile: "CandidateProfile", scoring: "ScoringResult
     return "Candidate details were only partially extracted from the resume. Review the source file to verify identity and experience."
 
 
+def _requires_fallback_summary(profile: "CandidateProfile") -> bool:
+    warnings = set(profile.parse_warnings or [])
+    if profile.name_confidence is not None and profile.name_confidence < 0.5:
+        return True
+    if "work_history_not_confident" in warnings and "skills_not_confident" in warnings:
+        return True
+    return False
+
+
 def _build_opening(profile: "CandidateProfile"):
     """Build the opening sentence: name, title, experience, skills."""
     name = profile.name or "This candidate"
@@ -76,7 +85,7 @@ def _build_opening(profile: "CandidateProfile"):
     # Top skills
     skills_part = ""
     if profile.skills:
-        top_skills = profile.skills[:3]
+        top_skills = [skill for skill in profile.skills[:3] if _looks_like_skill(skill)]
         if len(top_skills) == 1:
             skills_part = f" specializing in {top_skills[0]}"
         elif len(top_skills) == 2:
@@ -98,6 +107,21 @@ def _looks_like_role_title(value: str) -> bool:
     bad_phrases = ("summary", "objective", "curriculum vitae", "resume")
     lowered = normalized.lower()
     if any(phrase in lowered for phrase in bad_phrases):
+        return False
+    return True
+
+
+def _looks_like_skill(value: str) -> bool:
+    normalized = value.strip()
+    if not normalized:
+        return False
+    if len(normalized) > 40:
+        return False
+    if any(char.isdigit() for char in normalized):
+        return False
+    bad_terms = ("summary", "experience", "education", "references")
+    lowered = normalized.lower()
+    if any(term in lowered for term in bad_terms):
         return False
     return True
 
@@ -126,9 +150,12 @@ def _build_highlight(profile: "CandidateProfile", scoring: "ScoringResult"):
     """Build a highlight sentence based on certifications or scoring."""
     # Certifications
     if profile.certifications:
-        if len(profile.certifications) == 1:
-            return f"Certified in {profile.certifications[0]}."
-        certs = profile.certifications[:3]
+        filtered = [cert for cert in profile.certifications if len(cert) <= 80 and "@" not in cert][:3]
+        if not filtered:
+            return None
+        if len(filtered) == 1:
+            return f"Certified in {filtered[0]}."
+        certs = filtered
         return f"Holds certifications in {', '.join(certs[:-1])}, and {certs[-1]}."
 
     # Strong skill match

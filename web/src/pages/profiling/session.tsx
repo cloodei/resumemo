@@ -19,6 +19,7 @@ import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -58,11 +59,24 @@ type CandidateResult = {
 		identity_source?: string | null
 		name_confidence?: number | null
 		parse_warnings?: string[] | null
+		total_experience_years?: number | null
 	} | null
 	overallScore: number
 	summary: string
 	skillsMatched: string[] | null
 	originalName: string
+}
+
+type CandidateResultDetail = CandidateResult & {
+	rawText: string
+	scoreBreakdown: Record<string, {
+		score: number
+		weight: number
+		description: string
+		details?: Record<string, unknown>
+	}>
+	createdAt?: string | Date | null
+	mimeType?: string
 }
 
 function getDisplayCandidateName(candidate: CandidateResult) {
@@ -76,6 +90,28 @@ function getDisplayCandidateName(candidate: CandidateResult) {
 function hasLowConfidenceIdentity(candidate: CandidateResult) {
 	const confidence = Number(candidate.parsedProfile?.name_confidence ?? 0)
 	return !candidate.candidateName || confidence < 0.5
+}
+
+function needsManualReview(candidate: CandidateResult) {
+	return (candidate.parsedProfile?.parse_warnings?.length ?? 0) > 0
+}
+
+function getManualReviewLabel(candidate: CandidateResult) {
+	const warnings = new Set(candidate.parsedProfile?.parse_warnings ?? [])
+	if (warnings.has("name_missing_or_invalid"))
+		return "Identity check needed"
+	if (warnings.has("work_history_not_confident"))
+		return "Experience check needed"
+	if (warnings.has("skills_not_confident"))
+		return "Skills check needed"
+	return "Manual review recommended"
+}
+
+function getExperienceLabel(candidate: CandidateResult) {
+	const years = candidate.parsedProfile?.total_experience_years
+	if (typeof years !== "number")
+		return null
+	return `${years} year${years === 1 ? "" : "s"} experience`
 }
 
 function statusBadgeVariant(status: ProfilingSession["status"]) {
@@ -97,6 +133,9 @@ export default function ProfilingResultsPage() {
 	const [results, setResults] = useState<CandidateResult[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [isExporting, setIsExporting] = useState(false)
+	const [selectedResult, setSelectedResult] = useState<CandidateResultDetail | null>(null)
+	const [isDetailOpen, setIsDetailOpen] = useState(false)
+	const [isDetailLoading, setIsDetailLoading] = useState(false)
 
 	useEffect(() => {
 		if (id) {
@@ -183,6 +222,30 @@ export default function ProfilingResultsPage() {
 		}
 	}
 
+	const openCandidateDetail = async (candidate: CandidateResult) => {
+		if (!id) return
+		setIsDetailOpen(true)
+		setIsDetailLoading(true)
+
+		try {
+			const { data, error } = await api.api.v2.sessions({ id }).results({ resultId: candidate.id }).get()
+			if (error || !data?.result)
+				throw new Error(getEdenErrorMessage(error) ?? "Could not load candidate details")
+
+			setSelectedResult({
+				...data.result,
+				overallScore: Number((data.result as any).overallScore),
+			} as CandidateResultDetail)
+		}
+		catch (err) {
+			toast.error(getErrorMessage(err, "Failed to load candidate details"))
+			setIsDetailOpen(false)
+		}
+		finally {
+			setIsDetailLoading(false)
+		}
+	}
+
 	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -198,15 +261,16 @@ export default function ProfilingResultsPage() {
 
 	const isCompleted = session.status === "completed"
 	const isFailed = session.status === "failed"
+	const manualReviewCount = results.filter(needsManualReview).length
 
 	const summaryHighlights = [
 		"Strong overall alignment with specified technical requirements.",
 		`${results.filter(r => r.overallScore > 80).length} candidates exceed the 80/100 threshold.`,
-		"Multiple candidates flagged with senior leadership experience."
+		manualReviewCount > 0 ? `${manualReviewCount} candidate${manualReviewCount === 1 ? " requires" : "s require"} manual review for extracted details.` : "No parse anomalies were flagged in this batch."
 	]
 
 	return (
-		<div className="flex flex-col gap-8">
+			<div className="flex flex-col gap-8">
 			{/* Header */}
 			<section className="flex flex-col gap-4">
 				<div className="flex flex-wrap items-center gap-3">
@@ -364,8 +428,8 @@ export default function ProfilingResultsPage() {
 									<CardDescription className="text-sm mt-1">Sort and filter to build interview-ready slates.</CardDescription>
 								</div>
 								<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-									<span>Scoring model: Default similarity</span>
-									<Badge variant="outline">Confidence: High</Badge>
+									<span>Scoring model: Hybrid lexical + semantic</span>
+									<Badge variant="outline">{manualReviewCount > 0 ? `Review: ${manualReviewCount}` : "Review: Clear"}</Badge>
 								</div>
 							</CardHeader>
 							<CardContent className="space-y-4">
@@ -390,6 +454,7 @@ export default function ProfilingResultsPage() {
 												<TableRow
 													key={candidate.id}
 													className="group align-top transition-all hover:bg-muted/55 cursor-pointer"
+													onClick={() => void openCandidateDetail(candidate)}
 												>
 													<TableCell>
 														<Badge variant="secondary" className="text-xs shadow-sm">
@@ -397,20 +462,23 @@ export default function ProfilingResultsPage() {
 														</Badge>
 													</TableCell>
 													<TableCell className="space-y-1">
-									<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
-										{getDisplayCandidateName(candidate)}
-									</p>
-									<p className="text-xs text-muted-foreground">Score {candidate.overallScore}/100</p>
-									<p className="text-xs text-muted-foreground" title={candidate.originalName}>
-										Resume: {candidate.originalName}
-									</p>
-									{hasLowConfidenceIdentity(candidate) && (
-										<p className="text-[11px] text-amber-600">
-											Name hidden due to low extraction confidence
-										</p>
-									)}
-									{candidate.candidateEmail && (
-										<p className="text-xs text-muted-foreground flex items-center gap-1.5">
+														<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
+															{getDisplayCandidateName(candidate)}
+														</p>
+														<p className="text-xs text-muted-foreground">Score {candidate.overallScore}/100</p>
+														<p className="text-xs text-muted-foreground" title={candidate.originalName}>
+															Resume: {candidate.originalName}
+														</p>
+														{needsManualReview(candidate) && (
+															<p className="text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>
+														)}
+														{hasLowConfidenceIdentity(candidate) && (
+															<p className="text-[11px] text-amber-600">
+																Name hidden due to low extraction confidence
+															</p>
+														)}
+														{candidate.candidateEmail && (
+															<p className="text-xs text-muted-foreground flex items-center gap-1.5">
 																<Mail className="size-3" />
 																{candidate.candidateEmail}
 															</p>
@@ -439,7 +507,10 @@ export default function ProfilingResultsPage() {
 																<Mail className="size-3.5" />
 																Reach out
 															</Button>
-															<Button size="sm" variant="ghost" className="gap-1">
+															<Button size="sm" variant="ghost" className="gap-1" onClick={(event) => {
+																event.stopPropagation()
+																void openCandidateDetail(candidate)
+															}}>
 																<ArrowUpRight className="size-3.5" />
 																Profile
 															</Button>
@@ -475,18 +546,24 @@ export default function ProfilingResultsPage() {
 
 								<CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
 									{results.slice(0, 2).map((candidate) => (
-										<div key={candidate.id} className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer">
+												<div key={candidate.id} className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer" onClick={() => void openCandidateDetail(candidate)}>
 											<p className="text-sm font-semibold text-foreground">{getDisplayCandidateName(candidate)}</p>
-											<p className="mt-1 text-xs">Score {candidate.overallScore}/100 • Rank #{candidate.rank}</p>
+											<p className="mt-1 text-xs">
+												Score {candidate.overallScore}/100 • Rank #{candidate.rank}
+												{getExperienceLabel(candidate) ? ` • ${getExperienceLabel(candidate)}` : ""}
+											</p>
 											<p className="mt-1 text-xs text-muted-foreground" title={candidate.originalName}>{candidate.originalName}</p>
+											{needsManualReview(candidate) && (
+												<p className="mt-1 text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>
+											)}
 											<p className="mt-3 text-xs leading-relaxed line-clamp-3">{candidate.summary}</p>
-											<Button size="sm" variant="ghost" className="mt-4 gap-2">
-												View resume
-												<ArrowUpRight className="size-4" />
-											</Button>
-										</div>
-									))}
-								</CardContent>
+													<Button size="sm" variant="ghost" className="mt-4 gap-2">
+														View resume
+														<ArrowUpRight className="size-4" />
+													</Button>
+													</div>
+											))}
+									</CardContent>
 								<CardFooter className="border-t bg-muted/20 py-4">
 									<Button size="sm" variant="secondary" className="w-full gap-2">
 										Compare candidates
@@ -496,6 +573,72 @@ export default function ProfilingResultsPage() {
 							</Card>
 						)}
 					</section>
+
+					<Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+						<DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+							<DialogHeader>
+								<DialogTitle>{selectedResult ? getDisplayCandidateName(selectedResult) : "Candidate detail"}</DialogTitle>
+								<DialogDescription>
+									{selectedResult?.originalName ?? "Inspect extracted fields, scores, and warnings."}
+								</DialogDescription>
+							</DialogHeader>
+
+							{isDetailLoading ? (
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<Loader2 className="size-4 animate-spin" /> Loading candidate detail...
+								</div>
+							) : selectedResult ? (
+								<div className="space-y-6 text-sm">
+									<div className="grid gap-3 sm:grid-cols-2">
+										<SummaryTile label="Overall score" value={`${selectedResult.overallScore}/100`} subtext="Hybrid ranking" />
+										<SummaryTile label="Experience" value={getExperienceLabel(selectedResult) ?? "Unknown"} subtext="Parsed from work history" />
+									</div>
+
+									<div className="rounded-xl bg-muted/40 p-4">
+										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Summary</p>
+										<p className="mt-2 leading-6 text-foreground">{selectedResult.summary}</p>
+									</div>
+
+									<div className="grid gap-4 sm:grid-cols-2">
+										<div className="rounded-xl border p-4">
+											<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Identity</p>
+											<p className="mt-2 font-medium text-foreground">{getDisplayCandidateName(selectedResult)}</p>
+											<p className="mt-1 text-xs text-muted-foreground">Source file: {selectedResult.originalName}</p>
+											{selectedResult.candidateEmail && <p className="mt-2 text-xs text-muted-foreground">Email: {selectedResult.candidateEmail}</p>}
+											{selectedResult.candidatePhone && <p className="mt-1 text-xs text-muted-foreground">Phone: {selectedResult.candidatePhone}</p>}
+										</div>
+
+										<div className="rounded-xl border p-4">
+											<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Parse warnings</p>
+											<div className="mt-2 flex flex-wrap gap-2">
+												{(selectedResult.parsedProfile?.parse_warnings?.length ?? 0) > 0
+													? selectedResult.parsedProfile?.parse_warnings?.map((warning) => <Badge key={warning} variant="outline">{warning}</Badge>)
+													: <span className="text-sm text-muted-foreground">No warnings</span>}
+											</div>
+										</div>
+									</div>
+
+									<div className="rounded-xl border p-4">
+										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Score breakdown</p>
+										<div className="mt-3 grid gap-3 sm:grid-cols-2">
+											{Object.entries(selectedResult.scoreBreakdown ?? {}).map(([key, score]) => (
+												<div key={key} className="rounded-lg bg-muted/40 p-3">
+													<p className="font-medium text-foreground">{key.replace(/_/g, " ")}</p>
+													<p className="mt-1 text-xs text-muted-foreground">{score.description}</p>
+													<p className="mt-2 text-sm text-foreground">Score {score.score}/100 • Weight {score.weight}</p>
+												</div>
+											))}
+										</div>
+									</div>
+
+									<div className="rounded-xl border p-4">
+										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Extracted raw text preview</p>
+										<pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{selectedResult.rawText.slice(0, 4000)}</pre>
+									</div>
+								</div>
+							) : null}
+						</DialogContent>
+					</Dialog>
 				</>
 			)}
 

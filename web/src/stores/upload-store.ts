@@ -53,7 +53,7 @@ const EMPTY_FORM: SessionFormData = {
 	jobDescription: "",
 } as const
 
-interface UploadStoreV2 {
+interface UploadStore {
 	files: UploadFile[]
 	phase: UploadPhase
 	formData: SessionFormData
@@ -69,7 +69,7 @@ interface UploadStoreV2 {
 	}
 }
 
-const uploadStoreV2 = create<UploadStoreV2>()(
+const uploadStore = create<UploadStore>()(
 	persist(
 		(set, get) => ({
 			files: [],
@@ -136,7 +136,7 @@ const uploadStoreV2 = create<UploadStoreV2>()(
 			},
 		}),
 		{
-			name: "resumemo-uploads-v2",
+			name: "resumemo-uploads",
 			storage: createJSONStorage(() => sessionStorage),
 			partialize: (state) => ({
 				phase: state.phase,
@@ -182,7 +182,7 @@ const uploadStoreV2 = create<UploadStoreV2>()(
 	),
 )
 
-export const useUploadFiles = () => uploadStoreV2(state => state.files)
-export const useUploadPhase = () => uploadStoreV2(state => state.phase)
-export const useUploadFormData = () => uploadStoreV2(state => state.formData)
-export const useUploadActions = () => uploadStoreV2(state => state.actions)
+export const useUploadFiles = () => uploadStore(state => state.files)
+export const useUploadPhase = () => uploadStore(state => state.phase)
+export const useUploadFormData = () => uploadStore(state => state.formData)
+export const useUploadActions = () => uploadStore(state => state.actions)

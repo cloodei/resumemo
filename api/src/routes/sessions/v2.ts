@@ -547,6 +547,10 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					"Name Confidence",
 					"Parse Warnings",
 					"Overall Score",
+					"Lexical Score",
+					"Semantic Score",
+					"Skill Score",
+					"Experience Score",
 					"Summary",
 					"Skills Matched",
 					"Resume File",
@@ -562,6 +566,10 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					escapeCsv(getNameConfidence(r.parsedProfile)),
 					escapeCsv(getParseWarnings(r.parsedProfile)),
 					r.overallScore,
+					getBreakdownScore(r.scoreBreakdown, "text_similarity"),
+					getBreakdownScore(r.scoreBreakdown, "semantic_similarity"),
+					getBreakdownScore(r.scoreBreakdown, "skill_match"),
+					getBreakdownScore(r.scoreBreakdown, "experience_fit"),
 					escapeCsv(stripMarkup(r.summary)),
 					escapeCsv((r.skillsMatched as string[]).join("; ")),
 					escapeCsv(r.originalName),
@@ -630,4 +638,9 @@ function getParseWarnings(parsedProfile: unknown) {
 
 function stripMarkup(value: string) {
 	return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function getBreakdownScore(scoreBreakdown: unknown, key: string) {
+	const score = (scoreBreakdown as Record<string, { score?: number | string }> | null)?.[key]?.score;
+	return typeof score === "number" || typeof score === "string" ? String(score) : "";
 }

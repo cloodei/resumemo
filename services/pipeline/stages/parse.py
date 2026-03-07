@@ -94,6 +94,32 @@ ROLE_HEADER_PATTERN = re.compile(
     r"\b(?:summary|objective|contact|curriculum vitae|resume|references|profile)\b",
     re.IGNORECASE,
 )
+MONTH_MAP = {
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+}
+SKILL_STOPWORDS = {
+    "summary",
+    "professional",
+    "experience",
+    "work",
+    "education",
+    "skills",
+    "responsible",
+    "references",
+    "client",
+    "project",
+}
 
 
 def parse_resume(raw_text: str):
@@ -117,8 +143,8 @@ def parse_resume(raw_text: str):
     sections = _identify_sections(lines)
 
     # Extract structured fields
-    skills = _extract_skills(raw_text, doc)
-    work_history = _extract_work_history(sections.get("experience", []), doc)
+    skills = _extract_skills(raw_text, sections.get("skills", []))
+    work_history = _extract_work_history(sections.get("experience", []))
     work_history, work_warnings = _sanitize_work_history(work_history)
     education = _extract_education(sections.get("education", []), doc)
     certifications = _extract_certifications(sections.get("certifications", []))
@@ -139,8 +165,27 @@ def parse_resume(raw_text: str):
         certifications=certifications,
         projects=projects,
         total_experience_years=total_years,
-        parse_warnings=[*name_warnings, *work_warnings],
+        parse_warnings=_collect_parse_warnings(
+            name_warnings=name_warnings,
+            work_warnings=work_warnings,
+            skills=skills,
+            work_history=work_history,
+        ),
     )
+
+
+def _collect_parse_warnings(
+    name_warnings: list[str],
+    work_warnings: list[str],
+    skills: list[str],
+    work_history: list[WorkEntry],
+) -> list[str]:
+    warnings = [*name_warnings, *work_warnings]
+    if not skills:
+        warnings.append("skills_not_confident")
+    if not work_history:
+        warnings.append("work_history_not_confident")
+    return sorted(set(warnings))
 
 
 def _extract_name(doc, lines: list[str]):
@@ -247,36 +292,45 @@ def _identify_sections(lines: list[str]):
     return sections
 
 
-def _extract_skills(raw_text: str, doc):
-    """Extract skills via taxonomy matching and NER."""
+def _extract_skills(raw_text: str, skills_section_lines: list[str]):
+    """Extract skills with section-aware taxonomy matching and ranking."""
     taxonomy = _get_skills_taxonomy()
-    found_skills: set[str] = set()
+    if not taxonomy:
+        return []
 
     text_lower = raw_text.lower()
+    section_text = "\n".join(skills_section_lines)
+    section_lower = section_text.lower()
+    found_skills: dict[str, tuple[int, int]] = {}
 
-    # Taxonomy matching
     for skill in taxonomy:
-        # Match whole words/phrases
+        if skill in SKILL_STOPWORDS:
+            continue
+
         pattern = r"\b" + re.escape(skill) + r"\b"
-        if re.search(pattern, text_lower):
-            # Use original casing from taxonomy where possible
-            found_skills.add(skill)
+        in_section = bool(section_lower and re.search(pattern, section_lower))
+        in_resume = bool(re.search(pattern, text_lower))
+        if not in_section and not in_resume:
+            continue
 
-    # Try to preserve original casing by scanning the text
-    cased_skills: list[str] = []
-    for skill in found_skills:
-        # Find the original-case version in the text
-        pattern = re.compile(re.escape(skill), re.IGNORECASE)
-        match = pattern.search(raw_text)
-        if match:
-            cased_skills.append(match.group(0))
-        else:
-            cased_skills.append(skill)
+        position_source = section_text if in_section else raw_text
+        match = re.search(pattern, position_source, re.IGNORECASE)
+        position = match.start() if match else 999_999
+        found_skills[skill] = (0 if in_section else 1, position)
 
-    return sorted(set(cased_skills), key=str.lower)
+    ranked_skills = sorted(found_skills.items(), key=lambda item: (item[1][0], item[1][1], item[0]))
+    return [_normalize_skill_display(skill, raw_text) for skill, _ in ranked_skills[:20]]
 
 
-def _extract_work_history(section_lines: list[str], doc):
+def _normalize_skill_display(skill: str, raw_text: str) -> str:
+    pattern = re.compile(r"\b" + re.escape(skill) + r"\b", re.IGNORECASE)
+    match = pattern.search(raw_text)
+    if match:
+        return match.group(0)
+    return skill.title() if len(skill) > 3 else skill.upper()
+
+
+def _extract_work_history(section_lines: list[str]):
     """Extract work history entries from the experience section."""
     if not section_lines:
         return []
@@ -284,13 +338,15 @@ def _extract_work_history(section_lines: list[str], doc):
     entries: list[WorkEntry] = []
     current_entry: dict = {}
     description_lines: list[str] = []
+    recent_context: list[str] = []
 
     for line in section_lines:
-        if not line:
+        stripped_line = line.strip()
+        if not stripped_line:
             continue
 
         # Check if this line contains a date range (likely a new entry)
-        date_match = DATE_RANGE_PATTERN.search(line)
+        date_match = DATE_RANGE_PATTERN.search(stripped_line)
         if date_match:
             # Save previous entry
             if current_entry:
@@ -298,10 +354,16 @@ def _extract_work_history(section_lines: list[str], doc):
                 entries.append(WorkEntry(**current_entry))
                 description_lines = []
 
+            title, company = _extract_role_and_company_from_context(
+                line=stripped_line,
+                date_match=date_match,
+                recent_context=recent_context,
+            )
+
             # Start a new entry
             current_entry = {
-                "title": line[:date_match.start()].strip(" -–—|,") or None,
-                "company": None,
+                "title": title,
+                "company": company,
                 "start_date": None,
                 "end_date": None,
             }
@@ -313,16 +375,15 @@ def _extract_work_history(section_lines: list[str], doc):
                 current_entry["end_date"] = dates[1]
 
             # Try to find company name in the remaining part of the line
-            remaining = line[date_match.end():].strip(" -–—|,")
-            if remaining:
-                current_entry["company"] = remaining
-
         elif current_entry:
             # Check if this line might be a company name (short, title-case, near the top)
-            if not current_entry.get("company") and len(line) < 100 and not line.startswith(("•", "-", "*", "·")):
-                current_entry["company"] = line
+            if not current_entry.get("company") and _looks_like_company_hint(stripped_line):
+                current_entry["company"] = stripped_line
             else:
-                description_lines.append(line)
+                description_lines.append(stripped_line)
+        if _looks_like_context_line(stripped_line) and not date_match:
+            recent_context.append(stripped_line)
+            recent_context = recent_context[-3:]
 
     # Save the last entry
     if current_entry:
@@ -330,6 +391,42 @@ def _extract_work_history(section_lines: list[str], doc):
         entries.append(WorkEntry(**current_entry))
 
     return entries
+
+
+def _extract_role_and_company_from_context(line: str, date_match: re.Match[str], recent_context: list[str]) -> tuple[str | None, str | None]:
+    prefix = line[:date_match.start()].strip(" -–—|,") or None
+    suffix = line[date_match.end():].strip(" -–—|,") or None
+
+    if prefix and suffix:
+        return prefix, suffix
+    if prefix:
+        company = recent_context[-1] if recent_context and recent_context[-1] != prefix else None
+        return prefix, company
+    if suffix and recent_context:
+        return recent_context[-1], suffix
+    if len(recent_context) >= 2:
+        return recent_context[-1], recent_context[-2]
+    if len(recent_context) == 1:
+        return recent_context[-1], suffix
+    return None, suffix
+
+
+def _looks_like_context_line(value: str) -> bool:
+    if not value or value.startswith(("•", "-", "*", "·")):
+        return False
+    if len(value) > 100:
+        return False
+    if "@" in value:
+        return False
+    return True
+
+
+def _looks_like_company_hint(value: str) -> bool:
+    if not _looks_like_context_line(value):
+        return False
+    if ROLE_HEADER_PATTERN.search(value):
+        return False
+    return len(value.split()) <= 8
 
 
 def _sanitize_work_history(work_history: list[WorkEntry]) -> tuple[list[WorkEntry], list[str]]:
@@ -483,30 +580,36 @@ def _compute_experience_years(work_history: list[WorkEntry]):
     if not work_history:
         return None
 
-    total_months = 0
-    valid_entries = 0
+    ranges: list[tuple[int, int]] = []
 
     for entry in work_history:
-        start_year = _year_from_date(entry.start_date)
-        if start_year is None:
+        start_month = _month_index_from_date(entry.start_date)
+        if start_month is None:
             continue
 
         if entry.end_date is None:
-            # Current position — use the current UTC year as reference
-            end_year = datetime.utcnow().year
+            current = datetime.utcnow()
+            end_month = current.year * 12 + current.month
         else:
-            end_year = _year_from_date(entry.end_date)
-            if end_year is None:
+            end_month = _month_index_from_date(entry.end_date)
+            if end_month is None:
                 continue
 
-        months = (end_year - start_year) * 12
-        if months > 0:
-            total_months += months
-            valid_entries += 1
+        if end_month > start_month:
+            ranges.append((start_month, end_month))
 
-    if valid_entries == 0:
+    if not ranges:
         return None
 
+    ranges.sort(key=lambda item: item[0])
+    merged: list[list[int]] = []
+    for start, end in ranges:
+        if not merged or start > merged[-1][1]:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+
+    total_months = sum(end - start for start, end in merged)
     return round(total_months / 12, 1)
 
 
@@ -516,3 +619,22 @@ def _year_from_date(date_str: str | None):
         return None
     match = YEAR_PATTERN.search(date_str)
     return int(match.group(0)) if match else None
+
+
+def _month_index_from_date(date_str: str | None):
+    if not date_str:
+        return None
+
+    year_match = YEAR_PATTERN.search(date_str)
+    if not year_match:
+        return None
+
+    year = int(year_match.group(0))
+    month = 1
+    lowered = date_str.lower()
+    for key, value in MONTH_MAP.items():
+        if key in lowered:
+            month = value
+            break
+
+    return year * 12 + month
