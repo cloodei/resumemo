@@ -66,15 +66,15 @@ For each resume in the session:
               ┌──────────>│  queue          │───────────┐
               │           └─────────────────┘           │
               │                                         v
-     ┌────────┴────────┐                    ┌───────────────────┐
-     │   Elysia API    │                    │   Celery Worker   │
-     │   (Bun/TS)      │                    │   (Python)        │
+     ┌────────┴──────── ┐                    ┌───────────────────┐
+     │   Elysia API     │                    │   Celery Worker   │
+     │   (Bun/TS)       │                    │   (Python)        │
      │                  │                    │                   │
      │  POST /:id/start │                    │  1. Fetch files   │
      │  - set status    │                    │     from R2       │
      │    "processing"  │                    │  2. Extract text  │
      │  - publish job   │                    │  3. Parse fields  │
-     │    to RabbitMQ   │   HTTP callback   │  4. Score vs JD   │
+     │    to RabbitMQ   │   HTTP callback    │  4. Score vs JD   │
      │                  │<───────────────────│  5. Summarize     │
      │  POST /callback  │                    │  6. POST results  │
      │  - validate      │                    │     to Elysia     │
@@ -159,34 +159,34 @@ This section traces a single profiling session from start to finish.
 1. Recruiter fills out the new profiling form and uploads resumes.
 2. Frontend calls `POST /api/v2/sessions/create`.
 3. Elysia handler:
-   a. Creates the `profiling_session` row with status `processing`.
-   b. Persists uploaded file metadata in `resume_file`.
-   c. Publishes a minimal job message to RabbitMQ queue `profiling.jobs`.
-   d. Returns `{ status: "processing", sessionId: "..." }` to the frontend.
+  a. Creates the `profiling_session` row with status `processing`.
+  b. Persists uploaded file metadata in `resume_file`.
+  c. Publishes a minimal job message to RabbitMQ queue `profiling.jobs`.
+  d. Returns `{ status: "processing", sessionId: "..." }` to the frontend.
 
 ### 4.2 Processing
 
 4. Celery worker receives the job message from RabbitMQ.
-6. For each file in the manifest:
-   a. **Extract**: Fetch the file from R2 by `storage_key`. Detect format from the filename extension. Extract raw text.
-   b. **Parse**: Run spaCy NER and regex patterns over the raw text. Produce a structured `CandidateProfile`.
-   c. **Score**: Compute a hybrid score using lexical TF-IDF similarity, spaCy vector similarity, skill overlap, and experience fit. Produce a `ScoringResult`.
-   d. **Summarize**: Generate a template-based candidate summary from the parsed profile.
-   e. Append the file's results to the batch.
-7. After all files are processed, worker sends a **completion callback** with the full results array.
+5. For each file in the manifest:
+  a. **Extract**: Fetch the file from R2 by `storage_key`. Detect format from the filename extension. Extract raw text.
+  b. **Parse**: Run spaCy NER and regex patterns over the raw text. Produce a structured `CandidateProfile`.
+  c. **Score**: Compute a hybrid score using lexical TF-IDF similarity, sentence-transformer embeddings, skill overlap, and experience fit. Produce a `ScoringResult`.
+  d. **Summarize**: Generate a template-based candidate summary from the parsed profile.
+  e. Append the file's results to the batch.
+6. After all files are processed, worker sends a **completion callback** with the full results array.
 
 ### 4.3 Finalization
 
-8. Elysia callback handler receives the completion payload.
-9. Handler validates the shared secret and payload structure.
-10. Handler inserts one `candidate_result` row per file.
-11. Handler updates `profiling_session.status` to `completed`.
-12. If any error occurred, handler sets status to `failed` and records `error_message`.
+7. Elysia callback handler receives the completion payload.
+8. Handler validates the shared secret and payload structure.
+9. Handler inserts one `candidate_result` row per file.
+10. Handler updates `profiling_session.status` to `completed`.
+11. If any error occurred, handler sets status to `failed` and records `error_message`.
 
 ### 4.4 Display
 
-14. Frontend polls `GET /api/v2/sessions/:id` and sees status `completed`.
-15. Frontend fetches `GET /api/v2/sessions/:id/results` to display scored, ranked candidates.
+12. Frontend polls `GET /api/v2/sessions/:id` and sees status `completed`.
+13. Frontend fetches `GET /api/v2/sessions/:id/results` to display scored, ranked candidates.
 
 ### 4.5 Failure path
 
@@ -286,7 +286,7 @@ Published to queue `profiling.jobs`. This is a Celery-compatible task message.
         "semantic_similarity": {
           "score": 86.4,
           "weight": 0.25,
-          "description": "Semantic similarity using spaCy document vectors"
+          "description": "Semantic similarity using sentence-transformer embeddings"
         },
         "skill_match": {
           "score": 90.0,
@@ -480,11 +480,11 @@ These numbers are estimates. Actual accuracy should be measured against a manual
 
 **Input**: Raw text, `CandidateProfile`, job description text.
 **Output**: `ScoringResult` (Pydantic model).
-**Libraries**: `scikit-learn` (TF-IDF vectorizer, cosine similarity).
+**Libraries**: `scikit-learn` (TF-IDF vectorizer, cosine similarity), `sentence-transformers`.
 
-The scoring stage produces a relevance score from 0 to 100 for each resume against the job description. The score is a weighted combination of three sub-scores.
+The scoring stage produces a relevance score from 0 to 100 for each resume against the job description. The score is a weighted combination of four sub-scores.
 
-#### Sub-score 1: Text Similarity (weight: 0.40)
+#### Sub-score 1: Text Similarity (weight: 0.25)
 
 **Method**: TF-IDF cosine similarity.
 
@@ -494,11 +494,21 @@ The scoring stage produces a relevance score from 0 to 100 for each resume again
 4. Compute cosine similarity between the job description vector and each resume vector.
 5. Scale to 0-100.
 
-**Why TF-IDF over embeddings**: TF-IDF is deterministic, fast, requires no model downloads beyond scikit-learn, and produces interpretable results (you can inspect which terms contributed most). Semantic embedding models (sentence-transformers) would improve accuracy for paraphrased content but add a 400MB+ model dependency. This is a candidate for a v2 upgrade.
+TF-IDF remains useful because it is deterministic, fast, and interpretable. It now serves as the lexical component of a hybrid ranker instead of being the only semantic signal.
 
 **Corpus scope**: The vectorizer is fit per-session (one job description + N resumes). This means the vocabulary and IDF weights are specific to each session, which is appropriate since resumes within a session are compared against the same job.
 
-#### Sub-score 2: Skill Match (weight: 0.35)
+#### Sub-score 2: Semantic Similarity (weight: 0.25)
+
+**Method**: Sentence-transformer embeddings with cosine similarity.
+
+1. Load the configured embedding model (default: `sentence-transformers/all-MiniLM-L6-v2`).
+2. Encode the job description and resume text.
+3. Normalize embeddings and compute cosine similarity.
+4. Scale the result to 0-100.
+5. If the transformer backend fails to load or infer, fall back to spaCy document-vector similarity and mark the backend in the score breakdown.
+
+#### Sub-score 3: Skill Match (weight: 0.30)
 
 **Method**: Set intersection between required skills and candidate skills.
 
@@ -513,7 +523,7 @@ The breakdown includes:
 - `missing`: skills in JD but not in resume.
 - `extra`: skills in resume but not in JD (informational, not penalized).
 
-#### Sub-score 3: Experience Fit (weight: 0.25)
+#### Sub-score 4: Experience Fit (weight: 0.20)
 
 **Method**: Compare candidate's total experience years against the job's implied requirement.
 
@@ -1124,7 +1134,7 @@ Set up the project skeleton, infrastructure connections, and the job lifecycle w
 | Question | Current stance | Revisit when |
 |----------|----------------|--------------|
 | OCR for scanned PDFs | Not supported in v1. Scanned PDFs produce empty text and score 0. | User feedback indicates many scanned resumes. |
-| Semantic embeddings vs TF-IDF | TF-IDF for v1. Simpler, faster, deterministic. | Scoring accuracy needs improvement. Consider `sentence-transformers` or spaCy vectors. |
+| Semantic embeddings vs TF-IDF | Hybrid lexical + semantic scoring is active using TF-IDF and `sentence-transformers` with spaCy fallback. | Revisit when benchmarking stronger embedding models or rerankers. |
 | Custom-trained NER model | Using off-the-shelf `en_core_web_md`. | Parsing accuracy is insufficient. Train on labeled resume data. |
 | Multi-language support | English only in v1. | International user base requires it. Add language detection + multilingual spaCy models. |
 | Celery result backend | Not used. Results go through HTTP callback. | Need task result inspection or monitoring dashboards like Flower. |

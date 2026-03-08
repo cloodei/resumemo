@@ -558,7 +558,7 @@ export default function ProfilingResultsPage() {
 											)}
 											<p className="mt-3 text-xs leading-relaxed line-clamp-3">{candidate.summary}</p>
 													<Button size="sm" variant="ghost" className="mt-4 gap-2">
-														View resume
+														View details
 														<ArrowUpRight className="size-4" />
 													</Button>
 													</div>

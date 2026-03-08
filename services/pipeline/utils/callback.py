@@ -17,15 +17,14 @@ from config import (
 from models import JobPayload
 
 logger = logging.getLogger(__name__)
+headers = {
+    PIPELINE_SECRET_HEADER_NAME: PIPELINE_CALLBACK_SECRET,
+    "Content-Type": "application/json",
+}
 
 
 def _post_callback(payload: JobPayload, body: dict):
     """POST a callback to the Elysia API with retry logic."""
-    headers = {
-        PIPELINE_SECRET_HEADER_NAME: PIPELINE_CALLBACK_SECRET,
-        "Content-Type": "application/json",
-    }
-
     last_error: Exception | None = None
 
     for attempt in range(CALLBACK_RETRY_ATTEMPTS):
@@ -49,12 +48,11 @@ def _post_callback(payload: JobPayload, body: dict):
             if attempt < CALLBACK_RETRY_ATTEMPTS - 1:
                 delay = CALLBACK_RETRY_BACKOFF[attempt]
                 logger.warning(
-                    "Callback failed, retrying",
+                    f"Callback failed, retrying; Error: {str(e)}",
                     extra={
                         "session_id": payload.session_id,
                         "attempt": attempt + 1,
                         "delay_s": delay,
-                        "error": str(e),
                     },
                 )
                 time.sleep(delay)

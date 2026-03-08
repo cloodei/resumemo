@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -14,6 +15,7 @@ from config import (
     SCORING_WEIGHT_SKILL_MATCH,
     SCORING_WEIGHT_TEXT_SIMILARITY,
     SEMANTIC_MAX_CHARS,
+    SEMANTIC_MODEL_NAME,
     TFIDF_MAX_FEATURES,
     TFIDF_NGRAM_RANGE,
 )
@@ -21,6 +23,8 @@ from models import CandidateProfile, ScoringResult, SubScore
 from stages.parse import _get_nlp, _get_skills_taxonomy
 
 logger = logging.getLogger(__name__)
+_semantic_model: Any | None = None
+_semantic_backend = "sentence-transformers"
 
 EXPERIENCE_YEARS_PATTERN = re.compile(
     r"(\d+)\+?\s*(?:years?|yrs?)(?:\s+of\s+experience)?",
@@ -73,9 +77,11 @@ def score_resume(
         "semantic_similarity": SubScore(
             score=round(semantic_sim, 1),
             weight=round(weights["semantic_similarity"], 2),
-            description="Semantic similarity using spaCy document vectors",
+            description="Semantic similarity using sentence-transformer embeddings",
             details={
                 "max_chars": SEMANTIC_MAX_CHARS,
+                "backend": _semantic_backend,
+                "model": SEMANTIC_MODEL_NAME if _semantic_backend == "sentence-transformers" else "spacy-fallback",
             },
         ),
         "skill_match": SubScore(
@@ -133,18 +139,49 @@ def _score_text_similarity(resume_text: str, job_description: str) -> float:
 
 
 def _score_semantic_similarity(resume_text: str, job_description: str) -> float:
-    """Compute semantic similarity using spaCy document vectors."""
+    """Compute semantic similarity using sentence-transformers with spaCy fallback."""
     if not resume_text.strip() or not job_description.strip():
         return 0.0
+
+    try:
+        model = _get_semantic_model()
+        embeddings = model.encode(
+            [job_description[:SEMANTIC_MAX_CHARS], resume_text[:SEMANTIC_MAX_CHARS]],
+            normalize_embeddings=True,
+        )
+        similarity = float(embeddings[0] @ embeddings[1])
+        return max(0.0, min(100.0, float(similarity * 100)))
+    except Exception as exc:
+        logger.warning("Sentence-transformer scoring failed; falling back to spaCy", extra={"error": str(exc)})
+        return _score_semantic_similarity_spacy(resume_text, job_description)
+
+
+def _get_semantic_model():
+    global _semantic_model
+    global _semantic_backend
+
+    if _semantic_model is None:
+        from sentence_transformers import SentenceTransformer
+
+        logger.info("Loading semantic model", extra={"model": SEMANTIC_MODEL_NAME})
+        _semantic_model = SentenceTransformer(SEMANTIC_MODEL_NAME)
+        _semantic_backend = "sentence-transformers"
+
+    return _semantic_model
+
+
+def _score_semantic_similarity_spacy(resume_text: str, job_description: str) -> float:
+    global _semantic_backend
 
     try:
         nlp = _get_nlp()
         jd_doc = nlp(job_description[:SEMANTIC_MAX_CHARS])
         resume_doc = nlp(resume_text[:SEMANTIC_MAX_CHARS])
         similarity = jd_doc.similarity(resume_doc)
+        _semantic_backend = "spacy-fallback"
         return max(0.0, min(100.0, float(similarity * 100)))
     except Exception as exc:
-        logger.warning("Semantic scoring failed", extra={"error": str(exc)})
+        logger.warning("Semantic fallback scoring failed", extra={"error": str(exc)})
         return 0.0
 
 

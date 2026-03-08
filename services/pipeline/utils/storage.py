@@ -9,6 +9,7 @@ import boto3
 
 logger = logging.getLogger(__name__)
 
+_bucket = os.environ.get("R2_BUCKET_NAME")
 _client = None
 
 
@@ -28,10 +29,10 @@ def _get_s3_client():
 
 def _get_bucket() -> str:
     """Return the R2 bucket name from environment, failing fast if missing."""
-    bucket = os.environ.get("R2_BUCKET_NAME")
-    if not bucket:
+    global _bucket
+    if not _bucket:
         raise RuntimeError("R2_BUCKET_NAME environment variable is not set")
-    return bucket
+    return _bucket
 
 
 def fetch_file(storage_key: str):

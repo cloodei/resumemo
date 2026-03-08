@@ -55,13 +55,11 @@ export type PipelineJobPayload = {
 	}[];
 };
 
-type CeleryTaskOptions = {
+async function publishCeleryTask({ taskName, args, logLabel = "" }: {
 	taskName: string;
 	args: unknown[];
-	logLabel: string;
-};
-
-async function publishCeleryTask({ taskName, args, logLabel }: CeleryTaskOptions) {
+	logLabel?: string
+}) {
 	const ch = await getChannel();
 	const taskId = randomUUIDv7();
 

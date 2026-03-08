@@ -42,7 +42,7 @@ function generatePresignedUploadUrl(
 		Bucket: R2_BUCKET_NAME,
 		Key: storageKey,
 		ContentType: contentType,
-		...(contentLength != null ? { ContentLength: contentLength } : {}),
+		...(contentLength ? { ContentLength: contentLength } : {}),
 	});
 
 	return getSignedUrl(r2Client, command, { expiresIn: 60 * 15 });

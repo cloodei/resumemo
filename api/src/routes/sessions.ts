@@ -126,8 +126,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				files.map(async (file) => {
 					try {
 						const head = await headFile(file.storageKey);
-						const size = Number(head.ContentLength ?? 0);
-						const mimeType = head.ContentType ?? file.mimeType;
+						const size = head.ContentLength ?? 0;
+						const mimeType = head.ContentType ?? "bad"; // fallback to fail, immediately reject
 						const check = validateFileMetadata({
 							fileName: file.fileName,
 							claimedMimeType: mimeType,

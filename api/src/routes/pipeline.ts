@@ -59,7 +59,7 @@ type ErrorBody = typeof errorBody.static;
 
 const callbackBody = t.Union([completionBody, errorBody]);
 
-export const pipelineCallbackRoute = new Elysia({ prefix: "/api/internal/pipeline" })
+export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeline" })
 	.post(
 		"/callback",
 		async ({ body, headers, status }) => {

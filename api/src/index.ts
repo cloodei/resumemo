@@ -3,9 +3,7 @@ import { Elysia } from "elysia";
 import { logger } from "@rasla/logify";
 import { openapi } from "@elysiajs/openapi";
 
-import { systemRoutes } from "./routes/system";
-import { sessionRoutes } from "./routes/sessions";
-import { pipelineCallbackRoute } from "./routes/pipeline";
+import * as routes from "./routes";
 import { authMiddleware } from "./lib/auth";
 
 const app = new Elysia({ precompile: true })
@@ -21,11 +19,9 @@ const app = new Elysia({ precompile: true })
 	.use(logger())
 	.use(openapi())
 	.use(authMiddleware)
-	.use(systemRoutes)
-	.use(sessionRoutes)
-	// .use(fileRoutes)
-	.use(pipelineCallbackRoute)
-	// .use(randomRoutes)
+	.use(routes.systemRoutes)
+	.use(routes.sessionRoutes)
+	.use(routes.pipelineCallbackRoutes)
 	.listen({ hostname: "0.0.0.0", port: 8080 });
 
 export type API = typeof app;
