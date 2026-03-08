@@ -232,7 +232,7 @@ export default function Page() {
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={session.status === "completed" ? "secondary" : session.status === "processing" ? "default" : "outline"}
+                          variant={session.status === "completed" ? "secondary" : session.status === "processing" || session.status === "retrying" ? "default" : "outline"}
                           className="shadow-sm capitalize"
                         >
                           {session.status}

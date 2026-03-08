@@ -47,6 +47,7 @@ async function getChannel() {
 
 export type PipelineJobPayload = {
 	session_id: string;
+	run_id: string;
 	job_description: string;
 	files: {
 		file_id: number;

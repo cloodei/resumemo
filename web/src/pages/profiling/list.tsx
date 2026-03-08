@@ -18,7 +18,7 @@ type ProfilingSession = {
 	name: string
 	jobTitle: string | null
 	jobDescription: string
-	status: "processing" | "completed" | "failed"
+	status: "processing" | "retrying" | "completed" | "failed"
 	totalFiles: number
 	errorMessage: string | null
 	createdAt: Date
@@ -52,25 +52,40 @@ export default function ProfilingSessionsPage() {
 		void fetchSessions()
 	}, [])
 
-	const fetchSessions = async () => {
+	useEffect(() => {
+		if (!sessions.some(session => session.status === "processing" || session.status === "retrying"))
+			return
+
+		const timer = window.setInterval(() => {
+			void fetchSessions(false)
+		}, 5000)
+
+		return () => window.clearInterval(timer)
+	}, [sessions])
+
+	const fetchSessions = async (showLoading = true) => {
 		try {
-			setIsLoading(true)
+			if (showLoading)
+				setIsLoading(true)
 			const { data, error } = await api.api.v2.sessions.get()
 
 			if (error || !data) {
 				const message = getEdenErrorMessage(error) ?? "Could not load sessions"
-				toast.error(message)
+				if (showLoading)
+					toast.error(message)
 				return
 			}
 
 			setSessions(data.sessions)
 		}
 		catch (err) {
-			toast.error(getErrorMessage(err, "Failed to load sessions"))
+			if (showLoading)
+				toast.error(getErrorMessage(err, "Failed to load sessions"))
 			console.error("[ProfilingSessions] Fetch error:", err)
 		}
 		finally {
-			setIsLoading(false)
+			if (showLoading)
+				setIsLoading(false)
 		}
 	}
 
@@ -134,6 +149,7 @@ export default function ProfilingSessionsPage() {
 							<TabsTrigger value="all" className="rounded-md">All</TabsTrigger>
 							<TabsTrigger value="completed" className="rounded-md">Completed</TabsTrigger>
 							<TabsTrigger value="processing" className="rounded-md">Processing</TabsTrigger>
+							<TabsTrigger value="retrying" className="rounded-md">Retrying</TabsTrigger>
 							<TabsTrigger value="failed" className="rounded-md">Failed</TabsTrigger>
 						</TabsList>
 					</Tabs>
@@ -201,7 +217,7 @@ export default function ProfilingSessionsPage() {
 											<Badge 
 												variant={
 													session.status === "completed" ? "secondary" : 
-													session.status === "processing" ? "default" : 
+													session.status === "processing" || session.status === "retrying" ? "default" : 
 													session.status === "failed" ? "destructive" : "outline"
 												}
 												className="shadow-sm capitalize"

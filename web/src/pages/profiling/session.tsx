@@ -1,17 +1,21 @@
-import { toast } from "sonner"
-import { useEffect, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { useNavigate, useParams } from "react-router-dom"
 import {
 	ArrowLeft,
 	ArrowUpRight,
-	BarChart3,
 	Download,
-	Filter,
 	FileText,
 	Loader2,
 	Mail,
-	ThumbsUp,
+	Phone,
+	RefreshCw,
+	RotateCcw,
+	Sparkles,
+	TriangleAlert,
+	UserRound,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { BASE_URL } from "@/lib/constants"
@@ -19,9 +23,6 @@ import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
 	Card,
 	CardContent,
@@ -30,16 +31,32 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Textarea } from "@/components/ui/textarea"
+
+type SessionStatus = "processing" | "retrying" | "completed" | "failed"
+type RetryMode = "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
 
 type ProfilingSession = {
 	id: string
 	name: string
 	jobTitle: string | null
 	jobDescription: string
-	status: "processing" | "completed" | "failed"
+	status: SessionStatus
 	totalFiles: number
 	errorMessage: string | null
-	createdAt: Date
+	createdAt: string | Date
+	lastCompletedAt?: string | Date | null
+	retryCount?: number
 }
 
 type SessionFile = {
@@ -49,34 +66,95 @@ type SessionFile = {
 	size: number
 }
 
+type ParsedProfile = {
+	name_confidence?: number | null
+	parse_warnings?: string[] | null
+	total_experience_years?: number | null
+	work_history?: Array<{
+		title?: string | null
+		company?: string | null
+		start_date?: string | null
+		end_date?: string | null
+		description?: string | null
+	}> | null
+	education?: Array<{
+		degree?: string | null
+		institution?: string | null
+		year?: number | null
+	}> | null
+	certifications?: string[] | null
+	skills?: string[] | null
+} | null
+
+type ScoreDetail = {
+	score: number
+	weight: number
+	description: string
+	details?: Record<string, unknown>
+}
+
 type CandidateResult = {
 	rank?: number
 	id: string
+	runId?: string
 	candidateName: string | null
 	candidateEmail: string | null
 	candidatePhone: string | null
-	parsedProfile?: {
-		identity_source?: string | null
-		name_confidence?: number | null
-		parse_warnings?: string[] | null
-		total_experience_years?: number | null
-	} | null
+	parsedProfile?: ParsedProfile
 	overallScore: number
 	summary: string
 	skillsMatched: string[] | null
 	originalName: string
+	createdAt?: string | Date | null
 }
 
 type CandidateResultDetail = CandidateResult & {
 	rawText: string
-	scoreBreakdown: Record<string, {
-		score: number
-		weight: number
-		description: string
-		details?: Record<string, unknown>
-	}>
-	createdAt?: string | Date | null
+	scoreBreakdown: Record<string, ScoreDetail>
 	mimeType?: string
+}
+
+type RetryFormValues = {
+	name: string
+	jobTitle: string
+	jobDescription: string
+}
+
+const retryModeCopy: Record<RetryMode, {
+	label: string
+	description: string
+	buttonLabel: string
+	requiresUpdates: boolean
+	target: "current" | "new"
+}> = {
+	rerun_current: {
+		label: "Retry now",
+		description: "Instantly rerun this same session with the same files and same requirements.",
+		buttonLabel: "Retry this session",
+		requiresUpdates: false,
+		target: "current",
+	},
+	clone_current: {
+		label: "New copy",
+		description: "Create a new session using the same resumes and the same role brief.",
+		buttonLabel: "Create new copied session",
+		requiresUpdates: false,
+		target: "new",
+	},
+	clone_with_updates: {
+		label: "Update as new",
+		description: "Create a new session with the same resumes after editing the role brief.",
+		buttonLabel: "Create updated session",
+		requiresUpdates: true,
+		target: "new",
+	},
+	replace_with_updates: {
+		label: "Update and replace",
+		description: "Edit this session and rerun it in place, replacing the current results.",
+		buttonLabel: "Update and rerun",
+		requiresUpdates: true,
+		target: "current",
+	},
 }
 
 function getDisplayCandidateName(candidate: CandidateResult) {
@@ -87,11 +165,6 @@ function getDisplayCandidateName(candidate: CandidateResult) {
 	return candidate.originalName
 }
 
-function hasLowConfidenceIdentity(candidate: CandidateResult) {
-	const confidence = Number(candidate.parsedProfile?.name_confidence ?? 0)
-	return !candidate.candidateName || confidence < 0.5
-}
-
 function needsManualReview(candidate: CandidateResult) {
 	return (candidate.parsedProfile?.parse_warnings?.length ?? 0) > 0
 }
@@ -99,30 +172,83 @@ function needsManualReview(candidate: CandidateResult) {
 function getManualReviewLabel(candidate: CandidateResult) {
 	const warnings = new Set(candidate.parsedProfile?.parse_warnings ?? [])
 	if (warnings.has("name_missing_or_invalid"))
-		return "Identity check needed"
+		return "Please verify the candidate name manually"
 	if (warnings.has("work_history_not_confident"))
-		return "Experience check needed"
+		return "Please double-check work history and experience"
 	if (warnings.has("skills_not_confident"))
-		return "Skills check needed"
-	return "Manual review recommended"
+		return "Please confirm key skills from the resume"
+	return "A manual review is recommended"
 }
 
 function getExperienceLabel(candidate: CandidateResult) {
 	const years = candidate.parsedProfile?.total_experience_years
 	if (typeof years !== "number")
 		return null
+
 	return `${years} year${years === 1 ? "" : "s"} experience`
 }
 
-function statusBadgeVariant(status: ProfilingSession["status"]) {
+function statusBadgeVariant(status: SessionStatus) {
 	switch (status) {
 		case "processing":
+		case "retrying":
 			return "secondary"
 		case "completed":
 			return "default"
 		case "failed":
 			return "destructive"
 	}
+}
+
+function getStatusLabel(status: SessionStatus) {
+	switch (status) {
+		case "processing":
+			return "processing"
+		case "retrying":
+			return "retrying"
+		case "completed":
+			return "completed"
+		case "failed":
+			return "failed"
+	}
+}
+
+function getPrimarySkills(candidate: CandidateResult) {
+	const fromMatched = candidate.skillsMatched ?? []
+	if (fromMatched.length > 0)
+		return fromMatched.slice(0, 5)
+
+	return (candidate.parsedProfile?.skills ?? []).slice(0, 5)
+}
+
+function getMissingSkills(detail: CandidateResultDetail) {
+	const skillMatch = detail.scoreBreakdown?.skill_match
+	const missing = skillMatch?.details?.missing
+	return Array.isArray(missing) ? missing.filter(item => typeof item === "string") as string[] : []
+}
+
+function getRecentRoles(detail: CandidateResultDetail) {
+	return (detail.parsedProfile?.work_history ?? []).slice(0, 3)
+}
+
+function getEducationLines(detail: CandidateResultDetail) {
+	return (detail.parsedProfile?.education ?? []).map((entry) => {
+		return [entry.degree, entry.institution, entry.year].filter(Boolean).join(" • ")
+	}).filter(Boolean)
+}
+
+function SummaryTile({ label, value, subtext }: {
+	label: string
+	value: string | number
+	subtext: string
+}) {
+	return (
+		<div className="grid rounded-xl bg-muted/55 py-4 pl-3 pr-5 shadow-m transition-all hover:-translate-y-0.5">
+			<p className="text-xs uppercase tracking-tight text-muted-foreground">{label}</p>
+			<p className="mt-2 bg-linear-to-br from-foreground to-foreground/80 bg-clip-text text-2xl font-bold text-foreground">{value}</p>
+			<p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
+		</div>
+	)
 }
 
 export default function ProfilingResultsPage() {
@@ -133,89 +259,148 @@ export default function ProfilingResultsPage() {
 	const [results, setResults] = useState<CandidateResult[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [isExporting, setIsExporting] = useState(false)
+	const [isRetrying, setIsRetrying] = useState(false)
 	const [selectedResult, setSelectedResult] = useState<CandidateResultDetail | null>(null)
 	const [isDetailOpen, setIsDetailOpen] = useState(false)
 	const [isDetailLoading, setIsDetailLoading] = useState(false)
+	const [retryDialogOpen, setRetryDialogOpen] = useState(false)
+	const [selectedRetryMode, setSelectedRetryMode] = useState<RetryMode>("rerun_current")
+
+	const retryForm = useForm<RetryFormValues>({
+		defaultValues: {
+			name: "",
+			jobTitle: "",
+			jobDescription: "",
+		},
+	})
+
+	const isCompleted = session?.status === "completed"
+	const isFailed = session?.status === "failed"
+	const isRunning = session?.status === "processing" || session?.status === "retrying"
+	const manualReviewCount = useMemo(() => results.filter(needsManualReview).length, [results])
+	const strongMatches = useMemo(() => results.filter(candidate => candidate.overallScore >= 80).length, [results])
+	const averageScore = useMemo(() => {
+		if (results.length === 0)
+			return 0
+
+		return Math.round(results.reduce((accumulator, candidate) => accumulator + candidate.overallScore, 0) / results.length)
+	}, [results])
 
 	useEffect(() => {
-		if (id) {
-			void fetchSession()
-		}
+		if (!id)
+			return
+
+		void fetchSession(true)
 	}, [id])
 
-	const fetchSession = async () => {
+	useEffect(() => {
+		if (!id || !isRunning)
+			return
+
+		const timer = window.setInterval(() => {
+			void fetchSession(false)
+		}, 5000)
+
+		return () => window.clearInterval(timer)
+	}, [id, isRunning])
+
+	useEffect(() => {
+		if (!session)
+			return
+
+		retryForm.reset({
+			name: session.name,
+			jobTitle: session.jobTitle ?? "",
+			jobDescription: session.jobDescription,
+		})
+	}, [retryForm, session])
+
+	const fetchSession = async (showLoading: boolean) => {
+		if (!id)
+			return
+
+		if (showLoading)
+			setIsLoading(true)
+
 		try {
-			const { data, error } = await api.api.v2.sessions({ id: id! }).get()
+			const { data, error } = await api.api.v2.sessions({ id }).get()
 
 			if (error || !data) {
 				const message = getEdenErrorMessage(error)
-				toast.error(message ?? "Could not load profiling session")
-				if (error?.status === 404) {
+				if (showLoading)
+					toast.error(message ?? "Could not load profiling session")
+
+				if (error?.status === 404)
 					navigate("/dashboard")
-					return
-				}
+
 				return
 			}
 
 			setSession(data.session as ProfilingSession)
-			setFiles((data.files || []))
+			setFiles(data.files || [])
 
-			// Results are included in the response when the session is completed
 			if (data.session.status === "completed" && data.results) {
-				const rankedResults = (data.results as any[]).map((r: any, index: number) => ({
-					...r,
-					overallScore: Number(r.overallScore),
-					rank: index + 1
-				})) as Required<CandidateResult>[]
-
+				const rankedResults = (data.results as CandidateResult[]).map((candidate, index) => ({
+					...candidate,
+					overallScore: Number(candidate.overallScore),
+					rank: index + 1,
+				}))
 				setResults(rankedResults)
 			}
-		} catch (err) {
-			toast.error(getErrorMessage(err, "Failed to load profiling session"))
-			console.error("[ProfilingSession] Fetch error:", err)
-		} finally {
-			setIsLoading(false)
+			else {
+				setResults([])
+				setSelectedResult(null)
+			}
+		}
+		catch (error) {
+			if (showLoading)
+				toast.error(getErrorMessage(error, "Failed to load profiling session"))
+			console.error("[ProfilingSession] Fetch error:", error)
+		}
+		finally {
+			if (showLoading)
+				setIsLoading(false)
 		}
 	}
 
 	const exportResults = async () => {
-		if (!id) return
-		setIsExporting(true)
+		if (!id)
+			return
 
+		setIsExporting(true)
 		try {
-			const res = await fetch(`${BASE_URL}/api/v2/sessions/${id}/export?format=csv`, {
+			const response = await fetch(`${BASE_URL}/api/v2/sessions/${id}/export?format=csv`, {
 				credentials: "include",
 			})
 
-			if (!res.ok) {
-				let message = `Export failed (${res.status})`
+			if (!response.ok) {
+				let message = `Export failed (${response.status})`
 				try {
-					const body = await res.json()
-					if (body?.message) message = body.message
-				} catch { /* response wasn't JSON */ }
+					const body = await response.json()
+					if (body?.message)
+						message = body.message
+				}
+				catch {
+					// ignore JSON parse failures
+				}
 				throw new Error(message)
 			}
 
-			const blob = await res.blob()
-			const contentType = res.headers.get("content-type") || ""
-			if (!contentType.includes("text/csv")) {
-				const text = await blob.text()
-				throw new Error(text.slice(0, 200) || "Export response was not a CSV file")
-			}
+			const blob = await response.blob()
 			const url = window.URL.createObjectURL(blob)
-			const a = document.createElement("a")
-			a.href = url
-			a.download = `${session?.name || "session"}-results.csv`
-			document.body.appendChild(a)
-			a.click()
-			document.body.removeChild(a)
+			const link = document.createElement("a")
+			link.href = url
+			link.download = `${session?.name || "session"}-results.csv`
+			document.body.appendChild(link)
+			link.click()
+			document.body.removeChild(link)
 			window.URL.revokeObjectURL(url)
 
 			toast.success("Results exported successfully")
 		}
-		catch (err) {
-			toast.error(getErrorMessage(err, "Export failed"))
-			console.error("[ProfilingSession] Export error:", err)
+		catch (error) {
+			toast.error(getErrorMessage(error, "Export failed"))
+			console.error("[ProfilingSession] Export error:", error)
 		}
 		finally {
 			setIsExporting(false)
@@ -223,7 +408,9 @@ export default function ProfilingResultsPage() {
 	}
 
 	const openCandidateDetail = async (candidate: CandidateResult) => {
-		if (!id) return
+		if (!id)
+			return
+
 		setIsDetailOpen(true)
 		setIsDetailLoading(true)
 
@@ -234,11 +421,11 @@ export default function ProfilingResultsPage() {
 
 			setSelectedResult({
 				...data.result,
-				overallScore: Number((data.result as any).overallScore),
+				overallScore: Number(data.result.overallScore),
 			} as CandidateResultDetail)
 		}
-		catch (err) {
-			toast.error(getErrorMessage(err, "Failed to load candidate details"))
+		catch (error) {
+			toast.error(getErrorMessage(error, "Failed to load candidate details"))
 			setIsDetailOpen(false)
 		}
 		finally {
@@ -246,191 +433,224 @@ export default function ProfilingResultsPage() {
 		}
 	}
 
+	const selectedRetryCopy = retryModeCopy[selectedRetryMode]
+
+	const openRetryDialog = (mode: RetryMode) => {
+		setSelectedRetryMode(mode)
+		setRetryDialogOpen(true)
+	}
+
+	const submitRetry = retryForm.handleSubmit(async (values) => {
+		if (!id)
+			return
+
+		setIsRetrying(true)
+		try {
+			const payload = selectedRetryCopy.requiresUpdates
+				? {
+					mode: selectedRetryMode,
+					name: values.name.trim(),
+					jobTitle: values.jobTitle.trim() || undefined,
+					jobDescription: values.jobDescription.trim(),
+				}
+				: { mode: selectedRetryMode }
+
+			const { data, error } = await api.api.v2.sessions({ id }).retry.post(payload)
+			if (error || !data)
+				throw new Error(getEdenErrorMessage(error) ?? "Could not start retry flow")
+
+			toast.success(selectedRetryCopy.target === "current"
+				? "Retry started on this session"
+				: "A new session has been created")
+			setRetryDialogOpen(false)
+
+			const targetSessionId = data.targetSessionId ?? data.sessionId
+			if (targetSessionId && targetSessionId !== id) {
+				navigate(`/profiling/${targetSessionId}`)
+				return
+			}
+
+			await fetchSession(false)
+		}
+		catch (error) {
+			toast.error(getErrorMessage(error, "Could not start retry flow"))
+		}
+		finally {
+			setIsRetrying(false)
+		}
+	})
+
 	if (isLoading) {
 		return (
-			<div className="flex flex-col items-center justify-center min-h-[60vh]">
-				<Loader2 className="size-10 animate-spin text-primary mb-4" />
+			<div className="flex min-h-[60vh] flex-col items-center justify-center">
+				<Loader2 className="mb-4 size-10 animate-spin text-primary" />
 				<p className="text-muted-foreground">Loading profiling session...</p>
 			</div>
 		)
 	}
 
-	if (!session) {
+	if (!session)
 		return null
-	}
-
-	const isCompleted = session.status === "completed"
-	const isFailed = session.status === "failed"
-	const manualReviewCount = results.filter(needsManualReview).length
-
-	const summaryHighlights = [
-		"Strong overall alignment with specified technical requirements.",
-		`${results.filter(r => r.overallScore > 80).length} candidates exceed the 80/100 threshold.`,
-		manualReviewCount > 0 ? `${manualReviewCount} candidate${manualReviewCount === 1 ? " requires" : "s require"} manual review for extracted details.` : "No parse anomalies were flagged in this batch."
-	]
 
 	return (
-			<div className="flex flex-col gap-8">
-			{/* Header */}
+		<div className="flex flex-col gap-8">
 			<section className="flex flex-col gap-4">
 				<div className="flex flex-wrap items-center gap-3">
 					<Badge variant={statusBadgeVariant(session.status)} className="text-xs uppercase tracking-widest">
-						{session.status}
+						{getStatusLabel(session.status)}
 					</Badge>
 					<p className="text-sm text-muted-foreground">
-						{isCompleted
-							? `Finished ${new Date(session.createdAt).toLocaleDateString()}`
+						{session.lastCompletedAt
+							? `Last completed ${new Date(session.lastCompletedAt).toLocaleDateString()}`
 							: `Created ${new Date(session.createdAt).toLocaleDateString()}`}
 					</p>
 				</div>
+
 				<div className="flex flex-col gap-2">
 					<div className="flex items-center gap-3">
-						<Button variant="ghost" size="icon" className="shrink-0 size-8 mr-1 -ml-2" onClick={() => navigate("/profiling")}>
+						<Button variant="ghost" size="icon" className="-ml-2 mr-1 size-8 shrink-0" onClick={() => navigate("/profiling")}>
 							<ArrowLeft className="size-5" />
 						</Button>
 						<h1 className="head-text-md text-foreground">{session.name}</h1>
 					</div>
-					<p className="text-sm text-muted-foreground ml-10">
-						Session ID {session.id.substring(0, 8)} • {session.jobTitle || "Custom Job Description"}
+					<p className="ml-10 text-sm text-muted-foreground">
+						Session ID {session.id.substring(0, 8)} • {session.jobTitle || "Custom role brief"}
 					</p>
-					{session.jobDescription && (
-						<p className="text-sm text-muted-foreground max-w-4xl line-clamp-2 mt-1 ml-10">
-							{session.jobDescription}
-						</p>
-					)}
+					<p className="ml-10 max-w-4xl text-sm text-muted-foreground line-clamp-2">
+						{session.jobDescription}
+					</p>
 				</div>
+
 				<div className="flex flex-wrap items-center gap-2">
 					{isCompleted && (
 						<Button size="sm" className="gap-2" onClick={exportResults} disabled={isExporting}>
-							{isExporting ? <Loader2 className="size-4 animate-spin" /> : <>Export results</>}
+							{isExporting ? <Loader2 className="size-4 animate-spin" /> : "Export results"}
 							<Download className="size-4" />
 						</Button>
 					)}
-					<Button size="sm" variant="outline" className="gap-2">
-						Share
-						<Mail className="size-4" />
-					</Button>
-					<Button size="sm" variant="ghost" className="gap-2" onClick={() => navigate(`/profiling/${id}`)}>
-						View session details
-						<ArrowUpRight className="size-4" />
-					</Button>
+					{isFailed && (
+						<Button size="sm" variant="secondary" className="gap-2" onClick={() => openRetryDialog("rerun_current")}>
+							<RefreshCw className="size-4" />
+							Retry now
+						</Button>
+					)}
+					{isCompleted && (
+						<Button size="sm" variant="outline" className="gap-2" onClick={() => openRetryDialog("clone_current")}>
+							<RotateCcw className="size-4" />
+							Retry options
+						</Button>
+					)}
 				</div>
 			</section>
 
-			{/* Processing state */}
-			{session.status === "processing" && (
-				<section className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card shadow-sm mx-auto w-full max-w-4xl">
-					<div className="size-16 rounded-full bg-sky-500/10 flex items-center justify-center mb-6">
-						<Loader2 className="size-8 text-sky-500 animate-spin" />
+			{isRunning && (
+				<section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center rounded-xl border bg-card py-16 text-center shadow-sm">
+					<div className="mb-6 flex size-16 items-center justify-center rounded-full bg-sky-500/10">
+						<Loader2 className="size-8 animate-spin text-sky-500" />
 					</div>
-					<h2 className="text-2xl font-semibold mb-2 tracking-tight">Profiling in Progress</h2>
-					<p className="text-muted-foreground mb-4">
-						Scoring {session.totalFiles} resume{session.totalFiles !== 1 ? "s" : ""} against your requirements...
+					<h2 className="mb-2 text-2xl font-semibold tracking-tight">
+						{session.status === "retrying" ? "Refreshing this session" : "Profiling in progress"}
+					</h2>
+					<p className="mb-4 text-muted-foreground">
+						Working through {session.totalFiles} resume{session.totalFiles !== 1 ? "s" : ""}. This page refreshes automatically.
 					</p>
-					<p className="text-xs text-muted-foreground max-w-sm text-balance">
-						This typically takes a few minutes. You can leave this page—results will be saved automatically.
-					</p>
-				</section>
-			)}
-
-			{/* Failed state */}
-			{isFailed && (
-				<section className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card shadow-sm mx-auto w-full max-w-4xl">
-					<h2 className="text-2xl font-semibold mb-2 tracking-tight">Analysis Failed</h2>
-					<p className="text-muted-foreground max-w-md mb-2">The pipeline encountered an error during scoring.</p>
-					{session.errorMessage && (
-						<p className="text-sm text-destructive font-mono bg-destructive/5 px-4 py-2 rounded-md mb-6 max-w-md break-all">
-							{session.errorMessage}
-						</p>
-					)}
-					<Button variant="outline" onClick={() => navigate("/profiling/new")}>
-						<ArrowLeft className="size-4 mr-2" />
-						New Session
+					<Button size="sm" variant="outline" className="gap-2" onClick={() => void fetchSession(false)}>
+						<RefreshCw className="size-4" />
+						Refresh now
 					</Button>
 				</section>
 			)}
 
-			{/* Completed: ranking summary + filters */}
+			{isFailed && (
+				<section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center rounded-xl border bg-card py-16 text-center shadow-sm">
+					<div className="mb-5 flex size-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+						<TriangleAlert className="size-8" />
+					</div>
+					<h2 className="mb-2 text-2xl font-semibold tracking-tight">Profiling stopped before completion</h2>
+					<p className="mb-6 max-w-lg text-muted-foreground">
+						You can retry this same session instantly with the existing resumes, or start a fresh copy if you want to preserve this failed attempt.
+					</p>
+					<div className="flex flex-wrap items-center justify-center gap-3">
+						<Button className="gap-2" onClick={() => openRetryDialog("rerun_current")}>
+							<RefreshCw className="size-4" />
+							Retry now
+						</Button>
+						<Button variant="outline" className="gap-2" onClick={() => openRetryDialog("clone_current")}>
+							<RotateCcw className="size-4" />
+							Create new copy
+						</Button>
+					</div>
+					{session.errorMessage && (
+						<div className="mt-6 max-w-2xl rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-left text-sm text-muted-foreground">
+							<p className="font-medium text-foreground">Technical details</p>
+							<p className="mt-1 break-words">{session.errorMessage}</p>
+						</div>
+					)}
+				</section>
+			)}
+
 			{isCompleted && (
 				<>
 					<section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-						<Card className="h-full shadow-x border-none">
-							<CardHeader className="flex flex-row items-center justify-between gap-6 border-b border-border/50 dark:border-border/30 pb-4">
-								<div>
-									<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Ranking summary</CardTitle>
-									<CardDescription className="text-sm mt-1">Scoring overview for {session.totalFiles} candidates.</CardDescription>
-								</div>
-								<Badge variant="secondary" className="flex items-center gap-1 text-xs">
-									<BarChart3 className="size-3" /> View analytics
-								</Badge>
+						<Card className="h-full border-none shadow-x">
+							<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
+								<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">
+									Session overview
+								</CardTitle>
+								<CardDescription className="mt-1 text-sm">
+									A recruiter-friendly snapshot of this candidate batch.
+								</CardDescription>
 							</CardHeader>
 							<CardContent className="px-4">
-								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-									<SummaryTile label="Resumes processed" value={session.totalFiles} subtext="Source resumes" />
-									<SummaryTile label="Top tier" value={results.filter(r => r.overallScore >= 80).length} subtext="Score > 80" />
-									<SummaryTile
-										label="Average score"
-										value={results.length > 0 ? `${Math.round(results.reduce((acc, r) => acc + r.overallScore, 0) / results.length)}/100` : "0/100"}
-										subtext="Across all candidates"
-									/>
+								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+									<SummaryTile label="Candidates reviewed" value={session.totalFiles} subtext="Resumes processed" />
+									<SummaryTile label="Strong matches" value={strongMatches} subtext="Match score 80+" />
+									<SummaryTile label="Needs review" value={manualReviewCount} subtext="Manual follow-up recommended" />
+									<SummaryTile label="Average match" value={`${averageScore}/100`} subtext="Across the current run" />
 								</div>
 								<div className="mt-6 space-y-3 text-sm text-muted-foreground">
-									{summaryHighlights.map((highlight, i) => (
-										<div key={i} className="flex items-start gap-3">
-											<ThumbsUp className="size-4 text-primary" />
-											<p>{highlight}</p>
-										</div>
-									))}
+									<div className="flex items-start gap-3">
+										<Sparkles className="mt-0.5 size-4 text-primary" />
+										<p>{strongMatches > 0 ? `${strongMatches} candidates stand out as strong matches for the role.` : "No candidates crossed the strong-match threshold yet."}</p>
+									</div>
+									<div className="flex items-start gap-3">
+										<Sparkles className="mt-0.5 size-4 text-primary" />
+										<p>{manualReviewCount > 0 ? `${manualReviewCount} candidate${manualReviewCount === 1 ? " needs" : "s need"} a quick manual review for extracted details.` : "No manual review flags were raised in this run."}</p>
+									</div>
 								</div>
 							</CardContent>
 						</Card>
 
 						<Card className="border-none shadow-x">
-							<CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
-								<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Filters</CardTitle>
-								<CardDescription className="text-sm mt-1">Adjust scoring thresholds and view specific segments.</CardDescription>
+							<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
+								<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">
+									Next actions
+								</CardTitle>
+								<CardDescription className="mt-1 text-sm">
+									Choose whether to keep this run, duplicate it, or replace it with a refreshed version.
+								</CardDescription>
 							</CardHeader>
-							<CardContent>
-								<Tabs defaultValue="scores">
-									<TabsList>
-										<TabsTrigger className="border-none cursor-pointer" value="scores">Scores</TabsTrigger>
-										<TabsTrigger className="border-none cursor-pointer" value="skills">Skills</TabsTrigger>
-										<TabsTrigger className="border-none cursor-pointer" value="experience">Experience</TabsTrigger>
-									</TabsList>
-									<TabsContent value="scores" className="mt-4 space-y-3 text-sm text-muted-foreground">
-										<p>Focus on candidates above a certain match score to build your shortlist.</p>
-										<Button size="sm" variant="outline" className="gap-2 self-start">
-											<Filter className="size-4" /> Configure threshold
-										</Button>
-									</TabsContent>
-									<TabsContent value="skills" className="mt-4 space-y-3 text-sm text-muted-foreground">
-										<p>Toggle essential technical skills or keywords found during the analysis.</p>
-										<div className="flex flex-wrap gap-2">
-											{Array.from(new Set(results.flatMap(r => r.skillsMatched || []))).slice(0, 5).map(skill => (
-												<Badge key={skill} variant="outline">{skill}</Badge>
-											))}
-										</div>
-									</TabsContent>
-									<TabsContent value="experience" className="mt-4 space-y-2 text-sm text-muted-foreground">
-										<p>Filter candidates by inferred years of experience or leadership signals.</p>
-									</TabsContent>
-								</Tabs>
+							<CardContent className="space-y-3 pt-6 text-sm text-muted-foreground">
+								<ActionCard title="Retry now" description="Rerun this exact session in place." onClick={() => openRetryDialog("rerun_current")} />
+								<ActionCard title="New copy" description="Create a new session using the same files and current brief." onClick={() => openRetryDialog("clone_current")} />
+								<ActionCard title="Update as new" description="Edit the brief and create a new follow-up session." onClick={() => openRetryDialog("clone_with_updates")} />
+								<ActionCard title="Update and replace" description="Edit this session and rerun it in place." onClick={() => openRetryDialog("replace_with_updates")} />
 							</CardContent>
 						</Card>
 					</section>
 
-					{/* Ranked candidates table + spotlight */}
-					<section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-						<Card className="xl:col-span-2 shadow-m border-border/60 dark:border-border/40">
-							<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 dark:border-border/30 pb-4">
+					<section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+						<Card className="xl:col-span-2 border-border/60 shadow-m dark:border-border/40">
+							<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-4 dark:border-border/30">
 								<div>
-									<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Ranked candidates</CardTitle>
-									<CardDescription className="text-sm mt-1">Sort and filter to build interview-ready slates.</CardDescription>
+									<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">
+										Ranked candidates
+									</CardTitle>
+									<CardDescription className="mt-1 text-sm">
+										Open a candidate to inspect experience, strengths, and contact details.
+									</CardDescription>
 								</div>
-								<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-									<span>Scoring model: Hybrid lexical + semantic</span>
-									<Badge variant="outline">{manualReviewCount > 0 ? `Review: ${manualReviewCount}` : "Review: Clear"}</Badge>
-								</div>
+								<Badge variant="outline">{manualReviewCount > 0 ? `${manualReviewCount} need review` : "Ready to shortlist"}</Badge>
 							</CardHeader>
 							<CardContent className="space-y-4">
 								<Table>
@@ -438,14 +658,13 @@ export default function ProfilingResultsPage() {
 										<TableRow>
 											<TableHead>Rank</TableHead>
 											<TableHead>Candidate</TableHead>
-											<TableHead className="hidden sm:table-cell">Alignment highlights</TableHead>
-											<TableHead className="hidden md:table-cell">Actions</TableHead>
+											<TableHead className="hidden sm:table-cell">Highlights</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{results.length === 0 ? (
 											<TableRow>
-												<TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+												<TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
 													No results generated for this session.
 												</TableCell>
 											</TableRow>
@@ -453,67 +672,31 @@ export default function ProfilingResultsPage() {
 											results.map((candidate) => (
 												<TableRow
 													key={candidate.id}
-													className="group align-top transition-all hover:bg-muted/55 cursor-pointer"
+													className="group cursor-pointer align-top transition-all hover:bg-muted/55"
 													onClick={() => void openCandidateDetail(candidate)}
 												>
 													<TableCell>
-														<Badge variant="secondary" className="text-xs shadow-sm">
-															#{candidate.rank}
-														</Badge>
+														<Badge variant="secondary" className="text-xs shadow-sm">#{candidate.rank}</Badge>
 													</TableCell>
 													<TableCell className="space-y-1">
-														<p className="font-semibold text-foreground group-hover:text-primary transition-colors">
+														<p className="font-semibold text-foreground transition-colors group-hover:text-primary">
 															{getDisplayCandidateName(candidate)}
 														</p>
-														<p className="text-xs text-muted-foreground">Score {candidate.overallScore}/100</p>
-														<p className="text-xs text-muted-foreground" title={candidate.originalName}>
-															Resume: {candidate.originalName}
-														</p>
-														{needsManualReview(candidate) && (
-															<p className="text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>
-														)}
-														{hasLowConfidenceIdentity(candidate) && (
-															<p className="text-[11px] text-amber-600">
-																Name hidden due to low extraction confidence
-															</p>
-														)}
+														<p className="text-xs text-muted-foreground">Match score {candidate.overallScore}/100{getExperienceLabel(candidate) ? ` • ${getExperienceLabel(candidate)}` : ""}</p>
+														<p className="text-xs text-muted-foreground" title={candidate.originalName}>Resume: {candidate.originalName}</p>
 														{candidate.candidateEmail && (
-															<p className="text-xs text-muted-foreground flex items-center gap-1.5">
-																<Mail className="size-3" />
-																{candidate.candidateEmail}
-															</p>
+															<p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Mail className="size-3" />{candidate.candidateEmail}</p>
 														)}
+														{needsManualReview(candidate) && <p className="text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>}
 													</TableCell>
-													<TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+													<TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
 														<p className="line-clamp-2 leading-snug">{candidate.summary}</p>
-														{candidate.skillsMatched && candidate.skillsMatched.length > 0 && (
-															<div className="flex flex-wrap gap-1.5 mt-2">
-																{candidate.skillsMatched.slice(0, 4).map(skill => (
-																	<span key={skill} className="text-[10px] uppercase font-medium tracking-wider text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-sm">
-																		{skill}
-																	</span>
-																))}
-																{candidate.skillsMatched.length > 4 && (
-																	<span className="text-[10px] font-medium text-muted-foreground/70 px-1 py-0.5">
-																		+{candidate.skillsMatched.length - 4}
-																	</span>
-																)}
-															</div>
-														)}
-													</TableCell>
-													<TableCell className="hidden md:table-cell">
-														<div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-															<Button size="sm" variant="outline" className="gap-1 shadow-sm hover:shadow-md transition-shadow">
-																<Mail className="size-3.5" />
-																Reach out
-															</Button>
-															<Button size="sm" variant="ghost" className="gap-1" onClick={(event) => {
-																event.stopPropagation()
-																void openCandidateDetail(candidate)
-															}}>
-																<ArrowUpRight className="size-3.5" />
-																Profile
-															</Button>
+														<div className="mt-2 flex flex-wrap gap-1.5">
+															{getPrimarySkills(candidate).map((skill) => (
+																<span key={skill} className="rounded-sm bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+																	{skill}
+																</span>
+															))}
 														</div>
 													</TableCell>
 												</TableRow>
@@ -522,156 +705,67 @@ export default function ProfilingResultsPage() {
 									</TableBody>
 								</Table>
 							</CardContent>
-
 							<CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 py-4 text-xs text-muted-foreground">
-								<span>Export full CSV or sync shortlist to ATS.</span>
-								<div className="flex gap-2">
-									<Button size="sm" variant="secondary" onClick={exportResults} disabled={isExporting}>
-										Download CSV
-									</Button>
-									<Button size="sm" variant="ghost">
-										Sync to ATS
-									</Button>
-								</div>
+								<span>Use the export if you want to share or continue screening elsewhere.</span>
+								<Button size="sm" variant="secondary" onClick={exportResults} disabled={isExporting}>Download CSV</Button>
 							</CardFooter>
 						</Card>
 
-						{/* Candidate spotlight */}
 						{results.length > 0 && (
-							<Card className="shadow-m border-none">
-								<CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
-									<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Candidate spotlight</CardTitle>
-									<CardDescription className="text-sm mt-1">Dig into resume insights for top candidates.</CardDescription>
+							<Card className="border-none shadow-m">
+								<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
+									<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">
+										Top candidates
+									</CardTitle>
+									<CardDescription className="mt-1 text-sm">
+										Quick access to the most relevant profiles from this run.
+									</CardDescription>
 								</CardHeader>
-
-								<CardContent className="space-y-3 text-sm text-muted-foreground pt-6">
-									{results.slice(0, 2).map((candidate) => (
-												<div key={candidate.id} className="group rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-x transition-all hover:-translate-y-0.5 cursor-pointer" onClick={() => void openCandidateDetail(candidate)}>
+								<CardContent className="space-y-3 pt-6 text-sm text-muted-foreground">
+									{results.slice(0, 3).map((candidate) => (
+										<div
+											key={candidate.id}
+											className="cursor-pointer rounded-lg bg-muted/30 p-4 shadow-x transition-all hover:-translate-y-0.5 dark:bg-muted/20"
+											onClick={() => void openCandidateDetail(candidate)}
+										>
 											<p className="text-sm font-semibold text-foreground">{getDisplayCandidateName(candidate)}</p>
-											<p className="mt-1 text-xs">
-												Score {candidate.overallScore}/100 • Rank #{candidate.rank}
-												{getExperienceLabel(candidate) ? ` • ${getExperienceLabel(candidate)}` : ""}
-											</p>
-											<p className="mt-1 text-xs text-muted-foreground" title={candidate.originalName}>{candidate.originalName}</p>
-											{needsManualReview(candidate) && (
-												<p className="mt-1 text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>
-											)}
-											<p className="mt-3 text-xs leading-relaxed line-clamp-3">{candidate.summary}</p>
-													<Button size="sm" variant="ghost" className="mt-4 gap-2">
-														View details
-														<ArrowUpRight className="size-4" />
-													</Button>
-													</div>
-											))}
-									</CardContent>
-								<CardFooter className="border-t bg-muted/20 py-4">
-									<Button size="sm" variant="secondary" className="w-full gap-2">
-										Compare candidates
-										<ArrowUpRight className="size-4" />
-									</Button>
-								</CardFooter>
+											<p className="mt-1 text-xs">Match score {candidate.overallScore}/100 • Rank #{candidate.rank}</p>
+											<p className="mt-3 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{candidate.summary}</p>
+											<Button size="sm" variant="ghost" className="mt-4 gap-2">
+												View details
+												<ArrowUpRight className="size-4" />
+											</Button>
+										</div>
+									))}
+								</CardContent>
 							</Card>
 						)}
 					</section>
-
-					<Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-						<DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-							<DialogHeader>
-								<DialogTitle>{selectedResult ? getDisplayCandidateName(selectedResult) : "Candidate detail"}</DialogTitle>
-								<DialogDescription>
-									{selectedResult?.originalName ?? "Inspect extracted fields, scores, and warnings."}
-								</DialogDescription>
-							</DialogHeader>
-
-							{isDetailLoading ? (
-								<div className="flex items-center gap-2 text-sm text-muted-foreground">
-									<Loader2 className="size-4 animate-spin" /> Loading candidate detail...
-								</div>
-							) : selectedResult ? (
-								<div className="space-y-6 text-sm">
-									<div className="grid gap-3 sm:grid-cols-2">
-										<SummaryTile label="Overall score" value={`${selectedResult.overallScore}/100`} subtext="Hybrid ranking" />
-										<SummaryTile label="Experience" value={getExperienceLabel(selectedResult) ?? "Unknown"} subtext="Parsed from work history" />
-									</div>
-
-									<div className="rounded-xl bg-muted/40 p-4">
-										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Summary</p>
-										<p className="mt-2 leading-6 text-foreground">{selectedResult.summary}</p>
-									</div>
-
-									<div className="grid gap-4 sm:grid-cols-2">
-										<div className="rounded-xl border p-4">
-											<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Identity</p>
-											<p className="mt-2 font-medium text-foreground">{getDisplayCandidateName(selectedResult)}</p>
-											<p className="mt-1 text-xs text-muted-foreground">Source file: {selectedResult.originalName}</p>
-											{selectedResult.candidateEmail && <p className="mt-2 text-xs text-muted-foreground">Email: {selectedResult.candidateEmail}</p>}
-											{selectedResult.candidatePhone && <p className="mt-1 text-xs text-muted-foreground">Phone: {selectedResult.candidatePhone}</p>}
-										</div>
-
-										<div className="rounded-xl border p-4">
-											<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Parse warnings</p>
-											<div className="mt-2 flex flex-wrap gap-2">
-												{(selectedResult.parsedProfile?.parse_warnings?.length ?? 0) > 0
-													? selectedResult.parsedProfile?.parse_warnings?.map((warning) => <Badge key={warning} variant="outline">{warning}</Badge>)
-													: <span className="text-sm text-muted-foreground">No warnings</span>}
-											</div>
-										</div>
-									</div>
-
-									<div className="rounded-xl border p-4">
-										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Score breakdown</p>
-										<div className="mt-3 grid gap-3 sm:grid-cols-2">
-											{Object.entries(selectedResult.scoreBreakdown ?? {}).map(([key, score]) => (
-												<div key={key} className="rounded-lg bg-muted/40 p-3">
-													<p className="font-medium text-foreground">{key.replace(/_/g, " ")}</p>
-													<p className="mt-1 text-xs text-muted-foreground">{score.description}</p>
-													<p className="mt-2 text-sm text-foreground">Score {score.score}/100 • Weight {score.weight}</p>
-												</div>
-											))}
-										</div>
-									</div>
-
-									<div className="rounded-xl border p-4">
-										<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Extracted raw text preview</p>
-										<pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{selectedResult.rawText.slice(0, 4000)}</pre>
-									</div>
-								</div>
-							) : null}
-						</DialogContent>
-					</Dialog>
 				</>
 			)}
 
-			{/* File list — shown for non-completed states */}
 			{!isCompleted && files.length > 0 && (
 				<section>
-					<Card className="shadow-m border-border/60 dark:border-border/40 overflow-hidden">
-						<CardHeader className="border-b border-border/50 dark:border-border/30 pb-4">
+					<Card className="overflow-hidden border-border/60 shadow-m dark:border-border/40">
+						<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
 							<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">
 								Uploaded documents
 							</CardTitle>
-							<CardDescription className="text-sm mt-1">
-								{files.length} resume{files.length !== 1 ? "s" : ""} in this session
+							<CardDescription className="mt-1 text-sm">
+								{files.length} resume{files.length !== 1 ? "s" : ""} reusable for retry or rerun flows
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="pt-6">
 							<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 								{files.map((file) => (
-									<div
-										key={file.id}
-										className="rounded-lg border-none bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:-translate-y-0.5 cursor-pointer"
-									>
+									<div key={file.id} className="rounded-lg bg-muted/30 p-4 shadow-m transition-all hover:-translate-y-0.5 dark:bg-muted/20">
 										<div className="flex items-center gap-3.5">
-											<div className="shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+											<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
 												<FileText className="size-5 text-primary/80" />
 											</div>
 											<div className="min-w-0">
-												<p className="font-medium text-sm text-foreground truncate" title={file.originalName}>
-													{file.originalName}
-												</p>
-												<p className="text-xs text-muted-foreground mt-0.5">
-													{formatFileSize(Number(file.size))}
-												</p>
+												<p className="truncate text-sm font-medium text-foreground" title={file.originalName}>{file.originalName}</p>
+												<p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(Number(file.size))}</p>
 											</div>
 										</div>
 									</div>
@@ -681,20 +775,188 @@ export default function ProfilingResultsPage() {
 					</Card>
 				</section>
 			)}
+
+			<Dialog open={retryDialogOpen} onOpenChange={setRetryDialogOpen}>
+				<DialogContent className="max-w-3xl">
+					<DialogHeader>
+						<DialogTitle>Retry or recreate this session</DialogTitle>
+						<DialogDescription>
+							Choose whether to rerun the current session or create a new one using the same resumes.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="grid gap-3 md:grid-cols-2">
+						{(Object.entries(retryModeCopy) as Array<[RetryMode, typeof retryModeCopy[RetryMode]]>).map(([mode, copy]) => (
+							<button
+								key={mode}
+								type="button"
+								onClick={() => setSelectedRetryMode(mode)}
+								className={`rounded-xl border p-4 text-left transition-all ${selectedRetryMode === mode ? "border-primary bg-primary/5 shadow-m" : "border-border/60 bg-muted/20 hover:border-primary/30"}`}
+							>
+								<p className="font-medium text-foreground">{copy.label}</p>
+								<p className="mt-2 text-sm text-muted-foreground">{copy.description}</p>
+							</button>
+						))}
+					</div>
+
+					<form className="space-y-4" onSubmit={submitRetry}>
+						{selectedRetryCopy.requiresUpdates && (
+							<div className="grid gap-4 rounded-xl border border-border/50 bg-muted/20 p-4">
+								<div className="grid gap-2">
+									<label className="text-sm font-medium text-foreground" htmlFor="retry-name">Session name</label>
+									<Input id="retry-name" {...retryForm.register("name", { required: true })} />
+								</div>
+								<div className="grid gap-2">
+									<label className="text-sm font-medium text-foreground" htmlFor="retry-title">Job title</label>
+									<Input id="retry-title" {...retryForm.register("jobTitle")} />
+								</div>
+								<div className="grid gap-2">
+									<label className="text-sm font-medium text-foreground" htmlFor="retry-description">Job description</label>
+									<Textarea id="retry-description" className="min-h-[180px] resize-none" {...retryForm.register("jobDescription", { required: true })} />
+								</div>
+							</div>
+						)}
+
+						<div className="rounded-xl bg-muted/30 p-4 text-sm text-muted-foreground">
+							<p className="font-medium text-foreground">Selected action</p>
+							<p className="mt-1">{selectedRetryCopy.description}</p>
+						</div>
+
+						<DialogFooter>
+							<Button type="button" variant="ghost" onClick={() => setRetryDialogOpen(false)} disabled={isRetrying}>Cancel</Button>
+							<Button type="submit" className="gap-2" disabled={isRetrying}>
+								{isRetrying ? <Loader2 className="size-4 animate-spin" /> : null}
+								{selectedRetryCopy.buttonLabel}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+				<DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>{selectedResult ? getDisplayCandidateName(selectedResult) : "Candidate detail"}</DialogTitle>
+						<DialogDescription>
+							{selectedResult?.originalName ?? "Open a candidate to inspect their profile."}
+						</DialogDescription>
+					</DialogHeader>
+
+					{isDetailLoading ? (
+						<div className="flex items-center gap-2 text-sm text-muted-foreground">
+							<Loader2 className="size-4 animate-spin" /> Loading candidate detail...
+						</div>
+					) : selectedResult ? (
+						<div className="space-y-6 text-sm">
+							<div className="grid gap-3 sm:grid-cols-3">
+								<SummaryTile label="Match score" value={`${selectedResult.overallScore}/100`} subtext="Overall fit for this role" />
+								<SummaryTile label="Experience" value={getExperienceLabel(selectedResult) ?? "Unknown"} subtext="Estimated from resume history" />
+								<SummaryTile label="Review status" value={needsManualReview(selectedResult) ? "Needs review" : "Ready"} subtext={needsManualReview(selectedResult) ? getManualReviewLabel(selectedResult) : "No manual issues flagged"} />
+							</div>
+
+							<div className="rounded-xl bg-muted/40 p-4">
+								<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Summary</p>
+								<p className="mt-2 leading-6 text-foreground">{selectedResult.summary}</p>
+							</div>
+
+							<div className="grid gap-4 lg:grid-cols-2">
+								<div className="rounded-xl border p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Contact</p>
+									<div className="mt-3 space-y-2 text-sm text-muted-foreground">
+										<p className="flex items-center gap-2 text-foreground"><UserRound className="size-4 text-primary" />{getDisplayCandidateName(selectedResult)}</p>
+										<p className="text-xs">Resume file: {selectedResult.originalName}</p>
+										{selectedResult.candidateEmail && <p className="flex items-center gap-2"><Mail className="size-4" />{selectedResult.candidateEmail}</p>}
+										{selectedResult.candidatePhone && <p className="flex items-center gap-2"><Phone className="size-4" />{selectedResult.candidatePhone}</p>}
+									</div>
+								</div>
+
+								<div className="rounded-xl border p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Skills snapshot</p>
+									<div className="mt-3 flex flex-wrap gap-2">
+										{getPrimarySkills(selectedResult).length > 0 ? getPrimarySkills(selectedResult).map((skill) => (
+											<Badge key={skill} variant="outline">{skill}</Badge>
+										)) : <span className="text-sm text-muted-foreground">No clear skills extracted</span>}
+									</div>
+									{getMissingSkills(selectedResult).length > 0 && (
+										<div className="mt-4">
+											<p className="text-xs font-medium text-foreground">Skills to confirm manually</p>
+											<div className="mt-2 flex flex-wrap gap-2">
+												{getMissingSkills(selectedResult).map((skill) => (
+													<Badge key={skill} variant="secondary">{skill}</Badge>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="grid gap-4 lg:grid-cols-2">
+								<div className="rounded-xl border p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recent experience</p>
+									<div className="mt-3 space-y-3">
+										{getRecentRoles(selectedResult).length > 0 ? getRecentRoles(selectedResult).map((role, index) => (
+											<div key={`${role.title}-${role.company}-${index}`} className="rounded-lg bg-muted/30 p-3">
+												<p className="font-medium text-foreground">{role.title || "Role not extracted"}</p>
+												<p className="text-xs text-muted-foreground">{[role.company, role.start_date, role.end_date].filter(Boolean).join(" • ") || "Dates not available"}</p>
+												{role.description && <p className="mt-2 text-xs leading-relaxed text-muted-foreground line-clamp-3">{role.description}</p>}
+											</div>
+										)) : <span className="text-sm text-muted-foreground">No work history could be structured from this resume.</span>}
+									</div>
+								</div>
+
+								<div className="rounded-xl border p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Education and credentials</p>
+									<div className="mt-3 space-y-3 text-sm text-muted-foreground">
+										{getEducationLines(selectedResult).length > 0 && (
+											<div>
+												<p className="font-medium text-foreground">Education</p>
+												<div className="mt-2 space-y-1">{getEducationLines(selectedResult).map((line) => <p key={line}>{line}</p>)}</div>
+											</div>
+										)}
+										{(selectedResult.parsedProfile?.certifications ?? []).length > 0 && (
+											<div>
+												<p className="font-medium text-foreground">Certifications</p>
+												<div className="mt-2 flex flex-wrap gap-2">
+													{(selectedResult.parsedProfile?.certifications ?? []).map((item) => (
+														<Badge key={item} variant="outline">{item}</Badge>
+													))}
+												</div>
+											</div>
+										)}
+										{getEducationLines(selectedResult).length === 0 && (selectedResult.parsedProfile?.certifications ?? []).length === 0 && (
+											<span>No structured education or certifications were extracted.</span>
+										)}
+									</div>
+								</div>
+							</div>
+
+							{needsManualReview(selectedResult) && (
+								<div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-amber-700">Review notes</p>
+									<p className="mt-2 text-sm text-foreground">{getManualReviewLabel(selectedResult)}</p>
+								</div>
+							)}
+						</div>
+					) : null}
+				</DialogContent>
+			</Dialog>
 		</div>
 	)
 }
 
-function SummaryTile({ label, value, subtext }: {
-	label: string
-	value: string | number
-	subtext: string
+function ActionCard({ title, description, onClick }: {
+	title: string
+	description: string
+	onClick: () => void
 }) {
 	return (
-		<div className="rounded-xl border-none shadow-m bg-muted/55 py-4 pl-3 pr-5 transition-all hover:-translate-y-0.5 grid">
-			<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-			<p className="mt-2 text-2xl font-bold text-foreground bg-linear-to-br from-foreground to-foreground/80 bg-clip-text">{value}</p>
-			<p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
-		</div>
+		<button
+			type="button"
+			onClick={onClick}
+			className="w-full rounded-lg border border-border/50 bg-muted/20 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5"
+		>
+			<p className="font-medium text-foreground">{title}</p>
+			<p className="mt-2 text-sm text-muted-foreground">{description}</p>
+		</button>
 	)
 }

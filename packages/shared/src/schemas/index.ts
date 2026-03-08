@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, bigint, bigserial, numeric, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, bigint, bigserial, numeric, jsonb, uniqueIndex, integer } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -103,7 +103,7 @@ export const resumeFile = pgTable("resume_file", {
 	index().on(table.sessionId),
 ]);
 
-export const sessionStatusEnum = ["processing", "completed", "failed"] as const;
+export const sessionStatusEnum = ["processing", "retrying", "completed", "failed"] as const;
 
 export const profilingSession = pgTable("profiling_session", {
 	id: uuid("id")
@@ -117,8 +117,11 @@ export const profilingSession = pgTable("profiling_session", {
 	jobTitle: varchar("job_title", { length: 255 }),
 	status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("processing"),
 	totalFiles: bigint("total_files", { mode: "number" }).notNull().default(0),
+	activeRunId: uuid("active_run_id"),
+	retryCount: integer("retry_count").notNull().default(0),
 	pipelineVersion: varchar("pipeline_version", { length: 50 }),
 	errorMessage: text("error_message"),
+	lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.defaultNow()
 		.notNull(),
@@ -141,6 +144,7 @@ export const candidateResult = pgTable("candidate_result", {
 	fileId: bigint("file_id", { mode: "number" })
 		.notNull()
 		.references(() => resumeFile.id, { onDelete: "cascade" }),
+	runId: uuid("run_id").notNull(),
 	candidateName: varchar("candidate_name", { length: 255 }),
 	candidateEmail: varchar("candidate_email", { length: 320 }),
 	candidatePhone: varchar("candidate_phone", { length: 32 }),
@@ -156,6 +160,8 @@ export const candidateResult = pgTable("candidate_result", {
 		.notNull(),
 }, (table) => [
 	index().on(table.sessionId),
+	index().on(table.runId),
 	index().on(table.fileId),
 	index().on(table.overallScore),
+	uniqueIndex("candidate_result_run_file_unique").on(table.runId, table.fileId),
 ]);

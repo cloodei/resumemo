@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+
 import httpx
 
 from config import (
@@ -37,20 +38,22 @@ def _post_callback(payload: JobPayload, body: dict):
                 "Callback sent successfully",
                 extra={
                     "session_id": payload.session_id,
+                    "run_id": payload.run_id,
                     "type": body.get("type"),
                     "attempt": attempt + 1,
                 },
             )
             return
 
-        except (httpx.HTTPError, httpx.TimeoutException) as e:
-            last_error = e
+        except (httpx.HTTPError, httpx.TimeoutException) as error:
+            last_error = error
             if attempt < CALLBACK_RETRY_ATTEMPTS - 1:
                 delay = CALLBACK_RETRY_BACKOFF[attempt]
                 logger.warning(
-                    f"Callback failed, retrying; Error: {str(e)}",
+                    f"Callback failed, retrying; Error: {str(error)}",
                     extra={
                         "session_id": payload.session_id,
+                        "run_id": payload.run_id,
                         "attempt": attempt + 1,
                         "delay_s": delay,
                     },
@@ -61,6 +64,7 @@ def _post_callback(payload: JobPayload, body: dict):
         "All callback attempts failed",
         extra={
             "session_id": payload.session_id,
+            "run_id": payload.run_id,
             "type": body.get("type"),
             "error": str(last_error),
         },
@@ -73,6 +77,7 @@ def send_completion(payload: JobPayload, results: list[dict]):
     body = {
         "type": "completion",
         "session_id": payload.session_id,
+        "run_id": payload.run_id,
         "status": "completed",
         "pipeline_version": PIPELINE_VERSION,
         "results": results,
@@ -89,6 +94,7 @@ def send_error(
     body = {
         "type": "error",
         "session_id": payload.session_id,
+        "run_id": payload.run_id,
         "status": "failed",
         "error": error,
         "partial_results": partial_results or [],
@@ -96,5 +102,11 @@ def send_error(
     try:
         _post_callback(payload, body)
     except RuntimeError:
-        # If error callback itself fails, log and let Celery handle the retry
-        logger.error("Error callback failed", extra={"session_id": payload.session_id, "error": error})
+        logger.error(
+            "Error callback failed",
+            extra={
+                "session_id": payload.session_id,
+                "run_id": payload.run_id,
+                "error": error,
+            },
+        )

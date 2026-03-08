@@ -14,6 +14,7 @@ class JobPayload(BaseModel):
     """The full job message received from the queue."""
 
     session_id: str
+    run_id: str
     job_description: str
     files: list[FileManifestItem]
 

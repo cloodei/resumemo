@@ -25,6 +25,7 @@ export type UploadFile = {
 	size: number
 	mimeType: string
 	status: FileStatus
+	storageKey?: string
 	/** Upload progress 0-100. Only meaningful when status is "uploading". */
 	progress: number
 	errorMessage?: string
@@ -33,13 +34,14 @@ export type UploadFile = {
 /**
  * Upload phase — overall orchestration state.
  *
- * idle      → user is adding files / filling form
- * uploading → presign + PUT requests in flight
- * creating  → files uploaded, session creation POST in flight
- * done      → session created, navigating away
- * error     → something failed (user can retry or reset)
+	 * idle           → user is adding files / filling form
+	 * uploading      → presign + PUT requests in flight
+	 * creating       → files uploaded, session creation POST in flight
+	 * upload_error   → at least one file upload failed
+	 * create_error   → uploads finished but session creation failed
+	 * done           → session created, navigating away
  */
-export type UploadPhase = "idle" | "uploading" | "creating" | "done" | "error"
+export type UploadPhase = "idle" | "uploading" | "creating" | "upload_error" | "create_error" | "done"
 
 export type SessionFormData = {
 	sessionName: string
@@ -149,6 +151,7 @@ const uploadStore = create<UploadStore>()(
 					size: f.size,
 					mimeType: f.mimeType,
 					status: f.status,
+					storageKey: f.storageKey,
 					progress: f.progress,
 					errorMessage: f.errorMessage,
 				})),
@@ -158,11 +161,11 @@ const uploadStore = create<UploadStore>()(
 
 				// File blobs can't survive serialization. On rehydrate:
 				// - "done" phase: session was created successfully, clear everything.
-				// - "uploading"/"creating" phase: upload was interrupted, mark as error.
+				// - "uploading"/"creating" phase: upload was interrupted, mark as upload_error.
 				//   Files have no blobs so they can't be retried — clear them.
 				// - "idle" phase: keep form data (it's just strings), but clear files
 				//   since the File objects are gone.
-				// - "error" phase: same as idle — form data survives, files don't.
+				// - error phases: same as idle — form data survives, files don't.
 
 				if (state.phase === "done") {
 					state.files = []
@@ -172,7 +175,7 @@ const uploadStore = create<UploadStore>()(
 				}
 
 				if (state.phase === "uploading" || state.phase === "creating") {
-					state.phase = "error"
+					state.phase = "upload_error"
 				}
 
 				// Files without blobs are useless — clear them but keep form data

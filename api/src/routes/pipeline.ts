@@ -5,11 +5,12 @@
  * Authenticated by shared secret (PIPELINE_CALLBACK_SECRET), not user auth.
  */
 
+import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { eq } from "drizzle-orm";
+
+import * as schema from "@shared/schemas";
 
 import { db } from "~/lib/db";
-import * as schema from "@shared/schemas";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
 const PIPELINE_SECRET_HEADER_NAME = process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret";
@@ -42,6 +43,7 @@ const resultSchema = t.Object({
 const completionBody = t.Object({
 	type: t.Literal("completion"),
 	session_id: t.String(),
+	run_id: t.String(),
 	status: t.Literal("completed"),
 	pipeline_version: t.String(),
 	results: t.Array(resultSchema),
@@ -51,6 +53,7 @@ type CompletionBody = typeof completionBody.static;
 const errorBody = t.Object({
 	type: t.Literal("error"),
 	session_id: t.String(),
+	run_id: t.String(),
 	status: t.Literal("failed"),
 	error: t.String(),
 	partial_results: t.Array(resultSchema),
@@ -67,30 +70,29 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 			if (!validateSecret(secretHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
 
-			const { type, session_id } = body;
-
-			// Verify the session exists
 			const [session] = await db
-				.select({ id: schema.profilingSession.id, status: schema.profilingSession.status })
+				.select({
+					id: schema.profilingSession.id,
+					status: schema.profilingSession.status,
+					activeRunId: schema.profilingSession.activeRunId,
+				})
 				.from(schema.profilingSession)
-				.where(eq(schema.profilingSession.id, session_id));
+				.where(eq(schema.profilingSession.id, body.session_id));
 
 			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
 
-			// Idempotency guard: if session is already finalized, acknowledge but skip
-			if (session.status === "completed" || session.status === "failed") {
-				console.log(`[Pipeline Callback] Session ${session_id} already ${session.status}, skipping ${type} callback`);
+			if (!session.activeRunId || session.activeRunId !== body.run_id) {
+				console.log(`[Pipeline Callback] Session ${body.session_id} received stale callback for run ${body.run_id}`);
 				return { status: "ok", skipped: true };
 			}
 
-			// Handle each callback type
-			switch (type) {
+			switch (body.type) {
 				case "completion":
-					await handleCompletion(body, session_id);
+					await handleCompletion(body);
 					break;
 				case "error":
-					await handleError(body, session_id);
+					await handleError(body);
 					break;
 			}
 
@@ -99,79 +101,103 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 		{ body: callbackBody },
 	);
 
-async function handleCompletion(
-	body: CompletionBody,
-	sessionId: string,
-) {
+async function handleCompletion(body: CompletionBody) {
 	await db.transaction(async (tx) => {
-		const promise = tx
-			.update(schema.profilingSession)
-			.set({ status: "completed" })
-			.where(eq(schema.profilingSession.id, sessionId))
-			.catch((error) => console.error(`[Pipeline Callback] Failed to update session ${sessionId}:`, error));
-
-		if (body.results.length > 0) {
-			await tx.insert(schema.candidateResult).values(
-				body.results.map((r) => ({
-					sessionId,
-					fileId: r.file_id,
-					candidateName: r.candidate_name,
-					candidateEmail: r.candidate_email,
-					candidatePhone: r.candidate_phone,
-					rawText: r.raw_text,
-					parsedProfile: r.parsed_profile,
-					overallScore: String(r.overall_score),
-					scoreBreakdown: r.score_breakdown,
-					summary: r.summary,
-					skillsMatched: r.skills_matched,
-					pipelineVersion: body.pipeline_version,
-				})),
+		await tx
+			.delete(schema.candidateResult)
+			.where(
+				and(
+					eq(schema.candidateResult.sessionId, body.session_id),
+					eq(schema.candidateResult.runId, body.run_id),
+				),
 			);
-		}
 
-		await promise;
+		await tx
+			.update(schema.profilingSession)
+			.set({
+				status: "completed",
+				errorMessage: null,
+				pipelineVersion: body.pipeline_version,
+				lastCompletedAt: new Date(),
+			})
+			.where(
+				and(
+					eq(schema.profilingSession.id, body.session_id),
+					eq(schema.profilingSession.activeRunId, body.run_id),
+				),
+			);
+
+		if (body.results.length === 0)
+			return;
+
+		await tx.insert(schema.candidateResult).values(
+			body.results.map(result => ({
+				sessionId: body.session_id,
+				runId: body.run_id,
+				fileId: result.file_id,
+				candidateName: result.candidate_name,
+				candidateEmail: result.candidate_email,
+				candidatePhone: result.candidate_phone,
+				rawText: result.raw_text,
+				parsedProfile: result.parsed_profile,
+				overallScore: String(result.overall_score),
+				scoreBreakdown: result.score_breakdown,
+				summary: result.summary,
+				skillsMatched: result.skills_matched,
+				pipelineVersion: body.pipeline_version,
+			})),
+		);
 	});
 
-	console.log(`[Pipeline Callback] Completed: ${body.results.length} results for session ${sessionId}`);
+	console.log(`[Pipeline Callback] Completed run ${body.run_id} for session ${body.session_id}`);
 }
 
-async function handleError(
-	body: ErrorBody,
-	sessionId: string,
-) {
+async function handleError(body: ErrorBody) {
 	await db.transaction(async (tx) => {
-		const promise = tx
+		await tx
+			.delete(schema.candidateResult)
+			.where(
+				and(
+					eq(schema.candidateResult.sessionId, body.session_id),
+					eq(schema.candidateResult.runId, body.run_id),
+				),
+			);
+
+		await tx
 			.update(schema.profilingSession)
 			.set({
 				status: "failed",
-				errorMessage: body.error
+				errorMessage: body.error,
+				lastCompletedAt: null,
 			})
-			.where(eq(schema.profilingSession.id, sessionId))
-			.catch((error) => console.error(`[Pipeline Callback] Failed to update session ${sessionId}:`, error));
-
-		if (body.partial_results.length > 0) {
-			await tx.insert(schema.candidateResult).values(
-				body.partial_results.map((r) => ({
-					sessionId,
-					fileId: r.file_id,
-					candidateName: r.candidate_name,
-					candidateEmail: r.candidate_email,
-					candidatePhone: r.candidate_phone,
-					rawText: r.raw_text,
-					parsedProfile: r.parsed_profile,
-					overallScore: String(r.overall_score),
-					scoreBreakdown: r.score_breakdown,
-					summary: r.summary,
-					skillsMatched: r.skills_matched,
-					pipelineVersion: "unknown",
-				})),
+			.where(
+				and(
+					eq(schema.profilingSession.id, body.session_id),
+					eq(schema.profilingSession.activeRunId, body.run_id),
+				),
 			);
-		}
 
-		await promise;
+		if (body.partial_results.length === 0)
+			return;
+
+		await tx.insert(schema.candidateResult).values(
+			body.partial_results.map(result => ({
+				sessionId: body.session_id,
+				runId: body.run_id,
+				fileId: result.file_id,
+				candidateName: result.candidate_name,
+				candidateEmail: result.candidate_email,
+				candidatePhone: result.candidate_phone,
+				rawText: result.raw_text,
+				parsedProfile: result.parsed_profile,
+				overallScore: String(result.overall_score),
+				scoreBreakdown: result.score_breakdown,
+				summary: result.summary,
+				skillsMatched: result.skills_matched,
+				pipelineVersion: "unknown",
+			})),
+		);
 	});
 
-	console.log(
-		`[Pipeline Callback] Failed: ${body.error} for session ${sessionId} (${body.partial_results.length} partial results saved)`,
-	);
+	console.log(`[Pipeline Callback] Failed run ${body.run_id} for session ${body.session_id}: ${body.error}`);
 }
