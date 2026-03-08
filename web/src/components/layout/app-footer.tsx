@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { motion, spring } from 'motion/react';
+import { motion, spring } from "motion/react";
 import {
   Briefcase,
   Twitter,
@@ -12,8 +12,8 @@ import {
   Users,
   Zap,
   Building2,
-} from 'lucide-react';
-import { Logo } from './tlg';
+} from "lucide-react";
+import { Logo } from "../brand/logo";
 
 const footerLinks = {
   product: [

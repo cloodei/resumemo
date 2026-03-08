@@ -1,8 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom"
+import { Route, Routes } from "react-router-dom"
 
 import { RouteTitle } from "./routes/route-title"
 import { ROUTES } from "./routes/route-defs"
 import AppLayout from "./layouts/app-layout"
+import NotFoundPage from "./pages/not-found"
 
 export function App() {
   return (
@@ -23,7 +24,15 @@ export function App() {
           />
         )
       })}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="*"
+        element={(
+          <AppLayout>
+            <RouteTitle title="Not Found · Résumé Ranker" />
+            <NotFoundPage />
+          </AppLayout>
+        )}
+      />
     </Routes>
   )
 }

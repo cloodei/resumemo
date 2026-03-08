@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { ArrowRight, BadgeCheck, BookOpen, BrainCircuit, ChevronRight, Layers, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AppFooter } from "@/components/app-footer";
+import { AppFooter } from "@/components/layout/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const fadeUp = {

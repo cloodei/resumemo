@@ -1,6 +1,7 @@
 import LandingPage from "@/pages/landing-page"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
+import NotFoundPage from "@/pages/not-found"
 import NewProfilingPage from "@/pages/profiling/new"
 import ProfilingResultsPage from "@/pages/profiling/session"
 import ProfilingSessionsPage from "@/pages/profiling/list"
@@ -46,6 +47,12 @@ export const ROUTES = [
     path: "/app",
     title: "Dashboard · Résumé Ranker",
     element: <DashboardPage />,
+    layout: "app",
+  },
+  {
+    path: "/not-found",
+    title: "Not Found · Résumé Ranker",
+    element: <NotFoundPage />,
     layout: "app",
   },
 ] as const

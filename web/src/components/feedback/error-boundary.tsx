@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 type ErrorBoundaryProps = {
 	children: ReactNode
 	fallback?: ReactNode
+	onReset?: () => void
 }
 
 type ErrorBoundaryState = {
@@ -13,13 +14,6 @@ type ErrorBoundaryState = {
 	error: Error | null
 }
 
-/**
- * Catches unhandled exceptions in the React render tree and shows a
- * recoverable error screen instead of a blank white page.
- *
- * Wrap around <App /> in providers to protect the entire app, or wrap
- * individual routes for more granular recovery.
- */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	constructor(props: ErrorBoundaryProps) {
 		super(props)
@@ -35,6 +29,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	}
 
 	handleReset = () => {
+		this.props.onReset?.()
 		this.setState({ hasError: false, error: null })
 	}
 
@@ -44,9 +39,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 	render() {
 		if (this.state.hasError) {
-			if (this.props.fallback) {
+			if (this.props.fallback)
 				return this.props.fallback
-			}
 
 			return (
 				<div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -63,15 +57,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 						</div>
 
 						{this.state.error && (
-							<pre className="w-full overflow-auto rounded-lg bg-muted/50 p-4 text-left text-xs text-muted-foreground font-mono max-h-32">
+							<pre className="max-h-32 w-full overflow-auto rounded-lg bg-muted/50 p-4 text-left font-mono text-xs text-muted-foreground">
 								{this.state.error.message}
 							</pre>
 						)}
 
 						<div className="flex items-center gap-3">
-							<Button variant="outline" onClick={this.handleReset}>
-								Try again
-							</Button>
+							<Button variant="outline" onClick={this.handleReset}>Try again</Button>
 							<Button onClick={this.handleReload} className="gap-2">
 								<RefreshCw className="size-4" />
 								Reload page

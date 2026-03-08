@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
-import { getErrorMessage } from "@/lib/errors"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -14,7 +14,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog"
-import { useAuth } from "@/components/auth-provider"
+import { getErrorMessage } from "@/lib/errors"
 
 type SignOutDialogProps = {
 	trigger: React.ReactElement
@@ -61,11 +61,7 @@ export function SignOutDialog({ trigger }: SignOutDialogProps) {
 					<Button variant="ghost" onClick={() => setOpen(false)} disabled={isSigningOut}>
 						Cancel
 					</Button>
-					<Button
-						variant="destructive"
-						onClick={handleConfirm}
-						disabled={isSigningOut}
-					>
+					<Button variant="destructive" onClick={handleConfirm} disabled={isSigningOut}>
 						{isSigningOut ? "Signing out..." : "Sign out"}
 					</Button>
 				</DialogFooter>

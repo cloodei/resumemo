@@ -1,7 +1,11 @@
 import { Link } from "react-router-dom"
+import { Suspense } from "react"
 import { motion } from "motion/react"
 import { Github, Mail, Sparkles, Clock, Briefcase, FileText } from "lucide-react"
 
+import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
+import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
+import { ProfilingSessionsSkeleton } from "@/components/feedback/route-skeletons"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -56,7 +60,7 @@ function getProviderBadge(provider: string) {
   }
 }
 
-export default function Page() {
+function DashboardContent() {
   const { data: session, isPending } = useSession()
   const user = session?.user
   const authProvider = detectAuthProvider(user)
@@ -82,9 +86,9 @@ export default function Page() {
       icon: Clock,
     },
     {
-      label: "AI Model",
-      value: "Default v2.1",
-      change: "Optimized for tech roles",
+      label: "Background Jobs",
+      value: "Always On",
+      change: "Sessions keep running after you leave",
       icon: Sparkles,
     },
   ]
@@ -147,7 +151,7 @@ export default function Page() {
             )}
           </div>
           <p className="max-w-2xl text-balance text-sm text-muted-foreground">
-            Monitor ranking activity, jump into active jobs, and keep talent pipelines moving with confidence.
+            Monitor active screening work, jump into finished sessions, and let long-running jobs complete quietly in the background.
           </p>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -187,7 +191,7 @@ export default function Page() {
             <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/30 pb-4">
               <div>
                 <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Recent Profiling Sessions</CardTitle>
-                <CardDescription className="text-sm mt-1">Track AI analysis status and manage your resume profiling sessions.</CardDescription>
+                <CardDescription className="text-sm mt-1">Track recent screening work without having to stay on any one session page.</CardDescription>
               </div>
               <Button
                 asChild
@@ -235,46 +239,46 @@ export default function Page() {
                           variant={session.status === "completed" ? "secondary" : session.status === "processing" || session.status === "retrying" ? "default" : "outline"}
                           className="shadow-sm capitalize"
                         >
-                          {session.status}
+                          {session.status === "processing" ? "queued" : session.status === "retrying" ? "refreshing" : session.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-                <TableCaption>Profiling session updates refresh every 30 seconds.</TableCaption>
+                <TableCaption>Background sessions refresh automatically while they are active.</TableCaption>
               </Table>
             </CardContent>
           </Card>
 
           <Card className="flex h-full flex-col border-none shadow-md">
             <CardHeader className="border-b border-border/30 pb-4">
-              <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Workflows</CardTitle>
-              <CardDescription className="text-sm mt-1">Select a view to explore automation and insights.</CardDescription>
+              <CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Workflow Notes</CardTitle>
+              <CardDescription className="text-sm mt-1">Quick reminders for how screening work behaves across the app.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-6">
               <Tabs defaultValue="pipelines" className="flex-1">
                 <TabsList>
-                  <TabsTrigger value="pipelines" className="border-none">Pipelines</TabsTrigger>
-                  <TabsTrigger value="models" className="border-none">Scoring models</TabsTrigger>
+                  <TabsTrigger value="pipelines" className="border-none">Background jobs</TabsTrigger>
+                  <TabsTrigger value="models" className="border-none">Review flow</TabsTrigger>
                 </TabsList>
                 <TabsContent value="pipelines" className="mt-4 space-y-3 text-sm text-muted-foreground">
                   <div className="group rounded-lg bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:bg-muted/40 dark:hover:bg-muted/30 hover:-translate-y-0.5 cursor-pointer">
-                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Tech GTM</p>
-                    <p className="mt-1.5 text-xs text-muted-foreground">Automated screening for senior engineers meeting GTM hiring goals.</p>
+                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Leave and come back</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">New and retried sessions keep running in the background, so reviewers do not need to stay on a loading screen.</p>
                   </div>
                   <div className="group rounded-lg bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:bg-muted/40 dark:hover:bg-muted/30 hover:-translate-y-0.5 cursor-pointer">
-                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Product Ops Accelerator</p>
-                    <p className="mt-1.5 text-xs text-muted-foreground">30 resumes processed this week. 78% meet the minimum scoring threshold.</p>
+                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Retry without rework</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Uploads and completed sessions can be retried or duplicated without reselecting every resume file.</p>
                   </div>
                 </TabsContent>
                 <TabsContent value="models" className="mt-4 space-y-3 text-sm text-muted-foreground">
                   <div className="group rounded-lg bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:bg-muted/40 dark:hover:bg-muted/30 hover:-translate-y-0.5 cursor-pointer">
-                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Default similarity model</p>
-                    <p className="mt-1.5 text-xs text-muted-foreground">Optimized for balanced technical and leadership experience.</p>
+                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Review the shortlist first</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Completed sessions now highlight candidate summaries, experience, contact details, and manual review notes before anything else.</p>
                   </div>
                   <div className="group rounded-lg bg-muted/30 dark:bg-muted/20 p-4 shadow-m transition-all hover:shadow-l hover:bg-muted/40 dark:hover:bg-muted/30 hover:-translate-y-0.5 cursor-pointer">
-                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Experiment: AI/ML focus</p>
-                    <p className="mt-1.5 text-xs text-muted-foreground">Higher weight on publications, model deployment, and prompt design.</p>
+                    <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Choose the right retry path</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Use retry in place for a refreshed run, or create a new copy when you want to preserve prior outcomes.</p>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -282,5 +286,24 @@ export default function Page() {
           </Card>
         </section>
     </motion.div>
+  )
+}
+
+export default function Page() {
+  return (
+    <QueryErrorBoundary
+      fallback={(
+        <RouteErrorFallback
+          title="Could not load the dashboard"
+          description="The workspace overview is temporarily unavailable. You can retry this page or jump into your profiling sessions directly."
+          secondaryHref="/profiling"
+          secondaryLabel="Go to sessions"
+        />
+      )}
+    >
+      <Suspense fallback={<ProfilingSessionsSkeleton />}>
+        <DashboardContent />
+      </Suspense>
+    </QueryErrorBoundary>
   )
 }

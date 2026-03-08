@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth/auth-provider"
 
 type LoginGuardProps = {
 	children: React.ReactNode

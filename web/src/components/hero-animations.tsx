@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { motion, spring } from "motion/react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ArrowUpRight, Database, ShieldCheck, Sparkles, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
+import { Button } from "./ui/button";
 
 const containerVariants = {
   hidden: { opacity: 0 },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { motion, AnimatePresence } from "motion/react"
 import {
@@ -25,6 +25,9 @@ import {
 } from "@/lib/constants"
 import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
+import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
+import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
+import { ProfilingSessionSkeleton } from "@/components/feedback/route-skeletons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -104,7 +107,7 @@ const phaseLabel = {
 	done: "Session created. Redirecting...",
 } as const
 
-export default function NewProfilingPage() {
+function NewProfilingPageContent() {
 	const navigate = useNavigate()
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
@@ -794,5 +797,24 @@ export default function NewProfilingPage() {
 				)}
 			</AnimatePresence>
 		</div>
+	)
+}
+
+export default function NewProfilingPage() {
+	return (
+		<QueryErrorBoundary
+			fallback={(
+				<RouteErrorFallback
+					title="Could not open new profiling"
+					description="The upload workspace is temporarily unavailable. You can retry this page or go back to your session list."
+					secondaryHref="/profiling"
+					secondaryLabel="Back to sessions"
+				/>
+			)}
+		>
+			<Suspense fallback={<ProfilingSessionSkeleton />}>
+				<NewProfilingPageContent />
+			</Suspense>
+		</QueryErrorBoundary>
 	)
 }
