@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { pgTable, text, timestamp, boolean, uuid, index, varchar, bigint, bigserial, numeric, jsonb, uniqueIndex, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, varchar, bigint, bigserial, numeric, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -88,9 +88,6 @@ export const resumeFile = pgTable("resume_file", {
 	userId: uuid("user_id")
 		.notNull()
 		.references(() => user.id, { onDelete: "cascade" }),
-	sessionId: uuid("session_id")
-		.notNull()
-		.references(() => profilingSession.id, { onDelete: "cascade" }),
 	originalName: varchar("original_name", { length: 512 }).notNull(),
 	mimeType: varchar("mime_type", { length: 128 }).notNull(),
 	size: bigint("size", { mode: "bigint" }).notNull(),
@@ -100,7 +97,24 @@ export const resumeFile = pgTable("resume_file", {
 		.notNull()
 }, (table) => [
 	index().on(table.userId),
+	uniqueIndex("resume_file_user_storage_key_unique").on(table.userId, table.storageKey),
+]);
+
+export const profilingSessionFile = pgTable("profiling_session_file", {
+	id: bigserial("id", { mode: "number" }).primaryKey(),
+	sessionId: uuid("session_id")
+		.notNull()
+		.references(() => profilingSession.id, { onDelete: "cascade" }),
+	fileId: bigint("file_id", { mode: "number" })
+		.notNull()
+		.references(() => resumeFile.id, { onDelete: "cascade" }),
+	createdAt: timestamp("created_at", { withTimezone: true })
+		.defaultNow()
+		.notNull(),
+}, (table) => [
 	index().on(table.sessionId),
+	index().on(table.fileId),
+	uniqueIndex("profiling_session_file_session_file_unique").on(table.sessionId, table.fileId),
 ]);
 
 export const sessionStatusEnum = ["processing", "retrying", "completed", "failed"] as const;
@@ -118,8 +132,6 @@ export const profilingSession = pgTable("profiling_session", {
 	status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("processing"),
 	totalFiles: bigint("total_files", { mode: "number" }).notNull().default(0),
 	activeRunId: uuid("active_run_id"),
-	retryCount: integer("retry_count").notNull().default(0),
-	pipelineVersion: varchar("pipeline_version", { length: 50 }),
 	errorMessage: text("error_message"),
 	lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
 	createdAt: timestamp("created_at", { withTimezone: true })
@@ -154,14 +166,10 @@ export const candidateResult = pgTable("candidate_result", {
 	scoreBreakdown: jsonb("score_breakdown").notNull(),
 	summary: text("summary").notNull(),
 	skillsMatched: jsonb("skills_matched").notNull().default([]),
-	pipelineVersion: varchar("pipeline_version", { length: 50 }).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.defaultNow()
 		.notNull(),
 }, (table) => [
-	index().on(table.sessionId),
-	index().on(table.runId),
-	index().on(table.fileId),
-	index().on(table.overallScore),
+	index().on(table.sessionId, table.runId),
 	uniqueIndex("candidate_result_run_file_unique").on(table.runId, table.fileId),
 ]);

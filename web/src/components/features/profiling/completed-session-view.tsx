@@ -62,16 +62,20 @@ export function CompletedSessionView({
 					</CardContent>
 				</Card>
 
-				<Card className="border-none shadow-x">
-					<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
-						<CardTitle className="bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-lg font-semibold">Next actions</CardTitle>
-						<CardDescription className="mt-1 text-sm">Choose whether to keep this run, duplicate it, or replace it with a refreshed version.</CardDescription>
+				<Card className="border-none shadow-x gap-3">
+					<CardHeader className="border-b border-border/50 [.border-b]:pb-2 dark:border-border/30">
+						<CardTitle className="bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-lg font-semibold">
+							Next actions
+						</CardTitle>
+						<CardDescription className="mt-0 text-sm">
+							Choose whether to keep this run, duplicate it, or replace it with a refreshed version.
+						</CardDescription>
 					</CardHeader>
-					<CardContent className="space-y-3 pt-6 text-sm text-muted-foreground">
-						<ActionCard title="Retry now" description="Rerun this exact session in place." onClick={() => onOpenRetry("rerun_current")} />
-						<ActionCard title="New copy" description="Create a new session using the same files and current brief." onClick={() => onOpenRetry("clone_current")} />
+					<CardContent className="space-y-3 pt-2 text-sm text-muted-foreground">
+						<ActionCard title="Retry now" description="Re-score this session in place with a new result." onClick={() => onOpenRetry("rerun_current")} />
+						<ActionCard title="New copy" description="Re-score this session as a copy, using the same files and current brief." onClick={() => onOpenRetry("clone_current")} />
 						<ActionCard title="Update as new" description="Edit the brief and create a new follow-up session." onClick={() => onOpenRetry("clone_with_updates")} />
-						<ActionCard title="Update and replace" description="Edit this session and rerun it in place." onClick={() => onOpenRetry("replace_with_updates")} />
+						<ActionCard title="Update and replace" description="Edit this session and re-score it in place." onClick={() => onOpenRetry("replace_with_updates")} />
 					</CardContent>
 				</Card>
 			</section>

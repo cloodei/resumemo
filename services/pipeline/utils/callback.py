@@ -13,7 +13,6 @@ from config import (
     PIPELINE_CALLBACK_SECRET,
     PIPELINE_CALLBACK_URL,
     PIPELINE_SECRET_HEADER_NAME,
-    PIPELINE_VERSION,
 )
 from models import JobPayload
 
@@ -79,7 +78,6 @@ def send_completion(payload: JobPayload, results: list[dict]):
         "session_id": payload.session_id,
         "run_id": payload.run_id,
         "status": "completed",
-        "pipeline_version": PIPELINE_VERSION,
         "results": results,
     }
     _post_callback(payload, body)

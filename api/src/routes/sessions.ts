@@ -1,6 +1,6 @@
 import { randomUUIDv7 } from "bun";
 import { Elysia, t } from "elysia";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import * as schema from "@shared/schemas";
 import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
@@ -15,8 +15,6 @@ import {
 	generateStorageKey,
 	headFile,
 } from "~/lib/storage";
-
-const PIPELINE_VERSION = "0.1.0";
 
 type ConfirmedUpload = {
 	storageKey: string;
@@ -141,8 +139,9 @@ async function getSessionUploads(sessionId: string) {
 			mimeType: schema.resumeFile.mimeType,
 			size: schema.resumeFile.size,
 		})
-		.from(schema.resumeFile)
-		.where(eq(schema.resumeFile.sessionId, sessionId));
+		.from(schema.profilingSessionFile)
+		.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+		.where(eq(schema.profilingSessionFile.sessionId, sessionId));
 
 	return files.map(file => ({
 		storageKey: file.storageKey,
@@ -150,6 +149,70 @@ async function getSessionUploads(sessionId: string) {
 		mimeType: file.mimeType,
 		size: Number(file.size),
 	}));
+}
+
+async function attachExistingFilesToSession(args: {
+	tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+	sessionId: string;
+	userId: string;
+	files: ConfirmedUpload[];
+}) {
+	const storageKeys = args.files.map(file => file.storageKey);
+	const existingFiles = await args.tx
+		.select({
+			fileId: schema.resumeFile.id,
+			storageKey: schema.resumeFile.storageKey,
+			originalName: schema.resumeFile.originalName,
+			mimeType: schema.resumeFile.mimeType,
+			size: schema.resumeFile.size,
+		})
+		.from(schema.resumeFile)
+		.where(and(
+			eq(schema.resumeFile.userId, args.userId),
+			inArray(schema.resumeFile.storageKey, storageKeys),
+		));
+
+	const fileByStorageKey = new Map(existingFiles.map(file => [file.storageKey, file]));
+	const missingUploads = args.files.filter(file => !fileByStorageKey.has(file.storageKey));
+
+	if (missingUploads.length > 0) {
+		const insertedFiles = await args.tx
+			.insert(schema.resumeFile)
+			.values(missingUploads.map(file => ({
+				userId: args.userId,
+				originalName: file.fileName,
+				mimeType: file.mimeType,
+				size: BigInt(file.size),
+				storageKey: file.storageKey,
+			})))
+			.returning({
+				fileId: schema.resumeFile.id,
+				storageKey: schema.resumeFile.storageKey,
+				originalName: schema.resumeFile.originalName,
+				mimeType: schema.resumeFile.mimeType,
+				size: schema.resumeFile.size,
+			});
+
+		for (const file of insertedFiles)
+			fileByStorageKey.set(file.storageKey, file);
+	}
+
+	const sessionFiles = args.files.map((file) => {
+		const matched = fileByStorageKey.get(file.storageKey);
+		if (!matched)
+			throw new Error(`Missing stored file for ${file.fileName}`);
+
+		return matched;
+	});
+
+	await args.tx.insert(schema.profilingSessionFile).values(
+		sessionFiles.map(file => ({
+			sessionId: args.sessionId,
+			fileId: file.fileId,
+		})),
+	);
+
+	return sessionFiles;
 }
 
 async function getSessionFileRecords(sessionId: string) {
@@ -161,8 +224,9 @@ async function getSessionFileRecords(sessionId: string) {
 			mimeType: schema.resumeFile.mimeType,
 			size: schema.resumeFile.size,
 		})
-		.from(schema.resumeFile)
-		.where(eq(schema.resumeFile.sessionId, sessionId));
+		.from(schema.profilingSessionFile)
+		.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+		.where(eq(schema.profilingSessionFile.sessionId, sessionId));
 }
 
 async function createSessionWithFiles(args: {
@@ -186,8 +250,6 @@ async function createSessionWithFiles(args: {
 				jobTitle: args.jobTitle ?? null,
 				status: "processing",
 				activeRunId: runId,
-				retryCount: 0,
-				pipelineVersion: PIPELINE_VERSION,
 				totalFiles: args.files.length,
 				errorMessage: null,
 				lastCompletedAt: null,
@@ -196,24 +258,11 @@ async function createSessionWithFiles(args: {
 
 		sessionId = createdSession.id;
 
-		sessionFiles = await tx
-			.insert(schema.resumeFile)
-			.values(
-				args.files.map(file => ({
-					userId: args.userId,
-					sessionId,
-					originalName: file.fileName,
-					mimeType: file.mimeType,
-					size: BigInt(file.size),
-					storageKey: file.storageKey,
-				})),
-			)
-			.returning({
-				fileId: schema.resumeFile.id,
-				storageKey: schema.resumeFile.storageKey,
-				originalName: schema.resumeFile.originalName,
-				mimeType: schema.resumeFile.mimeType,
-				size: schema.resumeFile.size,
+		sessionFiles = await attachExistingFilesToSession({
+			tx,
+			sessionId,
+			userId: args.userId,
+			files: args.files,
 		});
 	});
 
@@ -244,7 +293,6 @@ async function rerunSession(args: {
 	jobTitle?: string | null;
 	jobDescription: string;
 	status: "retrying";
-	retryCount: number;
 }) {
 	const runId = randomUUIDv7();
 	const files = await getSessionFileRecords(args.sessionId);
@@ -260,8 +308,6 @@ async function rerunSession(args: {
 			jobDescription: args.jobDescription,
 			status: args.status,
 			activeRunId: runId,
-			retryCount: args.retryCount + 1,
-			pipelineVersion: PIPELINE_VERSION,
 			errorMessage: null,
 			lastCompletedAt: null,
 			totalFiles: files.length,
@@ -429,7 +475,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					jobTitle: schema.profilingSession.jobTitle,
 					jobDescription: schema.profilingSession.jobDescription,
 					status: schema.profilingSession.status,
-					retryCount: schema.profilingSession.retryCount,
 				})
 				.from(schema.profilingSession)
 				.where(
@@ -481,7 +526,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 							jobTitle: existingSession.jobTitle,
 							jobDescription: existingSession.jobDescription,
 							status: "retrying",
-							retryCount: existingSession.retryCount,
 						});
 
 						return {
@@ -530,7 +574,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 							jobTitle: nextJobTitle,
 							jobDescription: nextJobDescription,
 							status: "retrying",
-							retryCount: existingSession.retryCount,
 						});
 
 						return {
@@ -596,8 +639,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						mimeType: schema.resumeFile.mimeType,
 						size: schema.resumeFile.size,
 					})
-					.from(schema.resumeFile)
-					.where(eq(schema.resumeFile.sessionId, params.id)),
+					.from(schema.profilingSessionFile)
+					.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+					.where(eq(schema.profilingSessionFile.sessionId, params.id)),
 			]);
 
 			const session = sessionRows[0];
@@ -621,7 +665,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						overallScore: schema.candidateResult.overallScore,
 						summary: schema.candidateResult.summary,
 						skillsMatched: schema.candidateResult.skillsMatched,
-						pipelineVersion: schema.candidateResult.pipelineVersion,
 						createdAt: schema.candidateResult.createdAt,
 						originalName: schema.resumeFile.originalName,
 					})
@@ -677,7 +720,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						overallScore: schema.candidateResult.overallScore,
 						summary: schema.candidateResult.summary,
 						skillsMatched: schema.candidateResult.skillsMatched,
-						pipelineVersion: schema.candidateResult.pipelineVersion,
 						createdAt: schema.candidateResult.createdAt,
 						originalName: schema.resumeFile.originalName,
 					})
@@ -738,7 +780,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 						scoreBreakdown: schema.candidateResult.scoreBreakdown,
 						summary: schema.candidateResult.summary,
 						skillsMatched: schema.candidateResult.skillsMatched,
-						pipelineVersion: schema.candidateResult.pipelineVersion,
 						createdAt: schema.candidateResult.createdAt,
 						originalName: schema.resumeFile.originalName,
 						mimeType: schema.resumeFile.mimeType,

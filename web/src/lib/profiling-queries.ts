@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query"
 
-import { api } from "@/lib/api"
-import { getEdenErrorMessage } from "@/lib/errors"
+import { api } from "./api"
+import { getEdenErrorMessage } from "./errors"
 
 export type SessionStatus = "processing" | "retrying" | "completed" | "failed"
 
@@ -15,7 +15,6 @@ export type ProfilingSession = {
 	errorMessage: string | null
 	createdAt: string | Date
 	lastCompletedAt?: string | Date | null
-	retryCount?: number
 }
 
 export type SessionFile = {
@@ -29,13 +28,13 @@ export type ParsedProfile = {
 	name_confidence?: number | null
 	parse_warnings?: string[] | null
 	total_experience_years?: number | null
-	work_history?: Array<{
+	work_history?: {
 		title?: string | null
 		company?: string | null
 		start_date?: string | null
 		end_date?: string | null
 		description?: string | null
-	}> | null
+	}[] | null
 	education?: Array<{
 		degree?: string | null
 		institution?: string | null
@@ -91,7 +90,7 @@ async function fetchProfilingSession(id: string): Promise<ProfilingSessionRespon
 	}
 }
 
-async function fetchCandidateResultDetail(args: { sessionId: string; resultId: string }): Promise<CandidateResultDetail> {
+async function fetchCandidateResultDetail(args: { sessionId: string; resultId: string }) {
 	const { data, error } = await api.api.v2.sessions({ id: args.sessionId }).results({ resultId: args.resultId }).get()
 	if (error || !data?.result)
 		throw new Error(getEdenErrorMessage(error) ?? "Could not load candidate details")
@@ -102,7 +101,7 @@ async function fetchCandidateResultDetail(args: { sessionId: string; resultId: s
 	} as CandidateResultDetail
 }
 
-async function fetchProfilingSessions(): Promise<ProfilingSession[]> {
+async function fetchProfilingSessions() {
 	const { data, error } = await api.api.v2.sessions.get()
 	if (error || !data)
 		throw new Error(getEdenErrorMessage(error) ?? "Could not load sessions")

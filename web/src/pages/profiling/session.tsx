@@ -1,40 +1,25 @@
+import { toast } from "sonner"
+import { useNavigate, useParams } from "react-router-dom"
 import { Suspense, useMemo, useState } from "react"
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
-import { useNavigate, useParams } from "react-router-dom"
-import { toast } from "sonner"
 
+import * as Profiling from "@/components/features/profiling"
+import { api } from "@/lib/api"
+import { BASE_URL } from "@/lib/constants"
+import { formatFileSize } from "@/lib/utils"
 import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionSkeleton } from "@/components/feedback/route-skeletons"
-import { CandidateDetailDialog } from "@/components/features/profiling/candidate-detail-dialog"
-import { CompletedSessionView } from "@/components/features/profiling/completed-session-view"
-import { RetrySessionDialog } from "@/components/features/profiling/retry-session-dialog"
-import { SessionHeader } from "@/components/features/profiling/session-header"
-import {
-	FailedSessionSection,
-	RunningSessionSection,
-	UploadedDocumentsSection,
-} from "@/components/features/profiling/session-status-sections"
-import {
-	getManualReviewLabel,
-	needsManualReview,
-	retryModeCopy,
-	type RetryFormValues,
-	type RetryMode,
-} from "@/components/features/profiling/session-utils"
-import { api } from "@/lib/api"
-import { BASE_URL } from "@/lib/constants"
-import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { profilingSessionQueryOptions } from "@/lib/profiling-queries"
-import { formatFileSize } from "@/lib/utils"
+import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 
 function ProfilingSessionContent() {
 	const { id } = useParams<{ id: string }>()
 	const navigate = useNavigate()
 	const queryClient = useQueryClient()
 	const [retryDialogOpen, setRetryDialogOpen] = useState(false)
-	const [selectedRetryMode, setSelectedRetryMode] = useState<RetryMode>("rerun_current")
 	const [selectedResultId, setSelectedResultId] = useState<string | null>(null)
+	const [selectedRetryMode, setSelectedRetryMode] = useState<Profiling.RetryMode>("rerun_current")
 
 	if (!id)
 		throw new Error("Missing session id")
@@ -56,7 +41,8 @@ function ProfilingSessionContent() {
 	const isCompleted = session.status === "completed"
 	const isFailed = session.status === "failed"
 	const isRunning = session.status === "processing" || session.status === "retrying"
-	const manualReviewCount = useMemo(() => results.filter(needsManualReview).length, [results])
+
+	const manualReviewCount = useMemo(() => results.filter(Profiling.needsManualReview).length, [results])
 	const strongMatches = useMemo(() => results.filter(candidate => candidate.overallScore >= 80).length, [results])
 	const averageScore = useMemo(() => {
 		if (results.length === 0)
@@ -66,8 +52,8 @@ function ProfilingSessionContent() {
 	}, [results])
 
 	const retryMutation = useMutation({
-		mutationFn: async (values: RetryFormValues) => {
-			const selectedRetryCopy = retryModeCopy[selectedRetryMode]
+		mutationFn: async (values: Profiling.RetryFormValues) => {
+			const selectedRetryCopy = Profiling.retryModeCopy[selectedRetryMode]
 			const payload = selectedRetryCopy.requiresUpdates
 				? {
 					mode: selectedRetryMode,
@@ -84,7 +70,7 @@ function ProfilingSessionContent() {
 			return data
 		},
 		onSuccess: async (response) => {
-			const selectedRetryCopy = retryModeCopy[selectedRetryMode]
+			const selectedRetryCopy = Profiling.retryModeCopy[selectedRetryMode]
 			toast.success(selectedRetryCopy.target === "current"
 				? "Retry started in the background"
 				: "A new background session has been created")
@@ -142,20 +128,20 @@ function ProfilingSessionContent() {
 		},
 	})
 
-	const defaultRetryValues: RetryFormValues = {
+	const defaultRetryValues: Profiling.RetryFormValues = {
 		name: session.name,
 		jobTitle: session.jobTitle ?? "",
 		jobDescription: session.jobDescription,
 	}
 
-	const openRetry = (mode: RetryMode) => {
+	const openRetry = (mode: Profiling.RetryMode) => {
 		setSelectedRetryMode(mode)
 		setRetryDialogOpen(true)
 	}
 
 	return (
 		<div className="flex flex-col gap-8">
-			<SessionHeader
+			<Profiling.SessionHeader
 				session={session}
 				isCompleted={isCompleted}
 				isFailed={isFailed}
@@ -166,16 +152,16 @@ function ProfilingSessionContent() {
 			/>
 
 			{isRunning && (
-				<RunningSessionSection
+				<Profiling.RunningSessionSection
 					session={session}
 					onRefresh={() => queryClient.invalidateQueries({ queryKey: ["profiling-session", id] })}
 				/>
 			)}
 
-			{isFailed && <FailedSessionSection session={session} onOpenRetry={openRetry} />}
+			{isFailed && <Profiling.FailedSessionSection session={session} onOpenRetry={openRetry} />}
 
 			{isCompleted && (
-				<CompletedSessionView
+				<Profiling.CompletedSessionView
 					session={session}
 					results={results}
 					strongMatches={strongMatches}
@@ -189,13 +175,13 @@ function ProfilingSessionContent() {
 			)}
 
 			{!isCompleted && files.length > 0 && (
-				<UploadedDocumentsSection
+				<Profiling.UploadedDocumentsSection
 					files={files.map(file => ({ id: file.id, originalName: file.originalName, size: Number(file.size) }))}
 					formatFileSize={formatFileSize}
 				/>
 			)}
 
-			<RetrySessionDialog
+			<Profiling.RetrySessionDialog
 				open={retryDialogOpen}
 				onOpenChange={setRetryDialogOpen}
 				selectedRetryMode={selectedRetryMode}
@@ -207,7 +193,7 @@ function ProfilingSessionContent() {
 				isPending={retryMutation.isPending}
 			/>
 
-			<CandidateDetailDialog
+			<Profiling.CandidateDetailDialog
 				sessionId={id}
 				resultId={selectedResultId}
 				open={Boolean(selectedResultId)}

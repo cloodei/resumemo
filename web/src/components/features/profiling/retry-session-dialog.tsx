@@ -42,7 +42,7 @@ export function RetrySessionDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl">
+			<DialogContent className="lg:max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Retry or recreate this session</DialogTitle>
 					<DialogDescription>

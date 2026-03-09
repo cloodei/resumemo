@@ -40,15 +40,14 @@ const fileRoutes = new Elysia({ prefix: "/api/files" })
 			return { status: "error", message: "File not found" };
 		}
 
-		// Check if any session references this file
-		// const refs = await db.select({ id: schema.profilingSessionFile.id })
-		// 	.from(schema.profilingSessionFile)
-		// 	.where(eq(schema.profilingSessionFile.fileId, params.id));
+		const refs = await db.select({ id: schema.profilingSessionFile.id })
+			.from(schema.profilingSessionFile)
+			.where(eq(schema.profilingSessionFile.fileId, params.id));
 
-		// if (refs.length > 0) {
-		// 	set.status = 409;
-		// 	return { status: "error", message: "File is used by one or more sessions" };
-		// }
+		if (refs.length > 0) {
+			set.status = 409;
+			return { status: "error", message: "File is used by one or more sessions" };
+		}
 
 		try {
 			await deleteFile(file.storageKey);

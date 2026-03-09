@@ -45,7 +45,6 @@ const completionBody = t.Object({
 	session_id: t.String(),
 	run_id: t.String(),
 	status: t.Literal("completed"),
-	pipeline_version: t.String(),
 	results: t.Array(resultSchema),
 });
 type CompletionBody = typeof completionBody.static;
@@ -117,7 +116,6 @@ async function handleCompletion(body: CompletionBody) {
 			.set({
 				status: "completed",
 				errorMessage: null,
-				pipelineVersion: body.pipeline_version,
 				lastCompletedAt: new Date(),
 			})
 			.where(
@@ -144,7 +142,6 @@ async function handleCompletion(body: CompletionBody) {
 				scoreBreakdown: result.score_breakdown,
 				summary: result.summary,
 				skillsMatched: result.skills_matched,
-				pipelineVersion: body.pipeline_version,
 			})),
 		);
 	});
@@ -194,7 +191,6 @@ async function handleError(body: ErrorBody) {
 				scoreBreakdown: result.score_breakdown,
 				summary: result.summary,
 				skillsMatched: result.skills_matched,
-				pipelineVersion: "unknown",
 			})),
 		);
 	});

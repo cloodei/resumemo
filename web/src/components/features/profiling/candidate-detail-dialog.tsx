@@ -155,7 +155,7 @@ type CandidateDetailDialogProps = {
 export function CandidateDetailDialog({ sessionId, resultId, open, onOpenChange }: CandidateDetailDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+			<DialogContent className="max-h-[85vh] xl:max-w-[1080px] 2xl:max-w-6xl overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>Candidate detail</DialogTitle>
 					<DialogDescription>
