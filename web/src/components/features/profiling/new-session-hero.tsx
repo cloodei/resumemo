@@ -22,10 +22,12 @@ export function NewSessionHero({ steps }: NewSessionHeroProps) {
 			className="flex flex-col gap-4"
 		>
 			<div className="flex flex-col gap-2">
-				<Badge className="w-fit bg-linear-to-br from-sky-500/80 to-violet-500/90 text-neutral-100">
-					Create a new profiling session
-				</Badge>
-				<h1 className="head-text-md text-foreground">Describe, upload, and launch</h1>
+				<div className="flex items-center justify-between gap-2">
+					<h1 className="head-text-md text-foreground">Describe, upload, and launch</h1>
+					<Badge className="w-fit bg-linear-to-br from-primary-500/80 to-violet-500/90 text-neutral-100">
+						Create a new profiling session
+					</Badge>
+				</div>
 				<p className="max-w-2xl text-sm text-muted-foreground">
 					If something fails mid-flow, you can retry from the same screen without reselecting every resume.
 				</p>

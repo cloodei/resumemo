@@ -8,10 +8,10 @@ import {
 	Settings,
 } from "lucide-react"
 
-import { useAuth } from "@/components/auth/auth-provider"
-import { SignOutDialog } from "@/components/auth/signout-dialog"
 import { Logo } from "@/components/brand/logo"
+import { useAuth } from "@/components/auth/auth-provider"
 import { ThemeToggler } from "@/components/brand/theme-toggle"
+import { SignOutDialog } from "@/components/auth/signout-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
 	Sidebar,
@@ -104,20 +104,7 @@ export function AppSidebar() {
 			</SidebarContent>
 
 			<SidebarFooter>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							size="lg"
-							className="group-data-[collapsible=icon]:justify-center"
-						>
-							<ThemeToggler className="h-7 w-7 shrink-0 rounded-md border border-border/60 bg-background/60 hover:bg-background/80" />
-							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-								<span className="truncate font-medium">Theme</span>
-								<span className="truncate text-xs text-muted-foreground">Switch workspace appearance</span>
-							</div>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
+				<ThemeToggler className="text-sm hover:bg-transparent dark:hover:bg-transparent" />
 
 				{user && (
 					<SidebarMenu>

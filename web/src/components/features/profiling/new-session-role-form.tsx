@@ -1,8 +1,6 @@
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import type { SessionFormData } from "@/stores/upload-store"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 type Template = {
@@ -37,7 +35,6 @@ export function NewSessionRoleForm({
 					<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Role brief</CardTitle>
 					<CardDescription className="mt-1 text-sm">Describe what a strong candidate should look like.</CardDescription>
 				</div>
-				<Button variant="outline" size="sm" disabled={!canImportFromLibrary}>Import from library</Button>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<div className="grid gap-3">
@@ -77,7 +74,7 @@ export function NewSessionRoleForm({
 					{errors.jobDescription?.message && <span className="text-xs text-destructive">{errors.jobDescription.message}</span>}
 				</div>
 
-				<Tabs defaultValue="templates" className="pt-2">
+				{/* <Tabs defaultValue="templates" className="pt-2">
 					<TabsList>
 						<TabsTrigger className="cursor-pointer border-none" value="templates">Templates</TabsTrigger>
 						<TabsTrigger className="cursor-pointer border-none" value="history">Deprecated</TabsTrigger>
@@ -98,7 +95,7 @@ export function NewSessionRoleForm({
 					<TabsContent value="history" className="mt-4 text-sm text-muted-foreground">
 						Session history duplication is paused while the retryable flow stabilizes.
 					</TabsContent>
-				</Tabs>
+				</Tabs> */}
 			</CardContent>
 		</Card>
 	)

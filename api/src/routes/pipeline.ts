@@ -13,14 +13,9 @@ import * as schema from "@shared/schemas";
 import { db } from "~/lib/db";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
-const PIPELINE_SECRET_HEADER_NAME = process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret";
+const PIPELINE_SECRET_HEADER_NAME = (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase();
 
-function getSecretHeaderValue(headers: Record<string, string | undefined>) {
-	const headerName = PIPELINE_SECRET_HEADER_NAME.toLowerCase();
-	return headers[headerName] ?? null;
-}
-
-function validateSecret(secretHeader: string | null) {
+function validateSecret(secretHeader?: string | null) {
 	if (!PIPELINE_CALLBACK_SECRET || !secretHeader)
 		return false;
 
@@ -65,7 +60,7 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 	.post(
 		"/callback",
 		async ({ body, headers, status }) => {
-			const secretHeader = getSecretHeaderValue(headers);
+			const secretHeader = headers[PIPELINE_SECRET_HEADER_NAME];
 			if (!validateSecret(secretHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
 

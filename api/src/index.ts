@@ -9,8 +9,13 @@ import { authMiddleware } from "./lib/auth";
 const app = new Elysia({ precompile: true })
 	.use(
 		cors({
-			// origin: process.env.FRONTEND_URL ?? "http://localhost:5000",
-			origin: true,
+			origin: [
+				process.env.FRONTEND_URL ?? "http://localhost:5000",
+				"http://localhost:3000",
+				"http://localhost:5173",
+				"http://localhost:5174"
+			],
+			// origin: true,
 			methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 			credentials: true,
 			allowedHeaders: ["Content-Type", "Authorization", process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret"],
@@ -19,7 +24,6 @@ const app = new Elysia({ precompile: true })
 	.use(logger())
 	.use(openapi())
 	.use(authMiddleware)
-	.use(routes.systemRoutes)
 	.use(routes.sessionRoutes)
 	.use(routes.pipelineCallbackRoutes)
 	.listen({ hostname: "0.0.0.0", port: 8080 });

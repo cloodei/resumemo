@@ -43,36 +43,71 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 	year: "numeric",
 })
 
+const numberFormatter = new Intl.NumberFormat("en")
+
 function formatSessionDate(date: string | Date) {
+	if (date instanceof Date)
+		return dateFormatter.format(date)
+
 	return dateFormatter.format(new Date(date))
 }
 
 export function buildDashboardMetrics(sessions: ProfilingSession[]): DashboardMetric[] {
-	const activeSessions = sessions.filter((session) => session.status === "processing" || session.status === "retrying")
-	const completedSessions = sessions.filter((session) => session.status === "completed")
-	const failedSessions = sessions.filter((session) => session.status === "failed")
-	const totalFiles = sessions.reduce((sum, session) => sum + session.totalFiles, 0)
+	const totalSessions = sessions.length
+	let activeSessions: ProfilingSession[] = [],
+	 queuedSessions: ProfilingSession[] = [],
+	 retryingSessions: ProfilingSession[] = [],
+	 completedSessions: ProfilingSession[] = [],
+	 failedSessions: ProfilingSession[] = [];
+	let totalFiles = 0
+
+	for (let i = 0; i < sessions.length; i++) {
+		const session = sessions[i]
+		if (session.status === "processing" || session.status === "retrying")
+			activeSessions.push(session)
+		if (session.status === "processing")
+			queuedSessions.push(session)
+		else if (session.status === "retrying")
+			retryingSessions.push(session)
+		else if (session.status === "completed")
+			completedSessions.push(session)
+		else if (session.status === "failed")
+			failedSessions.push(session)
+
+		totalFiles += session.totalFiles
+	}
+
+	const completionRate = totalSessions === 0 ? 0 : Math.round((completedSessions.length / totalSessions) * 100)
+	const averageFilesPerSession = totalSessions === 0 ? 0 : Math.round(totalFiles / totalSessions)
 
 	return [
 		{
-			label: "Total Sessions",
-			value: sessions.length.toString(),
-			change: sessions.length === 0 ? "Create your first screening session to get started" : `${completedSessions.length} ready for review`,
+			label: "Session Volume",
+			value: numberFormatter.format(totalSessions),
+			change: totalSessions === 0
+				? "Create your first screening session to start building momentum"
+				: `${totalSessions} total, ${completedSessions.length} completed${failedSessions.length > 0 ? `, ${failedSessions.length} need attention` : ""}`,
 		},
 		{
-			label: "Active Sessions",
-			value: activeSessions.length.toString(),
-			change: activeSessions.length === 0 ? "No background jobs running right now" : `${activeSessions.length} running in the background`,
+			label: "Background Jobs",
+			value: numberFormatter.format(activeSessions.length),
+			change: activeSessions.length === 0
+				? "No sessions are currently processing in the background"
+				: `${queuedSessions.length} queued, ${retryingSessions.length} refreshing`,
 		},
 		{
-			label: "Files Uploaded",
-			value: totalFiles.toString(),
-			change: sessions.length === 0 ? "Uploads appear here once a session is created" : `${Math.round(totalFiles / sessions.length) || 0} files per session on average`,
+			label: "Completion Rate",
+			value: `${completionRate}%`,
+			change: totalSessions === 0
+				? "Completion rate appears once sessions begin finishing"
+				: `${completedSessions.length} of ${totalSessions} sessions are ready to review`,
 		},
 		{
-			label: failedSessions.length > 0 ? "Needs Attention" : "Completed Sessions",
-			value: (failedSessions.length > 0 ? failedSessions.length : completedSessions.length).toString(),
-			change: failedSessions.length > 0 ? "Retry failed sessions when you are ready" : "Finished sessions stay available for later review",
+			label: "Resume Files",
+			value: numberFormatter.format(totalFiles),
+			change: totalSessions === 0
+				? "Uploaded resumes will accumulate here across every session"
+				: `${averageFilesPerSession} files per session on average`,
 		},
 	]
 }
