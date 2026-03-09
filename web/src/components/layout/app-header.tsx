@@ -1,20 +1,7 @@
-import { Bell, ChevronDown, HelpCircle, Settings } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Bell, HelpCircle, Settings } from "lucide-react"
 
-import { useAuth } from "@/components/auth/auth-provider"
-import { SignOutDialog } from "@/components/auth/signout-dialog"
-import { ThemeToggler } from "@/components/brand/theme-toggle"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 function HeaderActions() {
@@ -44,61 +31,7 @@ function HeaderActions() {
 				</TooltipTrigger>
 				<TooltipContent>Settings</TooltipContent>
 			</Tooltip>
-			<ThemeToggler className="h-9 w-9" />
 		</>
-	)
-}
-
-function UserMenu() {
-	const { user } = useAuth()
-
-	if (!user)
-		return null
-
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" className="flex h-10 items-center gap-2 px-2">
-					<Avatar className="size-8 border border-border">
-						<AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
-						<AvatarFallback className="bg-primary/10 text-xs text-primary">
-							{user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "U"}
-						</AvatarFallback>
-					</Avatar>
-					<div className="hidden sm:flex flex-col items-start">
-						<span className="text-sm font-medium leading-none">{user.name ?? "User"}</span>
-						<span className="text-[11px] leading-tight text-muted-foreground">{user.email}</span>
-					</div>
-					<ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-64 border border-border">
-				<DropdownMenuLabel className="font-normal">
-					<div className="flex flex-col gap-1.5">
-						<p className="text-sm font-medium">{user.name ?? "User"}</p>
-						<p className="truncate text-xs text-muted-foreground">{user.email}</p>
-					</div>
-				</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem asChild>
-					<Link to="/settings" className="cursor-pointer">Workspace settings</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
-					<Link to="/help" className="cursor-pointer">Help & support</Link>
-				</DropdownMenuItem>
-				<DropdownMenuSeparator />
-				<SignOutDialog
-					trigger={
-						<DropdownMenuItem
-							className="text-destructive focus:text-destructive"
-							onSelect={(event) => event.preventDefault()}
-						>
-							Sign out
-						</DropdownMenuItem>
-					}
-				/>
-			</DropdownMenuContent>
-		</DropdownMenu>
 	)
 }
 
@@ -125,7 +58,6 @@ export function AppHeader() {
 
 				<div className="ml-auto flex items-center gap-1.5">
 					<HeaderActions />
-					<UserMenu />
 				</div>
 			</div>
 		</header>

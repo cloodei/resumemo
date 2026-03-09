@@ -2,17 +2,12 @@ import { motion } from "motion/react"
 import { Briefcase, Clock, FileText, Sparkles } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { DashboardMetric } from "@/components/features/dashboard/dashboard-utils"
 
 const metricIcons = [Briefcase, FileText, Clock, Sparkles] as const
 
-type Metric = {
-	label: string
-	value: string
-	change: string
-}
-
 type DashboardMetricsProps = {
-	metrics: readonly Metric[]
+	metrics: readonly DashboardMetric[]
 }
 
 export function DashboardMetrics({ metrics }: DashboardMetricsProps) {

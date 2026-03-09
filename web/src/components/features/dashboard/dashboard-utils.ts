@@ -1,3 +1,5 @@
+import type { ProfilingSession } from "@/lib/profiling-queries"
+
 export function detectAuthProvider(user?: { image?: string | null; email?: string | null }) {
 	if (!user)
 		return "email"
@@ -20,15 +22,71 @@ export function getProviderBadge(provider: string) {
 	}
 }
 
-export const dashboardMetrics = [
-	{ label: "Active Sessions", value: "12", change: "+3.8% vs last week" },
-	{ label: "Resumes Uploaded", value: "6,284", change: "+18.2%" },
-	{ label: "Avg. Profiling Time", value: "4m 12s", change: "-1m 05s" },
-	{ label: "Background Jobs", value: "Always On", change: "Sessions keep running after you leave" },
-] as const
+export type DashboardMetric = {
+	label: string
+	value: string
+	change: string
+}
 
-export const dashboardRecentSessions = [
-	{ id: "prof-2f8a9c1d", name: "Senior Frontend Engineer - Q1 2026", jobTitle: "Senior Frontend Engineer", createdAt: "Jan 28, 2026", resumes: 48, status: "completed" },
-	{ id: "prof-9e3b7a2f", name: "Product Design Lead", jobTitle: "Product Designer", createdAt: "Jan 25, 2026", resumes: 32, status: "processing" },
-	{ id: "prof-1c5d8e4b", name: "AI Research Team", jobTitle: "AI Research Scientist", createdAt: "Jan 22, 2026", resumes: 64, status: "completed" },
-] as const
+export type DashboardRecentSession = {
+	id: string
+	name: string
+	jobTitle: string
+	createdAt: string
+	resumes: number
+	status: ProfilingSession["status"]
+}
+
+const dateFormatter = new Intl.DateTimeFormat("en", {
+	month: "short",
+	day: "numeric",
+	year: "numeric",
+})
+
+function formatSessionDate(date: string | Date) {
+	return dateFormatter.format(new Date(date))
+}
+
+export function buildDashboardMetrics(sessions: ProfilingSession[]): DashboardMetric[] {
+	const activeSessions = sessions.filter((session) => session.status === "processing" || session.status === "retrying")
+	const completedSessions = sessions.filter((session) => session.status === "completed")
+	const failedSessions = sessions.filter((session) => session.status === "failed")
+	const totalFiles = sessions.reduce((sum, session) => sum + session.totalFiles, 0)
+
+	return [
+		{
+			label: "Total Sessions",
+			value: sessions.length.toString(),
+			change: sessions.length === 0 ? "Create your first screening session to get started" : `${completedSessions.length} ready for review`,
+		},
+		{
+			label: "Active Sessions",
+			value: activeSessions.length.toString(),
+			change: activeSessions.length === 0 ? "No background jobs running right now" : `${activeSessions.length} running in the background`,
+		},
+		{
+			label: "Files Uploaded",
+			value: totalFiles.toString(),
+			change: sessions.length === 0 ? "Uploads appear here once a session is created" : `${Math.round(totalFiles / sessions.length) || 0} files per session on average`,
+		},
+		{
+			label: failedSessions.length > 0 ? "Needs Attention" : "Completed Sessions",
+			value: (failedSessions.length > 0 ? failedSessions.length : completedSessions.length).toString(),
+			change: failedSessions.length > 0 ? "Retry failed sessions when you are ready" : "Finished sessions stay available for later review",
+		},
+	]
+}
+
+export function buildDashboardRecentSessions(sessions: ProfilingSession[]): DashboardRecentSession[] {
+	return [...sessions]
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+		.slice(0, 6)
+		.map((session) => ({
+			id: session.id,
+			name: session.name,
+			jobTitle: session.jobTitle || "Custom brief",
+			createdAt: formatSessionDate(session.createdAt),
+			resumes: session.totalFiles,
+			status: session.status,
+		}))
+}

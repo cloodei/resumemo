@@ -1,21 +1,13 @@
 import { Link } from "react-router-dom"
 
+import type { DashboardRecentSession } from "@/components/features/dashboard/dashboard-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-type Session = {
-	id: string
-	name: string
-	jobTitle: string
-	createdAt: string
-	resumes: number
-	status: string
-}
-
 type DashboardRecentSessionsProps = {
-	sessions: readonly Session[]
+	sessions: readonly DashboardRecentSession[]
 }
 
 export function DashboardRecentSessions({ sessions }: DashboardRecentSessionsProps) {
@@ -31,35 +23,44 @@ export function DashboardRecentSessions({ sessions }: DashboardRecentSessionsPro
 				</Button>
 			</CardHeader>
 			<CardContent>
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Session</TableHead>
-							<TableHead>Job Title</TableHead>
-							<TableHead className="hidden sm:table-cell">Created</TableHead>
-							<TableHead className="hidden md:table-cell">Resumes</TableHead>
-							<TableHead>Status</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{sessions.map((session) => (
-							<TableRow key={session.id} className="group cursor-pointer transition-all hover:bg-muted/50 dark:hover:bg-muted/20">
-								<TableCell className="font-semibold text-foreground">
-									<Link to={`/profiling/${session.id}`} className="hover:text-primary transition-colors hover:underline underline-offset-4 decoration-primary/30">{session.name}</Link>
-								</TableCell>
-								<TableCell className="font-medium group-hover:text-foreground transition-colors">{session.jobTitle}</TableCell>
-								<TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{session.createdAt}</TableCell>
-								<TableCell className="hidden md:table-cell text-muted-foreground">{session.resumes}</TableCell>
-								<TableCell>
-									<Badge variant={session.status === "completed" ? "secondary" : session.status === "processing" || session.status === "retrying" ? "default" : "outline"} className="capitalize shadow-sm">
-										{session.status === "processing" ? "queued" : session.status === "retrying" ? "refreshing" : session.status}
-									</Badge>
-								</TableCell>
+				{sessions.length === 0 ? (
+					<div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/10 px-6 text-center">
+						<p className="text-sm font-medium text-foreground">No sessions yet</p>
+						<p className="mt-2 max-w-sm text-sm text-muted-foreground">
+							Create your first profiling session to start tracking uploads, processing progress, and ranked results here.
+						</p>
+					</div>
+				) : (
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Session</TableHead>
+								<TableHead>Job Title</TableHead>
+								<TableHead className="hidden sm:table-cell">Created</TableHead>
+								<TableHead className="hidden md:table-cell">Resumes</TableHead>
+								<TableHead>Status</TableHead>
 							</TableRow>
-						))}
-					</TableBody>
-					<TableCaption>Background sessions refresh automatically while they are active.</TableCaption>
-				</Table>
+						</TableHeader>
+						<TableBody>
+							{sessions.map((session) => (
+								<TableRow key={session.id} className="group cursor-pointer transition-all hover:bg-muted/50 dark:hover:bg-muted/20">
+									<TableCell className="font-semibold text-foreground">
+										<Link to={`/profiling/${session.id}`} className="transition-colors hover:text-primary hover:underline decoration-primary/30 underline-offset-4">{session.name}</Link>
+									</TableCell>
+									<TableCell className="font-medium transition-colors group-hover:text-foreground">{session.jobTitle}</TableCell>
+									<TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{session.createdAt}</TableCell>
+									<TableCell className="hidden text-muted-foreground md:table-cell">{session.resumes}</TableCell>
+									<TableCell>
+										<Badge variant={session.status === "completed" ? "secondary" : session.status === "processing" || session.status === "retrying" ? "default" : "outline"} className="capitalize shadow-sm">
+											{session.status === "processing" ? "queued" : session.status === "retrying" ? "refreshing" : session.status}
+										</Badge>
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+						<TableCaption>Background sessions refresh automatically while they are active.</TableCaption>
+					</Table>
+				)}
 			</CardContent>
 		</Card>
 	)
