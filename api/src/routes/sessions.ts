@@ -7,8 +7,8 @@ import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
 
 import { db } from "~/lib/db";
 import { authMiddleware } from "~/lib/auth";
-import { publishPipelineJob, type PipelineJobPayload } from "~/lib/queue";
 import { validateFileMetadata } from "~/lib/upload-guard";
+import { publishPipelineJob, type PipelineJobPayload } from "~/lib/queue";
 import {
 	deleteFile,
 	generatePresignedUploadUrl,
@@ -31,6 +31,28 @@ type SessionFileRecord = {
 	size: bigint;
 };
 
+type SessionResultRecord = {
+	id: string;
+	runId: string;
+	fileId: number;
+	candidateName: string | null;
+	candidateEmail: string | null;
+	candidatePhone: string | null;
+	parsedProfile: unknown;
+	overallScore: unknown;
+	summary: string;
+	skillsMatched: unknown;
+	createdAt: Date;
+	originalName: string;
+};
+
+type SessionResultDetailRecord = SessionResultRecord & {
+	sessionId: string;
+	rawText: string;
+	scoreBreakdown: unknown;
+	mimeType: string;
+};
+
 async function cleanupUploadedKeys(storageKeys: string[]) {
 	await Promise.all(storageKeys.map(async (storageKey) => {
 		try {
@@ -40,17 +62,6 @@ async function cleanupUploadedKeys(storageKeys: string[]) {
 			// Best-effort cleanup.
 		}
 	}));
-}
-
-function buildResultWhere(sessionId: string, activeRunId: string | null) {
-	if (activeRunId) {
-		return and(
-			eq(schema.candidateResult.sessionId, sessionId),
-			eq(schema.candidateResult.runId, activeRunId),
-		);
-	}
-
-	return eq(schema.candidateResult.sessionId, sessionId);
 }
 
 function buildPipelinePayload(args: {
@@ -69,34 +80,6 @@ function buildPipelinePayload(args: {
 			original_name: file.originalName,
 		})),
 	};
-}
-
-async function markSessionQueueFailure(sessionId: string, errorMessage: string) {
-	await db
-		.update(schema.profilingSession)
-		.set({
-			status: "failed",
-			errorMessage,
-		})
-		.where(eq(schema.profilingSession.id, sessionId));
-}
-
-async function publishSessionRun(args: {
-	sessionId: string;
-	runId: string;
-	jobDescription: string;
-	files: SessionFileRecord[];
-}) {
-	try {
-		await publishPipelineJob(buildPipelinePayload(args));
-	}
-	catch (error) {
-		await markSessionQueueFailure(
-			args.sessionId,
-			error instanceof Error ? error.message : "Failed to publish to queue",
-		);
-		throw error;
-	}
 }
 
 async function verifyUploads(files: ConfirmedUpload[]) {
@@ -151,9 +134,8 @@ async function getSessionUploads(sessionId: string) {
 	}));
 }
 
-async function attachExistingFilesToSession(args: {
+async function getOrCreateSessionFiles(args: {
 	tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
-	sessionId: string;
 	userId: string;
 	files: ConfirmedUpload[];
 }) {
@@ -205,14 +187,20 @@ async function attachExistingFilesToSession(args: {
 		return matched;
 	});
 
+	return sessionFiles;
+}
+
+async function attachFilesToSession(args: {
+	tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+	sessionId: string;
+	files: SessionFileRecord[];
+}) {
 	await args.tx.insert(schema.profilingSessionFile).values(
-		sessionFiles.map(file => ({
+		args.files.map(file => ({
 			sessionId: args.sessionId,
 			fileId: file.fileId,
 		})),
 	);
-
-	return sessionFiles;
 }
 
 async function getSessionFileRecords(sessionId: string) {
@@ -229,104 +217,11 @@ async function getSessionFileRecords(sessionId: string) {
 		.where(eq(schema.profilingSessionFile.sessionId, sessionId));
 }
 
-async function createSessionWithFiles(args: {
-	userId: string;
-	name: string;
-	jobTitle?: string | null;
-	jobDescription: string;
-	files: ConfirmedUpload[];
-}) {
-	const runId = randomUUIDv7();
-	let sessionId = "";
-	let sessionFiles: SessionFileRecord[] = [];
+function filterActiveRunResults<T extends { runId?: string | null }>(results: T[], activeRunId: string | null) {
+	if (!activeRunId)
+		return results;
 
-	await db.transaction(async (tx) => {
-		const [createdSession] = await tx
-			.insert(schema.profilingSession)
-			.values({
-				userId: args.userId,
-				name: args.name,
-				jobDescription: args.jobDescription,
-				jobTitle: args.jobTitle ?? null,
-				status: "processing",
-				activeRunId: runId,
-				totalFiles: args.files.length,
-				errorMessage: null,
-				lastCompletedAt: null,
-			})
-			.returning({ id: schema.profilingSession.id });
-
-		sessionId = createdSession.id;
-
-		sessionFiles = await attachExistingFilesToSession({
-			tx,
-			sessionId,
-			userId: args.userId,
-			files: args.files,
-		});
-	});
-
-	try {
-		await publishSessionRun({
-			sessionId,
-			runId,
-			jobDescription: args.jobDescription,
-			files: sessionFiles,
-		});
-	}
-	catch (error) {
-		await db.delete(schema.profilingSession).where(eq(schema.profilingSession.id, sessionId));
-		throw error;
-	}
-
-	return {
-		status: "processing" as const,
-		sessionId,
-		runId,
-		totalConfirmed: args.files.length,
-	};
-}
-
-async function rerunSession(args: {
-	sessionId: string;
-	name: string;
-	jobTitle?: string | null;
-	jobDescription: string;
-	status: "retrying";
-}) {
-	const runId = randomUUIDv7();
-	const files = await getSessionFileRecords(args.sessionId);
-
-	if (files.length === 0)
-		throw new Error("No files found for this session");
-
-	await db
-		.update(schema.profilingSession)
-		.set({
-			name: args.name,
-			jobTitle: args.jobTitle ?? null,
-			jobDescription: args.jobDescription,
-			status: args.status,
-			activeRunId: runId,
-			errorMessage: null,
-			lastCompletedAt: null,
-			totalFiles: files.length,
-		})
-		.where(eq(schema.profilingSession.id, args.sessionId));
-
-	await publishSessionRun({
-		sessionId: args.sessionId,
-		runId,
-		jobDescription: args.jobDescription,
-		files,
-	});
-
-	return {
-		status: args.status,
-		sessionId: args.sessionId,
-		runId,
-		totalConfirmed: files.length,
-	};
+	return results.filter(result => result.runId === activeRunId);
 }
 
 export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
@@ -432,13 +327,61 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			}
 
 			try {
-				return await createSessionWithFiles({
-					userId: user.id,
-					name,
-					jobTitle,
-					jobDescription,
-					files,
+				const runId = randomUUIDv7();
+				let sessionId = "";
+				let sessionFiles: SessionFileRecord[] = [];
+
+				await db.transaction(async (tx) => {
+					const [createdSession] = await tx
+						.insert(schema.profilingSession)
+						.values({
+							userId: user.id,
+							name,
+							jobDescription,
+							jobTitle: jobTitle ?? null,
+							status: "processing",
+							activeRunId: runId,
+							totalFiles: files.length,
+							errorMessage: null,
+							lastCompletedAt: null,
+						})
+						.returning({ id: schema.profilingSession.id });
+
+					sessionId = createdSession.id;
+					sessionFiles = await getOrCreateSessionFiles({
+						tx,
+						userId: user.id,
+						files,
+					});
+					await attachFilesToSession({ tx, sessionId, files: sessionFiles });
 				});
+
+				try {
+					await publishPipelineJob(buildPipelinePayload({
+						sessionId,
+						runId,
+						jobDescription,
+						files: sessionFiles,
+					}));
+				}
+				catch (error) {
+					await db
+						.update(schema.profilingSession)
+						.set({
+							status: "failed",
+							errorMessage: error instanceof Error ? error.message : "Failed to publish to queue",
+						})
+						.where(eq(schema.profilingSession.id, sessionId));
+
+					throw error;
+				}
+
+				return {
+					status: "processing" as const,
+					sessionId,
+					runId,
+					totalConfirmed: files.length,
+				};
 			}
 			catch {
 				return status(500, {
@@ -494,15 +437,29 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				});
 			}
 
-			const uploads = await getSessionUploads(existingSession.id);
-			if (uploads.length === 0) {
+			const u = await db
+				.select({
+					storageKey: schema.resumeFile.storageKey,
+					fileName: schema.resumeFile.originalName,
+					mimeType: schema.resumeFile.mimeType,
+					size: schema.resumeFile.size,
+				})
+				.from(schema.profilingSessionFile)
+				.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+				.where(eq(schema.profilingSessionFile.sessionId, existingSession.id));
+
+			if (u.length === 0) {
 				return status(404, {
 					status: "error",
 					message: "Files not found for this session",
 				});
 			}
 
-			const reusableFailures = await verifyUploads(uploads);
+			const reusableFailures = await verifyUploads(u.map(up => ({
+				...up,
+				size: Number(up.size)
+			})));
+
 			if (reusableFailures.length > 0) {
 				return status(409, {
 					status: "error",
@@ -518,66 +475,158 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			const nextJobDescription = body.jobDescription?.trim() || existingSession.jobDescription;
 
 			try {
+				const currentFiles = await getSessionFileRecords(existingSession.id);
+				if (currentFiles.length === 0) {
+					return status(404, {
+						status: "error",
+						message: "Files not found for this session",
+					});
+				}
+
 				switch (body.mode) {
 					case "rerun_current": {
-						const retried = await rerunSession({
+						const runId = randomUUIDv7();
+						publishPipelineJob(buildPipelinePayload({
 							sessionId: existingSession.id,
-							name: existingSession.name,
-							jobTitle: existingSession.jobTitle,
+							runId,
 							jobDescription: existingSession.jobDescription,
-							status: "retrying",
-						});
+							files: currentFiles,
+						}));
+						
+						await db
+							.update(schema.profilingSession)
+							.set({
+								name: existingSession.name,
+								jobTitle: existingSession.jobTitle,
+								jobDescription: existingSession.jobDescription,
+								status: "retrying",
+								activeRunId: runId,
+								errorMessage: null,
+								lastCompletedAt: null,
+								totalFiles: currentFiles.length,
+							})
+							.where(eq(schema.profilingSession.id, existingSession.id));
 
 						return {
-							...retried,
+							status: "retrying" as const,
+							sessionId: existingSession.id,
+							runId,
+							totalConfirmed: currentFiles.length,
 							action: "rerun_current",
 							targetSessionId: existingSession.id,
 						};
 					}
 
 					case "clone_current": {
-						const created = await createSessionWithFiles({
-							userId: user.id,
-							name: existingSession.name,
-							jobTitle: existingSession.jobTitle,
-							jobDescription: existingSession.jobDescription,
-							files: uploads,
+						const runId = randomUUIDv7();
+						let sessionId = "";
+
+						await db.transaction(async (tx) => {
+							const [createdSession] = await tx
+								.insert(schema.profilingSession)
+								.values({
+									userId: user.id,
+									name: existingSession.name,
+									jobDescription: existingSession.jobDescription,
+									jobTitle: existingSession.jobTitle,
+									status: "processing",
+									activeRunId: runId,
+									totalFiles: currentFiles.length,
+									errorMessage: null,
+									lastCompletedAt: null,
+								})
+								.returning({ id: schema.profilingSession.id });
+
+							sessionId = createdSession.id;
+							await attachFilesToSession({ tx, sessionId, files: currentFiles });
 						});
 
+						await publishPipelineJob(buildPipelinePayload({
+							sessionId,
+							runId,
+							jobDescription: existingSession.jobDescription,
+							files: currentFiles,
+						}));
+
 						return {
-							...created,
+							status: "processing" as const,
+							sessionId,
+							runId,
+							totalConfirmed: currentFiles.length,
 							action: "clone_current",
-							targetSessionId: created.sessionId,
+							targetSessionId: sessionId,
 						};
 					}
 
 					case "clone_with_updates": {
-						const created = await createSessionWithFiles({
-							userId: user.id,
-							name: nextName,
-							jobTitle: nextJobTitle,
-							jobDescription: nextJobDescription,
-							files: uploads,
+						const runId = randomUUIDv7();
+						let sessionId = "";
+
+						await db.transaction(async (tx) => {
+							const [createdSession] = await tx
+								.insert(schema.profilingSession)
+								.values({
+									userId: user.id,
+									name: nextName,
+									jobDescription: nextJobDescription,
+									jobTitle: nextJobTitle,
+									status: "processing",
+									activeRunId: runId,
+									totalFiles: currentFiles.length,
+									errorMessage: null,
+									lastCompletedAt: null,
+								})
+								.returning({ id: schema.profilingSession.id });
+
+							sessionId = createdSession.id;
+							await attachFilesToSession({ tx, sessionId, files: currentFiles });
 						});
 
+						await publishPipelineJob(buildPipelinePayload({
+							sessionId,
+							runId,
+							jobDescription: nextJobDescription,
+							files: currentFiles,
+						}));
+
 						return {
-							...created,
+							status: "processing" as const,
+							sessionId,
+							runId,
+							totalConfirmed: currentFiles.length,
 							action: "clone_with_updates",
-							targetSessionId: created.sessionId,
+							targetSessionId: sessionId,
 						};
 					}
 
 					case "replace_with_updates": {
-						const retried = await rerunSession({
+						const runId = randomUUIDv7();
+						publishPipelineJob(buildPipelinePayload({
 							sessionId: existingSession.id,
-							name: nextName,
-							jobTitle: nextJobTitle,
+							runId,
 							jobDescription: nextJobDescription,
-							status: "retrying",
-						});
+							files: currentFiles,
+						}));
+
+						await db
+							.update(schema.profilingSession)
+							.set({
+								name: nextName,
+								jobTitle: nextJobTitle,
+								jobDescription: nextJobDescription,
+								status: "retrying",
+								activeRunId: runId,
+								errorMessage: null,
+								lastCompletedAt: null,
+								totalFiles: currentFiles.length,
+							})
+							.where(eq(schema.profilingSession.id, existingSession.id));
 
 						return {
-							...retried,
+							status: "retrying" as const,
+							sessionId: existingSession.id,
+							runId,
+							totalConfirmed: currentFiles.length,
 							action: "replace_with_updates",
 							targetSessionId: existingSession.id,
 						};
@@ -623,8 +672,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		"/:id",
 		async ({ user, params, status }) => {
 			const [sessionRows, files] = await Promise.all([
-				db
-					.select()
+				db.select()
 					.from(schema.profilingSession)
 					.where(
 						and(
@@ -651,7 +699,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (files.length === 0)
 				return status(404, { status: "error", message: "Files not found" });
 
-			let results: unknown[] | null = null;
+			let results: SessionResultRecord[] | null = null;
 			if (session.status === "completed") {
 				results = await db
 					.select({
@@ -670,8 +718,10 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					})
 					.from(schema.candidateResult)
 					.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-					.where(buildResultWhere(params.id, session.activeRunId ?? null))
+					.where(eq(schema.candidateResult.sessionId, params.id))
 					.orderBy(desc(schema.candidateResult.overallScore));
+
+				results = filterActiveRunResults(results, session.activeRunId ?? null);
 			}
 
 			return {
@@ -733,7 +783,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
 
-			const filteredResults = results.filter(result => !session.activeRunId || result.runId === session.activeRunId);
+			const filteredResults = filterActiveRunResults(results, session.activeRunId ?? null);
 
 			return {
 				sessionId: params.id,
@@ -798,7 +848,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
 
-			const result = resultRows.find(row => !session.activeRunId || row.runId === session.activeRunId);
+			const [result] = filterActiveRunResults(resultRows, session.activeRunId ?? null);
 			if (!result)
 				return status(404, { status: "error", message: "Result not found" });
 
@@ -848,7 +898,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (session.status !== "completed")
 				return status(409, { status: "error", message: "Session is not completed yet" });
 
-			const filteredResults = results.filter(result => !session.activeRunId || result.runId === session.activeRunId);
+			const filteredResults = filterActiveRunResults(results, session.activeRunId ?? null);
 			const format = query.format ?? "json";
 
 			if (format === "csv") {

@@ -21,8 +21,8 @@ const app = new Elysia({ precompile: true })
 			allowedHeaders: ["Content-Type", "Authorization", process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret"],
 		}),
 	)
-	.use(logger())
-	.use(openapi())
+	// .use(logger())
+	// .use(openapi())
 	.use(authMiddleware)
 	.use(routes.sessionRoutes)
 	.use(routes.pipelineCallbackRoutes)

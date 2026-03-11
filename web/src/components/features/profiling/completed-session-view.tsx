@@ -1,15 +1,14 @@
-import { ArrowUpRight, Mail, Sparkles } from "lucide-react"
+import { ArrowUpRight, BadgeInfo, Mail } from "lucide-react"
 
-import { ActionCard } from "@/components/features/profiling/action-card"
-import { SummaryTile } from "@/components/features/profiling/summary-tile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ActionCard } from "@/components/features/profiling/action-card"
+import { SummaryTile } from "@/components/features/profiling/summary-tile"
 import type { CandidateResult, ProfilingSession } from "@/lib/profiling-queries"
-
-import type { RetryMode } from "./session-utils"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+	type RetryMode,
 	getDisplayCandidateName,
 	getExperienceLabel,
 	getManualReviewLabel,
@@ -56,8 +55,23 @@ export function CompletedSessionView({
 							<SummaryTile label="Average match" value={`${averageScore}/100`} subtext="Across the current run" />
 						</div>
 						<div className="mt-6 space-y-3 text-sm text-muted-foreground">
-							<div className="flex items-start gap-3"><Sparkles className="mt-0.5 size-4 text-primary" /><p>{strongMatches > 0 ? `${strongMatches} candidates stand out as strong matches for this brief.` : "No candidates crossed the strong-match threshold yet."}</p></div>
-							<div className="flex items-start gap-3"><Sparkles className="mt-0.5 size-4 text-primary" /><p>{manualReviewCount > 0 ? `${manualReviewCount} candidate${manualReviewCount === 1 ? " needs" : "s need"} a quick manual check for extracted details.` : "No manual review flags were raised in this run."}</p></div>
+							<div className="flex items-start gap-3">
+								<BadgeInfo className="pt-1 size-5 text-primary" />
+								<p>
+									{strongMatches > 0
+										? `${strongMatches} candidates stand out as strong matches for this brief.`
+										: "No candidates crossed the strong-match threshold yet."}
+								</p>
+							</div>
+
+							<div className="flex items-start gap-3">
+								<BadgeInfo className="pt-1 size-5 text-primary" />
+								<p>
+									{manualReviewCount > 0 ?
+										`${manualReviewCount} candidate${manualReviewCount === 1 ? " needs" : "s need"} a quick manual check for extracted details.`
+										: "No manual review flags were raised in this run."}
+								</p>
+							</div>
 						</div>
 					</CardContent>
 				</Card>
