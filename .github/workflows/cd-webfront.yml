@@ -7,7 +7,7 @@ on:
     paths:
       - "web/**"
       - "packages/shared/**"
-      - ".github/workflows/deploy-frontend.yml"
+      - ".github/workflows/cd-webfront.yml"
   workflow_dispatch:
 
 jobs:
