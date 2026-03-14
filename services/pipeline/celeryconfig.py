@@ -10,9 +10,8 @@ result_serializer = "json"
 task_acks_late = True
 task_reject_on_worker_lost = True
 worker_prefetch_multiplier = 1
-worker_pool = os.getenv("CELERY_WORKER_POOL", "solo" if is_windows else "prefork")
-# worker_concurrency = int(os.getenv("CELERY_WORKER_CONCURRENCY", "1"))
-worker_concurrency = 1
+worker_pool = os.getenv("CELERY_WORKER_POOL", "solo" if is_windows else "solo")
+worker_concurrency = int(os.getenv("CELERY_WORKER_CONCURRENCY", "1"))
 
 task_routes = {
     "pipeline.process_session": {"queue": "profiling.jobs"},

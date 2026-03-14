@@ -1,8 +1,12 @@
-import os from 'node:os'
-import cluster from 'node:cluster'
+import os from "node:os"
+import cluster from "node:cluster"
+
+const requestedWorkers = Number.parseInt(process.env.API_WORKER_COUNT ?? "1", 10)
+const maxWorkers = Math.max(1, os.availableParallelism())
+const workerCount = Math.min(Math.max(1, requestedWorkers || 1), maxWorkers)
 
 if (cluster.isPrimary)
-  for (let i = 0; i < os.availableParallelism(); ++i)
-    cluster.fork()
+	for (let i = 0; i < workerCount; i += 1)
+		cluster.fork()
 else
-  await import("src/index")
+	await import("src/index")

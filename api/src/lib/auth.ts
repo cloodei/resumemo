@@ -5,6 +5,15 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import * as schema from "@shared/schemas";
 
+const trustedOrigins = (process.env.FRONTEND_URLS
+	?? process.env.FRONTEND_URL
+	?? "http://localhost:5173,http://localhost:5000,http://localhost:3000")
+	.split(",")
+	.map(origin => origin.trim())
+	.filter(Boolean);
+
+const useCrossSiteCookies = process.env.AUTH_COOKIE_CROSS_SITE === "true";
+
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:8080",
@@ -17,15 +26,16 @@ export const auth = betterAuth({
     database: {
       generateId: "uuid"
     },
-    // crossSubDomainCookies: {
-    //   enabled: true
-    // },
-    // defaultCookieAttributes: {
-    //   sameSite: "none",
-    //   secure: process.env.NODE_ENV === "production"
-    // }
+    ...(useCrossSiteCookies
+      ? {
+          defaultCookieAttributes: {
+            sameSite: "none" as const,
+            secure: true,
+          },
+        }
+      : {}),
   },
-  trustedOrigins: [process.env.FRONTEND_URL ?? "http://localhost:5173", "http://localhost:5000", "http://localhost:3000"],
+  trustedOrigins,
   emailAndPassword: {
     enabled: true,
     disableSignUp: false,
@@ -61,7 +71,8 @@ export const authMiddleware = new Elysia({ name: "auth" })
       async resolve({ status, request: { headers } }) {
         const session = await auth.api.getSession({ headers });
 
-        if (!session) return status(401, { status: "error", message: "Unauthorized" });
+        if (!session)
+          return status(401, { status: "error", message: "Unauthorized" });
 
         return {
           user: session.user,
