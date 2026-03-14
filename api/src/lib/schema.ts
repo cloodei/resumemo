@@ -1,1 +1,1 @@
-export * from "@shared/schemas";
+export * from "@resumemo/shared/schemas";

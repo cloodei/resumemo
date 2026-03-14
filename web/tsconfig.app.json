@@ -28,7 +28,7 @@
       "@/*": [
         "./src/*"
       ],
-      "@shared/*": [
+      "@resumemo/shared/*": [
         "../packages/shared/src/*"
       ],
       "@api": [

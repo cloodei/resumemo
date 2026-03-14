@@ -1,4 +1,4 @@
-import * as schema from "@shared/schemas";
+import * as schema from "@resumemo/shared/schemas";
 
 export type User = typeof schema.user.$inferSelect;
 export type Session = typeof schema.session.$inferSelect;

@@ -8,7 +8,7 @@
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import * as schema from "@shared/schemas";
+import * as schema from "@resumemo/shared/schemas";
 
 import { db } from "~/lib/db";
 

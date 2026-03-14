@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { db } from "./db";
-import * as schema from "@shared/schemas";
+import * as schema from "@resumemo/shared/schemas";
 
 const trustedOrigins = (process.env.FRONTEND_URLS
 	?? process.env.FRONTEND_URL

@@ -32,6 +32,7 @@ Thumbs.db
 一impl
 /docs/plans
 
+*.pem
 
 
 cd-server.yml

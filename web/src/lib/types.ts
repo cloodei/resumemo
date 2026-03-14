@@ -1,1 +1,1 @@
-export * from "@shared/types/auth";
+export * from "@resumemo/shared/types/auth";

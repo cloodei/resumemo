@@ -4,7 +4,7 @@ import {
 	type ALLOWED_MIME_TYPES,
 	MAGIC_BYTES,
 	MAX_FILE_BYTES,
-} from "@shared/constants/file-uploads";
+} from "@resumemo/shared/constants/file-uploads";
 
 function getExtension(fileName: string) {
 	const trimmed = fileName.trim().toLowerCase();

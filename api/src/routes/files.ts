@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { and, desc, eq } from "drizzle-orm";
 
-import * as schema from "@shared/schemas";
+import * as schema from "@resumemo/shared/schemas";
 
 import { db } from "../lib/db";
 import { deleteFile } from "../lib/storage";

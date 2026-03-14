@@ -2,8 +2,8 @@ import { randomUUIDv7 } from "bun";
 import { Elysia, t } from "elysia";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-import * as schema from "@shared/schemas";
-import { MAX_FILES_PER_SESSION } from "@shared/constants/file-uploads";
+import * as schema from "@resumemo/shared/schemas";
+import { MAX_FILES_PER_SESSION } from "@resumemo/shared/constants/file-uploads";
 
 import { db } from "~/lib/db";
 import { authMiddleware } from "~/lib/auth";
