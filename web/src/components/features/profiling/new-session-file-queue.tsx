@@ -3,17 +3,15 @@ import { ArrowRight, Ban, CheckCircle2, FileText, Loader2, RefreshCw, RotateCcw,
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import type { UploadFile } from "@/stores/upload-store"
-
 import { fileStatusLabel, phaseLabel } from "./new-session-utils"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 type NewSessionFileQueueProps = {
 	files: UploadFile[]
 	phase: "idle" | "uploading" | "creating" | "upload_error" | "create_error" | "done"
 	pendingUploadCount: number
 	doneFilesCount: number
-	failedFiles: UploadFile[]
 	isBusy: boolean
 	canSubmit: boolean
 	formatFileSize: (size: number) => string
@@ -31,7 +29,6 @@ export function NewSessionFileQueue({
 	phase,
 	pendingUploadCount,
 	doneFilesCount,
-	failedFiles,
 	isBusy,
 	canSubmit,
 	formatFileSize,

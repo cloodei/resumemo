@@ -3,30 +3,19 @@ import { Textarea } from "@/components/ui/textarea"
 import type { SessionFormData } from "@/stores/upload-store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-type Template = {
-	title: string
-	summary: string
-}
-
 type NewSessionRoleFormProps = {
 	isBusy: boolean
-	canImportFromLibrary: boolean
-	templates: readonly Template[]
 	errors: {
 		sessionName?: { message?: string }
 		jobDescription?: { message?: string }
 	}
 	register: (name: keyof SessionFormData, options?: unknown) => Record<string, unknown>
-	onUseTemplate: (template: Template) => void
 }
 
 export function NewSessionRoleForm({
 	isBusy,
-	canImportFromLibrary,
-	templates,
 	errors,
 	register,
-	onUseTemplate,
 }: NewSessionRoleFormProps) {
 	return (
 		<Card className="border-none shadow-x">

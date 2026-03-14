@@ -46,13 +46,6 @@ type SessionResultRecord = {
 	originalName: string;
 };
 
-type SessionResultDetailRecord = SessionResultRecord & {
-	sessionId: string;
-	rawText: string;
-	scoreBreakdown: unknown;
-	mimeType: string;
-};
-
 async function cleanupUploadedKeys(storageKeys: string[]) {
 	await Promise.all(storageKeys.map(async (storageKey) => {
 		try {
@@ -112,26 +105,6 @@ async function verifyUploads(files: ConfirmedUpload[]) {
 	return headResults.filter(
 		(result): result is { storageKey: string; reason: string } => result !== null,
 	);
-}
-
-async function getSessionUploads(sessionId: string) {
-	const files = await db
-		.select({
-			storageKey: schema.resumeFile.storageKey,
-			fileName: schema.resumeFile.originalName,
-			mimeType: schema.resumeFile.mimeType,
-			size: schema.resumeFile.size,
-		})
-		.from(schema.profilingSessionFile)
-		.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-		.where(eq(schema.profilingSessionFile.sessionId, sessionId));
-
-	return files.map(file => ({
-		storageKey: file.storageKey,
-		fileName: file.fileName,
-		mimeType: file.mimeType,
-		size: Number(file.size),
-	}));
 }
 
 async function getOrCreateSessionFiles(args: {

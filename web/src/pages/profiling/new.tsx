@@ -19,7 +19,6 @@ import {
 	NewSessionHero,
 	NewSessionRoleForm,
 	NewSessionUploadPanel,
-	jobDescriptionTemplates,
 	newSessionSteps,
 } from "@/components/features/profiling"
 import {
@@ -66,7 +65,6 @@ export default function NewProfilingPage() {
 	const {
 		register,
 		handleSubmit,
-		setValue,
 		watch,
 		formState: { errors },
 	} = useForm<SessionFormData>({
@@ -86,7 +84,6 @@ export default function NewProfilingPage() {
 	const doneFiles = useMemo(() => files.filter(file => file.status === "done"), [files])
 	const pendingUploadFiles = useMemo(() => files.filter(file => file.status === "ready" || file.status === "failed"), [files])
 	const isBusy = phase === "uploading" || phase === "creating"
-	const canImportFromLibrary = false
 	const canSubmit = files.length > 0 && !isBusy
 
 	const handleAddFiles = useCallback((newFiles: File[]) => {
@@ -369,14 +366,8 @@ export default function NewProfilingPage() {
 			>
 				<NewSessionRoleForm
 					isBusy={isBusy}
-					canImportFromLibrary={canImportFromLibrary}
-					templates={jobDescriptionTemplates}
 					errors={errors}
 					register={register as never}
-					onUseTemplate={(template) => {
-						setValue("jobTitle", template.title)
-						setValue("jobDescription", `${template.summary}\n\nAdd more details about the role...`)
-					}}
 				/>
 
 				<NewSessionUploadPanel
@@ -408,7 +399,6 @@ export default function NewProfilingPage() {
 				phase={phase}
 				pendingUploadCount={pendingUploadFiles.length}
 				doneFilesCount={doneFiles.length}
-				failedFiles={failedFiles}
 				isBusy={isBusy}
 				canSubmit={canSubmit}
 				formatFileSize={formatFileSize}

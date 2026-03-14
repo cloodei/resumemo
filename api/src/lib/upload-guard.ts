@@ -1,7 +1,7 @@
 import {
 	ALLOWED_MIME_TYPES_SET,
 	MIME_EXTENSION_MAP,
-	ALLOWED_MIME_TYPES,
+	type ALLOWED_MIME_TYPES,
 	MAGIC_BYTES,
 	MAX_FILE_BYTES,
 } from "@shared/constants/file-uploads";
