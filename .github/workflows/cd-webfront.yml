@@ -30,12 +30,12 @@ jobs:
       - name: Build frontend
         run: npm run --filter web build
         env:
-          VITE_AUTH_SERVER_URL: ${{ secrets.VITE_AUTH_SERVER_URL }}
           VITE_FRONTEND_URL: ${{ secrets.VITE_FRONTEND_URL }}
+          VITE_AUTH_SERVER_URL: ${{ secrets.VITE_AUTH_SERVER_URL }}
 
       - name: Deploy with Wrangler
         working-directory: web
-        run: npm run --filter web deploy
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
