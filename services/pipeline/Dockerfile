@@ -9,6 +9,7 @@ FROM base AS builder
 
 WORKDIR /app
 
+FROM astral/uv:alpine AS uv
 COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
 
 RUN uv sync --frozen --no-dev --no-install-project
