@@ -8,7 +8,7 @@ FROM base AS builder
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin
 COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
 
 RUN uv sync --frozen --no-dev --no-install-project
@@ -21,7 +21,7 @@ FROM base AS runtime
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin
 COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
