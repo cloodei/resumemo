@@ -16,6 +16,7 @@
     "web:start": "bun run --filter web preview",
     "api:start": "bun run --filter api start",
     "web:build": "bun run --filter web build",
+    "web:build:npm": "cd web && npm run build",
     "api:build": "bun run --filter api build",
     "web:up": "cd web && npm run up",
     "web:deploy": "npm run web:up",
