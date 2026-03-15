@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom"
 
 import { Logo } from "@/components/brand/logo"
-import { ThemeToggler } from "@/components/brand/theme-toggle"
 import { SignInForm } from "./signin"
 import { SignUpForm } from "./signup"
 import { LoginGuard } from "./login-guard"
+import { ThemeToggler } from "@/components/brand/theme-toggle"
 import { SocialButtons } from "./social-buttons"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"

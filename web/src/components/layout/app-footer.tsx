@@ -13,6 +13,7 @@ import {
   Zap,
   Building2,
 } from "lucide-react";
+
 import { Logo } from "../brand/logo";
 
 const footerLinks = {
@@ -68,9 +69,9 @@ export function AppFooter() {
     <footer className="relative overflow-hidden border-t border-white/10 bg-surface">
       {/* Brand-themed background gradients */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-brand/15 via-transparent to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-32 w-[90%] rounded-full bg-brand/8 blur-3xl" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-brand/20 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,var(--tw-gradient-stops))] from-[#7dd3fc]/20 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-32 w-[90%] rounded-full bg-[#7dd3fc]/8 blur-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-[#7dd3fc]/20 to-transparent" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -162,7 +163,7 @@ export function AppFooter() {
             </Link>
           </div>
           <p className="text-xs text-slate-500">
-            Built with care by the Resumemo Team
+            Property of aan
           </p>
         </motion.div>
       </div>

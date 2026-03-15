@@ -14,7 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@resumemo/core": path.resolve(__dirname, "../packages/shared/src"),
+      "@resumemo/core": path.resolve(__dirname, "../core/src"),
     },
   },
 })

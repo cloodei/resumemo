@@ -40,7 +40,7 @@ type SocialButtonsProps = {
   variant?: "default" | "prominent"
 }
 
-export function SocialButtons({ callbackURL = "/dashboard", className, variant = "default" }: SocialButtonsProps) {
+export function SocialButtons({ callbackURL = "/dashboard", className, variant = "prominent" }: SocialButtonsProps) {
   const [loading, setLoading] = useState<"github" | "google" | null>(null)
 
   const absoluteCallbackURL = callbackURL.startsWith("http") ? callbackURL : `${frontendURL}${callbackURL}`

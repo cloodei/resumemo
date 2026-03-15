@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
+
 import { authClient, useSession } from "@/lib/auth"
 
 type User = {
@@ -33,7 +34,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-function useAuth() {
+export function useAuth() {
 	const context = useContext(AuthContext)
 	if (!context) {
 		throw new Error("useAuth must be used within an AuthProvider")
@@ -93,5 +94,3 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		</AuthContext.Provider>
 	)
 }
-
-export { useAuth }
