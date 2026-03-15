@@ -18,8 +18,8 @@
     "web:build": "bun run --filter web build",
     "web:build:npm": "cd web && npm run build",
     "api:build": "bun run --filter api build",
-    "web:up": "cd web && npm run up",
-    "web:deploy": "npm run web:up",
+    "web:up:npm": "cd web && npm run up",
+    "web:deploy:npm": "npm run web:up:npm",
     "lint": "turbo lint",
     "clean": "turbo clean && rimraf node_modules web/node_modules api/node_modules packages/*/node_modules"
   },

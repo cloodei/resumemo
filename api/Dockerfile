@@ -5,12 +5,12 @@ WORKDIR /app
 COPY package.json bun.lock turbo.json ./
 COPY api/package.json ./api/package.json
 COPY web/package.json ./web/package.json
-COPY packages/shared/package.json ./packages/shared/package.json
+COPY core/package.json ./core/package.json
 
 RUN bun install --frozen-lockfile
 
 COPY api ./api
-COPY packages/shared ./packages/shared
+COPY core ./core
 
 WORKDIR /app/api
 RUN bun run build

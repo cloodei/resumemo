@@ -15,23 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
-
-      # - uses: oven-sh/setup-bun@v2
-      #   with:
-      #     bun-version: 1.3.9
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
       - uses: actions/setup-node@v6
         with:
           node-version: 24.3.0
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Build frontend
-        run: npm run web:build:npm
+        run: bun run web:build
         env:
           VITE_FRONTEND_URL: ${{ secrets.VITE_FRONTEND_URL }}
           VITE_AUTH_SERVER_URL: ${{ secrets.VITE_AUTH_SERVER_URL }}
+
+      - name: Reinstall dependencies
+        run: npm install
 
       - name: Deploy with Wrangler
         working-directory: web
