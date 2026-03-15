@@ -8,7 +8,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@resumemo/shared/*": ["../packages/shared/src/*"],
+      "@resumemo/core/*": ["../core/src/*"],
       "@api": ["../api/src/index.ts"],
       "~/*": ["../api/src/*"]
     }

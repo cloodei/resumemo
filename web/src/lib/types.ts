@@ -1,1 +1,1 @@
-export * from "@resumemo/shared/types/auth";
+export * from "@resumemo/core/types/auth";

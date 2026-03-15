@@ -4,6 +4,6 @@ export {
 	type ALLOWED_MIME_TYPES,
 	ALLOWED_MIME_TYPES_LIST,
 	FILE_INPUT_ACCEPT,
-} from "@resumemo/shared/constants/file-uploads"
+} from "@resumemo/core/constants/file-uploads"
 
 export const BASE_URL = import.meta.env.VITE_AUTH_SERVER_URL ?? "http://localhost:8080"

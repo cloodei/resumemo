@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 
 import { db } from "../lib/db";
-import * as schema from "@resumemo/shared/schemas";
+import * as schema from "@resumemo/core/schemas";
 
 export const systemRoutes = new Elysia()
 	.get("/", () => process.env.JWT_SECRET)

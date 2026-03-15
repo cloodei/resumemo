@@ -6,9 +6,11 @@ STACK_DIR="/opt/resumemo"
 COMPOSE_FILE="$STACK_DIR/docker-compose.prod.yml"
 HEALTH_URL="http://127.0.0.1/health"
 
-export GHCR_OWNER="${GHCR_OWNER:?GHCR_OWNER is required}"
+# export GHCR_OWNER="${GHCR_OWNER:?GHCR_OWNER is required}"
+export GHCR_OWNER="cloodei"
 export API_IMAGE_TAG="${API_IMAGE_TAG:?API_IMAGE_TAG is required}"
-export PIPELINE_IMAGE_TAG="${PIPELINE_IMAGE_TAG:?PIPELINE_IMAGE_TAG is required}"
+# export PIPELINE_IMAGE_TAG="${PIPELINE_IMAGE_TAG:?PIPELINE_IMAGE_TAG is required}"
+export PIPELINE_IMAGE_TAG="${API_IMAGE_TAG}"
 
 docker compose -f "$COMPOSE_FILE" pull
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans

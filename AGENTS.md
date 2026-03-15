@@ -155,11 +155,11 @@ No testing framework currently configured. When adding tests:
 ```typescript
 // Web (vite.config.ts)
 import { cn } from "@/lib/utils"              // @/* -> web/src/*
-import { userSchema } from "@resumemo/shared/schemas"  // @resumemo/shared/* -> packages/shared/src/*
+import { userSchema } from "@resumemo/core/schemas"  // @resumemo/core/* -> packages/shared/src/*
 
 // API (tsconfig paths)
 import { db } from "~/lib/db"                 // ~/* -> api/src/*
-import * as schema from "@resumemo/shared/schemas"     // @resumemo/shared/* -> packages/shared/src/*
+import * as schema from "@resumemo/core/schemas"     // @resumemo/core/* -> packages/shared/src/*
 ```
 
 ### Naming Conventions

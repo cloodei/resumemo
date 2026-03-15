@@ -7,8 +7,8 @@
     "paths": {
       "~/*": ["src/*"],
       "@/*": ["../web/src/*"],
-      "@resumemo/shared": ["../packages/shared/src"],
-      "@resumemo/shared/*": ["../packages/shared/src/*"]
+      "@resumemo/core": ["../core/src"],
+      "@resumemo/core/*": ["../core/src/*"]
     },
     "jsx": "react",
     "types": ["bun-types"],
