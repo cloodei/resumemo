@@ -16,6 +16,7 @@
     "web:start": "bun run --filter web preview",
     "api:start": "bun run --filter api start",
     "web:build": "bun run --filter web build",
+    "web:build:npm": "npm run --filter web build",
     "api:build": "bun run --filter api build",
     "lint": "turbo lint",
     "clean": "turbo clean && rimraf node_modules web/node_modules api/node_modules packages/*/node_modules"

@@ -28,7 +28,7 @@ jobs:
         run: npm install
 
       - name: Build frontend
-        run: npm run --filter web build
+        run: npm run web:build:npm
         env:
           VITE_FRONTEND_URL: ${{ secrets.VITE_FRONTEND_URL }}
           VITE_AUTH_SERVER_URL: ${{ secrets.VITE_AUTH_SERVER_URL }}
