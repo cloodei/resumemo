@@ -1,28 +1,27 @@
-FROM python:3.12-slim AS base
+FROM python:3.15-rc-alpine AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
 	PYTHONUNBUFFERED=1 \
-	UV_LINK_MODE=copy \
-	UV_COMPILE_BYTECODE=1
+	UV_LINK_MODE=copy
 
 FROM base AS builder
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /usr/local/bin/uv
 COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
 
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY services/pipeline ./
 
-RUN uv sync --frozen --no-dev
+# RUN uv sync --frozen --no-dev
 
 FROM base AS runtime
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /usr/local/bin/uv
 COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
