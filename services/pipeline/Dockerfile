@@ -9,8 +9,10 @@ FROM base AS builder
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin/
+FROM astral/uv:alpine AS uv
+
 COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin/
 
 RUN uv sync --frozen --no-dev --no-install-project
 
