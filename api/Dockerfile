@@ -1,4 +1,4 @@
-FROM oven/bun:canary-distroless AS builder
+FROM oven/bun:canary-slim AS builder
 
 WORKDIR /app
 
