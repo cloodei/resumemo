@@ -74,4 +74,4 @@ jobs:
           script: |
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            GHCR_OWNER=${{ github.repository_owner }} API_IMAGE_TAG=${{ github.sha }} PIPELINE_IMAGE_TAG=${{ github.sha }} /opt/resumemo/deploy/ec2/deploy.sh
+            API_IMAGE_TAG=${{ github.sha }} /opt/resumemo/deploy/ec2/deploy.sh

@@ -1,4 +1,4 @@
-FROM oven/bun:canary-alpine AS builder
+FROM oven/bun:1.3.9 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY api ./api
 COPY core ./core
 
 WORKDIR /app/api
-RUN bun run build
+RUN bun build --compile --minify --target=bun-linux-x64-baseline --outfile main index.ts
 
 FROM debian:bookworm-slim AS runtime
 
@@ -21,7 +21,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/api/main ./main
+COPY --from=builder --chmod=755 /app/api/main ./main
 
 EXPOSE 8080
 
