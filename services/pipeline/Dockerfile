@@ -9,8 +9,9 @@ FROM base AS builder
 
 WORKDIR /app
 
-FROM astral/uv:alpine AS uv
 COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
+
+COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /uvx /usr/local/bin/
 
 RUN uv sync --frozen --no-dev --no-install-project
 
@@ -31,4 +32,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 	CMD /app/.venv/bin/celery -A worker inspect ping --timeout=5 || exit 1
 
-CMD ["uv", "run", "celery", "-A", "worker", "worker", "--loglevel=info", "--queues=profiling.jobs", "--pool=solo", "--concurrency=2"]
+CMD ["/app/.venv/bin/celery", "-A", "worker", "worker", "--loglevel=info", "--queues=profiling.jobs", "--pool=solo", "--concurrency=2"]
