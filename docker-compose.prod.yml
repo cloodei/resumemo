@@ -17,7 +17,7 @@ services:
         max-file: "3"
 
   api:
-    image: ghcr.io/${GHCR_OWNER}/resumemo-api:latest
+    image: ghcr.io/${GHCR_OWNER}/resumemo-api:${API_IMAGE_TAG}
     env_file:
       - ./env/api.env
     restart: unless-stopped
@@ -33,7 +33,7 @@ services:
         max-file: "3"
 
   pipeline:
-    image: ghcr.io/${GHCR_OWNER}/resumemo-pipeline:latest
+    image: ghcr.io/${GHCR_OWNER}/resumemo-pipeline:${PIPELINE_IMAGE_TAG}
     env_file:
       - ./env/pipeline.env
     restart: unless-stopped
