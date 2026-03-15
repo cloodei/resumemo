@@ -30,7 +30,7 @@ COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-	CMD ["/app/.venv/bin/python", "-m", "celery", "-A", "worker", "inspect", "ping", "--timeout=5"]
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# 	CMD ["uv", "run", "celery", "-A", "worker", "inspect", "ping", "--timeout=5"]
 
-CMD ["/app/.venv/bin/python", "-m", "celery", "-A", "worker", "worker", "--loglevel=info", "--queues=profiling.jobs", "--pool=solo", "--concurrency=1"]
+CMD ["uv", "run", "celery", "-A", "worker", "worker", "--loglevel=info", "--queues=profiling.jobs", "--pool=solo", "--concurrency=1"]

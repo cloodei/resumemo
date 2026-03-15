@@ -56,14 +56,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Copy deploy assets to EC2
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/nginx/api.conf,deploy/ec2/deploy.sh"
-          target: "/opt/resumemo"
+      # - name: Copy deploy assets to EC2
+      #   uses: appleboy/scp-action@v1
+      #   with:
+      #     host: ${{ secrets.EC2_HOST }}
+      #     username: ${{ secrets.EC2_USER }}
+      #     key: ${{ secrets.EC2_SSH_KEY }}
+      #     source: "docker-compose.prod.yml,deploy/nginx/api.conf,deploy/ec2/deploy.sh"
+      #     target: "/opt/resumemo"
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.2.5
