@@ -9,7 +9,15 @@ export GHCR_OWNER="cloodei"
 export API_IMAGE_TAG="${API_IMAGE_TAG:?API_IMAGE_TAG is required}"
 export PIPELINE_IMAGE_TAG="${API_IMAGE_TAG}"
 
-docker compose -f "$COMPOSE_FILE" pull
+docker compose -f "$COMPOSE_FILE" pull api nginx
+
+if [[ "${PULL_PIPELINE:-true}" == "true" ]]; then
+	echo "Pipeline changes detected — pulling pipeline image"
+	docker compose -f "$COMPOSE_FILE" pull pipeline
+else
+	echo "No pipeline changes — skipping pipeline pull"
+fi
+
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 docker compose -f "$COMPOSE_FILE" ps
 docker system prune --all --volumes --force

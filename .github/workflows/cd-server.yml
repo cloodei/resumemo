@@ -23,8 +23,18 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      pipeline_changed: ${{ steps.changes.outputs.pipeline }}
     steps:
       - uses: actions/checkout@v6.0.2
+
+      - name: Detect pipeline changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            pipeline:
+              - 'services/pipeline/**'
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v4
@@ -80,4 +90,4 @@ jobs:
           script: |
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            API_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
+            API_IMAGE_TAG=latest PULL_PIPELINE=${{ needs.build-and-push.outputs.pipeline_changed }} /opt/resumemo/deploy/ec2/deploy.sh
