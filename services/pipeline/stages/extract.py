@@ -26,16 +26,10 @@ def extract_text(file_bytes: bytes, file_name: str):
 
     extractor = extractors.get(extension)
     if extractor is None:
-        logger.warning("Unsupported file extension for extraction", extra={"file_name": file_name, "extension": extension})
         return ""
 
     try:
-        text = extractor(file_bytes)
-        logger.info(
-            "Text extracted",
-            extra={"file_name": file_name, "extension": extension, "text_length": len(text)},
-        )
-        return text
+        return extractor(file_bytes)
     except Exception as e:
         logger.error(
             "Text extraction failed",

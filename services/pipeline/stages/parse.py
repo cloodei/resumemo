@@ -12,8 +12,8 @@ import spacy
 from config import SPACY_MODEL
 from models import CandidateProfile, EducationEntry, WorkEntry
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 _nlp = None
 _skills_taxonomy: set[str] | None = None
@@ -25,7 +25,6 @@ def _get_nlp():
     """Lazily load the spaCy model."""
     global _nlp
     if _nlp is None:
-        logger.info("Loading spaCy model", extra={"model": SPACY_MODEL})
         _nlp = spacy.load(SPACY_MODEL)
     return _nlp
 
@@ -38,9 +37,8 @@ def _get_skills_taxonomy():
             with open(SKILLS_TAXONOMY_PATH) as f:
                 raw = json.load(f)
             _skills_taxonomy = {s.lower() for s in raw}
-            logger.info("Skills taxonomy loaded", extra={"count": len(_skills_taxonomy)})
         else:
-            logger.warning("Skills taxonomy file not found, using empty set")
+            logger.error("Skills taxonomy file not found", extra={"path": str(SKILLS_TAXONOMY_PATH)})
             _skills_taxonomy = set()
     return _skills_taxonomy
 

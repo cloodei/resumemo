@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
-import time
 
 from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded
@@ -44,21 +43,11 @@ def process_session(self, raw_payload: dict):
     """
     payload = JobPayload.model_validate(raw_payload)
 
-    logger.info(
-        "Starting pipeline job",
-        extra={
-            "session_id": payload.session_id,
-            "total_files": len(payload.files),
-        },
-    )
-
     results: list[dict] = []
     errors: list[dict] = []
 
     try:
-        for i, file in enumerate(payload.files):
-            file_start = time.monotonic()
-
+        for file in payload.files:
             try:
                 result = _process_single_file(file, payload)
                 results.append(result)
@@ -78,18 +67,6 @@ def process_session(self, raw_payload: dict):
                     "original_name": file.original_name,
                     "error": str(e),
                 })
-
-            elapsed = time.monotonic() - file_start
-            logger.info(
-                "File processed",
-                extra={
-                    "session_id": payload.session_id,
-                    "file_id": file.file_id,
-                    "file_index": f"{i + 1}/{len(payload.files)}",
-                    "duration_ms": round(elapsed * 1000),
-                    "success": len(errors) == 0 or errors[-1].get("file_id") != file.file_id,
-                },
-            )
 
         # All files processed — send completion or error
         if results or not errors:

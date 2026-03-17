@@ -76,10 +76,8 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 			if (!session)
 				return status(404, { status: "error", message: "Session not found" });
 
-			if (!session.activeRunId || session.activeRunId !== body.run_id) {
-				console.log(`[Pipeline Callback] Session ${body.session_id} received stale callback for run ${body.run_id}`);
+			if (!session.activeRunId || session.activeRunId !== body.run_id)
 				return { status: "ok", skipped: true };
-			}
 
 			switch (body.type) {
 				case "completion":
@@ -97,51 +95,70 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 
 async function handleCompletion(body: CompletionBody) {
 	await db.transaction(async (tx) => {
-		await tx
-			.delete(schema.candidateResult)
-			.where(
-				and(
-					eq(schema.candidateResult.sessionId, body.session_id),
-					eq(schema.candidateResult.runId, body.run_id),
-				),
-			);
+		if (body.results.length === 0) {
+			await Promise.all([
+				tx.delete(schema.candidateResult)
+					.where(
+						and(
+							eq(schema.candidateResult.sessionId, body.session_id),
+							eq(schema.candidateResult.runId, body.run_id)
+						)
+					),
+				tx.update(schema.profilingSession)
+					.set({
+						status: "completed",
+						errorMessage: null,
+						lastCompletedAt: new Date()
+					})
+					.where(
+						and(
+							eq(schema.profilingSession.id, body.session_id),
+							eq(schema.profilingSession.activeRunId, body.run_id)
+						)
+					)
+			]);
 
-		await tx
-			.update(schema.profilingSession)
-			.set({
-				status: "completed",
-				errorMessage: null,
-				lastCompletedAt: new Date(),
-			})
-			.where(
-				and(
-					eq(schema.profilingSession.id, body.session_id),
-					eq(schema.profilingSession.activeRunId, body.run_id),
-				),
-			);
-
-		if (body.results.length === 0)
 			return;
+		}
 
-		await tx.insert(schema.candidateResult).values(
-			body.results.map(result => ({
-				sessionId: body.session_id,
-				runId: body.run_id,
-				fileId: result.file_id,
-				candidateName: result.candidate_name,
-				candidateEmail: result.candidate_email,
-				candidatePhone: result.candidate_phone,
-				rawText: result.raw_text,
-				parsedProfile: result.parsed_profile,
-				overallScore: String(result.overall_score),
-				scoreBreakdown: result.score_breakdown,
-				summary: result.summary,
-				skillsMatched: result.skills_matched,
-			})),
-		);
+		await Promise.all([
+			tx.delete(schema.candidateResult)
+				.where(
+					and(
+						eq(schema.candidateResult.sessionId, body.session_id),
+						eq(schema.candidateResult.runId, body.run_id)
+					)
+				),
+			tx.update(schema.profilingSession)
+				.set({
+					status: "completed",
+					errorMessage: null,
+					lastCompletedAt: new Date()
+				})
+				.where(
+					and(
+						eq(schema.profilingSession.id, body.session_id),
+						eq(schema.profilingSession.activeRunId, body.run_id)
+					)
+				),
+			tx.insert(schema.candidateResult).values(
+				body.results.map(result => ({
+					sessionId: body.session_id,
+					runId: body.run_id,
+					fileId: result.file_id,
+					candidateName: result.candidate_name,
+					candidateEmail: result.candidate_email,
+					candidatePhone: result.candidate_phone,
+					rawText: result.raw_text,
+					parsedProfile: result.parsed_profile,
+					overallScore: String(result.overall_score),
+					scoreBreakdown: result.score_breakdown,
+					summary: result.summary,
+					skillsMatched: result.skills_matched,
+				}))
+			)
+		]);
 	});
-
-	console.log(`[Pipeline Callback] Completed run ${body.run_id} for session ${body.session_id}`);
 }
 
 async function handleError(body: ErrorBody) {
@@ -189,6 +206,4 @@ async function handleError(body: ErrorBody) {
 			})),
 		);
 	});
-
-	console.log(`[Pipeline Callback] Failed run ${body.run_id} for session ${body.session_id}: ${body.error}`);
 }

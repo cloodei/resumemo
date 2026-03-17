@@ -11,9 +11,15 @@ import amqplib, { type Connection, type ChannelModel, type Channel } from "amqpl
 const QUEUE_NAME = "profiling.jobs";
 const url = process.env.CELERY_BROKER_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
 
-export let connection: Connection | null = null;
 export let channel: Channel | null = null;
+export let connection: Connection | null = null;
 export let channelModel: ChannelModel | null = null;
+
+function resetConnectionState() {
+	channelModel = null;
+	channel = null;
+	connection = null;
+}
 
 async function getChannel() {
 	if (channel)
@@ -24,22 +30,14 @@ async function getChannel() {
 	connection = channelModel.connection;
 
 	await channel.assertQueue(QUEUE_NAME, { durable: true });
-	console.log(`[RabbitMQ] Connected and queue "${QUEUE_NAME}" asserted`);
 
 	connection.on("error", (err) => {
-		channelModel = null;
-		channel = null;
-		connection = null;
-
-		console.error("[RabbitMQ] Connection error:", err.message);
+		resetConnectionState();
+		console.error("[RabbitMQ] Broker connection error:", err.message);
 	});
 
 	connection.on("close", () => {
-		channelModel = null;
-		channel = null;
-		connection = null;
-
-		console.warn("[RabbitMQ] Connection closed, will reconnect on next publish");
+		resetConnectionState();
 	});
 
 	return channel;
@@ -56,10 +54,9 @@ export type PipelineJobPayload = {
 	}[];
 };
 
-async function publishCeleryTask({ taskName, args, logLabel = "" }: {
+async function publishCeleryTask({ taskName, args }: {
 	taskName: string;
 	args: unknown[];
-	logLabel?: string
 }) {
 	const ch = await getChannel();
 	const taskId = randomUUIDv7();
@@ -105,9 +102,8 @@ async function publishCeleryTask({ taskName, args, logLabel = "" }: {
 	);
 
 	if (!sent)
-		throw new Error(`Failed to publish ${logLabel} — channel buffer full`);
+		throw new Error("Failed to publish task: channel buffer full");
 
-	console.log(`[RabbitMQ] Published ${logLabel} as task ${taskId}`);
 	return taskId;
 }
 
@@ -121,7 +117,6 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 	return publishCeleryTask({
 		taskName: "pipeline.process_session",
 		args: [payload],
-		logLabel: `pipeline job for session ${payload.session_id}`,
 	});
 }
 
@@ -138,7 +133,5 @@ export async function closeRabbitMQ() {
 	catch {
 		// Best-effort cleanup
 	}
-	channelModel = null;
-	channel = null;
-	connection = null;
+	resetConnectionState();
 }

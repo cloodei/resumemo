@@ -133,8 +133,7 @@ def _score_text_similarity(resume_text: str, job_description: str) -> float:
         tfidf_matrix = vectorizer.fit_transform([job_description, resume_text])
         similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
         return float(similarity * 100)
-    except Exception as exc:
-        logger.warning("TF-IDF scoring failed", extra={"error": str(exc)})
+    except Exception:
         return 0.0
 
 
@@ -151,9 +150,8 @@ def _score_semantic_similarity(resume_text: str, job_description: str) -> float:
         )
         similarity = float(embeddings[0] @ embeddings[1])
         return max(0.0, min(100.0, float(similarity * 100)))
-    except Exception as exc:
-        logger.warning("Sentence-transformer scoring failed; falling back to spaCy", extra={"error": str(exc)})
-        return _score_semantic_similarity_spacy(resume_text, job_description)
+    except Exception as primary_error:
+        return _score_semantic_similarity_spacy(resume_text, job_description, primary_error)
 
 
 def _get_semantic_model():
@@ -163,14 +161,17 @@ def _get_semantic_model():
     if _semantic_model is None:
         from sentence_transformers import SentenceTransformer
 
-        logger.info("Loading semantic model", extra={"model": SEMANTIC_MODEL_NAME})
         _semantic_model = SentenceTransformer(SEMANTIC_MODEL_NAME)
         _semantic_backend = "sentence-transformers"
 
     return _semantic_model
 
 
-def _score_semantic_similarity_spacy(resume_text: str, job_description: str) -> float:
+def _score_semantic_similarity_spacy(
+    resume_text: str,
+    job_description: str,
+    primary_error: Exception | None = None,
+) -> float:
     global _semantic_backend
 
     try:
@@ -180,8 +181,14 @@ def _score_semantic_similarity_spacy(resume_text: str, job_description: str) -> 
         similarity = jd_doc.similarity(resume_doc)
         _semantic_backend = "spacy-fallback"
         return max(0.0, min(100.0, float(similarity * 100)))
-    except Exception as exc:
-        logger.warning("Semantic fallback scoring failed", extra={"error": str(exc)})
+    except Exception as fallback_error:
+        logger.error(
+            "Semantic scoring failed after fallback",
+            extra={
+                "primary_error": str(primary_error) if primary_error else None,
+                "fallback_error": str(fallback_error),
+            },
+        )
         return 0.0
 
 

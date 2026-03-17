@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 import os
 
 import boto3
-
-logger = logging.getLogger(__name__)
 
 _bucket = os.environ.get("R2_BUCKET_NAME")
 _client = None
@@ -50,14 +47,7 @@ def fetch_file(storage_key: str):
     client = _get_s3_client()
     bucket = _get_bucket()
 
-    logger.info("Fetching file from R2", extra={"storage_key": storage_key, "bucket": bucket})
-
     response = client.get_object(Bucket=bucket, Key=storage_key)
     data = response["Body"].read()
-
-    logger.info(
-        "File fetched",
-        extra={"storage_key": storage_key, "size_bytes": len(data)},
-    )
 
     return data

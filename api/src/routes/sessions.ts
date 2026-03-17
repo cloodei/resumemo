@@ -465,7 +465,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 							jobDescription: existingSession.jobDescription,
 							files: currentFiles,
 						}));
-						
+
 						await db
 							.update(schema.profilingSession)
 							.set({
