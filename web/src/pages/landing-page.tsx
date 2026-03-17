@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-import { useRef } from "react";
-import { motion, useScroll, useTransform, type Variants } from "motion/react";
+import { motion, type Variants } from "motion/react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -8,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { AppFooter } from "@/components/layout/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+const scaleIn: Variants = {
+	hidden: { opacity: 0, scale: 0.92 },
+	visible: {
+		opacity: 1,
+		scale: 1,
+		transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+	},
+};
 const revealUp: Variants = {
 	hidden: { opacity: 0, y: 30, filter: "blur(8px)" },
 	visible: {
@@ -21,15 +28,6 @@ const stagger: Variants = {
 	hidden: { opacity: 0 },
 	visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
-const scaleIn: Variants = {
-	hidden: { opacity: 0, scale: 0.92 },
-	visible: {
-		opacity: 1,
-		scale: 1,
-		transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-	},
-};
-
 const WORKFLOW_STEPS = [
 	{
 		num: "01",
@@ -136,62 +134,28 @@ const STUDIO_FEATURES = [
 ];
 
 export default function LandingPage() {
-	const pageRef = useRef<HTMLDivElement>(null);
-	const { scrollYProgress } = useScroll({
-		target: pageRef,
-		offset: ["start start", "end end"],
-	});
-	const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
-	const bgOpacity = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], [1, 0.7, 0.5, 0.3]);
-
 	return (
-		<div ref={pageRef} className="relative min-h-screen bg-[#060608] text-white selection:bg-[#C95D42] selection:text-white">
+		<div className="relative min-h-screen bg-[#060608] text-white selection:bg-[#C95D42] selection:text-white">
 			{/* ═══ UNIFIED PAGE ATMOSPHERE ═══ */}
-			{/* Fixed grid + noise — always visible, not scroll-dependent */}
 			<div className="pointer-events-none fixed inset-0 z-0">
-				{/* Grid lines — primary texture (subtle, modern) */}
+				{/* Grid lines — primary texture */}
 				<div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-size-[72px_72px]" />
 				{/* Dot grid overlay */}
 				<div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(rgba(255,255,255,0.3)_1px,transparent_1px)] bg-size-[24px_24px]" />
 				{/* Noise texture */}
 				<div className="absolute inset-0 opacity-[0.025] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2EpIi8+PC9zdmc+')]" />
+				{/* Static color blobs — very faint ambient tint */}
+				<div className="absolute -top-32 left-[-15%] size-[800px] rounded-full bg-[#C95D42]/6 blur-[300px]" />
+				<div className="absolute right-[-10%] top-[15%] size-[600px] rounded-full bg-[#f4c06d]/4 blur-[300px]" />
+				<div className="absolute bottom-[-10%] left-[20%] size-[700px] rounded-full bg-[#7dd3fc]/3 blur-[300px]" />
+				<div className="absolute left-[60%] top-[50%] size-[500px] rounded-full bg-[#C95D42]/4 blur-[300px]" />
 			</div>
-			{/* Scroll-driven color blobs — very subtle */}
-			<motion.div className="pointer-events-none fixed inset-0 z-0" style={{ y: bgY, opacity: bgOpacity }}>
-				<div className="absolute -top-32 left-[-15%] size-[800px] rounded-full bg-[#C95D42]/8 blur-[280px]" />
-				<div className="absolute right-[-10%] top-[15%] size-[600px] rounded-full bg-[#f4c06d]/5 blur-[260px]" />
-				<div className="absolute bottom-[-10%] left-[20%] size-[700px] rounded-full bg-[#7dd3fc]/3 blur-[280px]" />
-				<div className="absolute left-[60%] top-[50%] size-[500px] rounded-full bg-[#C95D42]/5 blur-[260px]" />
-			</motion.div>
-
-			{/* ═══════════════ NAV ═══════════════ */}
-			<nav className="fixed inset-x-0 top-0 z-50 backdrop-blur-md">
-				<div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
-				<div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
-					<Link to="/" className="group flex items-center gap-2.5">
-						<Logo className="size-8 rounded-xl transition-transform group-hover:scale-105" />
-						<span className="text-lg font-semibold tracking-tight">Resumemo</span>
-					</Link>
-					<div className="flex items-center gap-2">
-						<Button asChild variant="ghost" size="sm" className="text-white/60 hover:text-white">
-							<Link to="/login">Sign in</Link>
-						</Button>
-						<Button
-							asChild
-							size="sm"
-							className="rounded-full bg-[#C95D42] px-5 text-white shadow-[0_0_24px_rgba(201,93,66,0.5)] transition-shadow hover:bg-[#d4725a] hover:shadow-[0_0_32px_rgba(201,93,66,0.6)]"
-						>
-							<Link to="/dashboard" className="flex items-center gap-1.5">
-								Get started <ArrowRight className="size-3.5" />
-							</Link>
-						</Button>
-					</div>
-				</div>
-			</nav>
 
 			{/* ═══════════════ HERO ═══════════════ */}
 			<section className="relative z-10 min-h-dvh overflow-hidden">
-				<div className="relative mx-auto grid min-h-dvh max-w-7xl items-center gap-12 px-6 pt-28 pb-16 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:px-10 lg:pt-32">
+				<div
+					className="relative mx-auto grid min-h-dvh max-w-7xl items-center gap-12 px-6 pt-8 pb-14 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:px-10 lg:pt-32"
+				>
 					{/* Left — Editorial typography */}
 					<motion.div initial="hidden" animate="visible" variants={stagger} className="flex flex-col">
 						<motion.div
@@ -338,7 +302,7 @@ export default function LandingPage() {
 				</div>
 
 				{/* Bottom gradient fade */}
-				<div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[#060608] to-transparent" />
+				<div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-transparent to-[#060608]" />
 			</section>
 
 			{/* ═══════════════ WORKFLOW — Vertical Timeline ═══════════════ */}
@@ -362,32 +326,50 @@ export default function LandingPage() {
 							{WORKFLOW_STEPS.map((step, index) => (
 								<motion.div
 									key={step.num}
-									variants={revealUp}
-									className={`group relative grid items-center gap-8 border-b border-white/5 py-12 lg:grid-cols-[200px_1fr_1.2fr] lg:gap-16 ${
+									initial="idle"
+									whileInView="active"
+									viewport={{ once: false, amount: 0.6 }}
+									className={`relative grid items-center gap-8 border-b border-white/5 py-12 lg:grid-cols-[200px_1fr_1.2fr] lg:gap-16 ${
 										index === 0 ? "border-t" : ""
 									}`}
 								>
 									{/* Step number */}
 									<div className="flex items-baseline gap-3">
-										<span className="text-6xl font-bold text-white/6 transition-colors group-hover:text-[#C95D42]/20 lg:text-7xl">
+										<motion.span
+											variants={{ idle: { color: "rgba(255,255,255,0.06)" }, active: { color: "rgba(201,93,66,0.25)" } }}
+											transition={{ duration: 0.5 }}
+											className="text-6xl font-bold lg:text-7xl"
+										>
 											{step.num}
-										</span>
+										</motion.span>
 									</div>
 
 									{/* Step label */}
 									<div>
-										<h3 className="text-3xl font-bold tracking-tight transition-colors group-hover:text-[#f4c06d] lg:text-4xl">
+										<motion.h3
+											variants={{ idle: { color: "rgba(255,255,255,1)" }, active: { color: "#f4c06d" } }}
+											transition={{ duration: 0.5 }}
+											className="text-3xl font-bold tracking-tight lg:text-4xl"
+										>
 											{step.label}
-										</h3>
+										</motion.h3>
 									</div>
 
 									{/* Step detail */}
-									<p className="text-base leading-relaxed text-white/40 transition-colors group-hover:text-white/60 lg:text-lg">
+									<motion.p
+										variants={{ idle: { color: "rgba(255,255,255,0.4)" }, active: { color: "rgba(255,255,255,0.65)" } }}
+										transition={{ duration: 0.5 }}
+										className="text-base leading-relaxed lg:text-lg"
+									>
 										{step.detail}
-									</p>
+									</motion.p>
 
-									{/* Hover accent line */}
-									<div className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-[#C95D42] opacity-0 transition-opacity group-hover:opacity-100" />
+									{/* Scroll-triggered accent line */}
+									<motion.div
+										variants={{ idle: { opacity: 0 }, active: { opacity: 1 } }}
+										transition={{ duration: 0.4 }}
+										className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-[#C95D42]"
+									/>
 								</motion.div>
 							))}
 						</div>
