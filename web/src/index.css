@@ -432,7 +432,7 @@ html {
     opacity: 0.4;
   }
   100% {
-    transform: translateY(-36px);
+    transform: translateY(-40px);
     opacity: 0;
   }
 }

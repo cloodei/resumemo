@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { motion, type Variants } from "motion/react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { AppFooter } from "@/components/layout/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +22,16 @@ const revealUp: Variants = {
 		filter: "blur(0px)",
 		transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
 	},
+};
+const fadeUp = {
+  hidden: {
+    opacity: 0,
+    y: 18
+  },
+  visible: {
+    opacity: 1,
+    y: 0
+  },
 };
 const stagger: Variants = {
 	hidden: { opacity: 0 },
@@ -135,26 +144,30 @@ const STUDIO_FEATURES = [
 
 export default function LandingPage() {
 	return (
-		<div className="relative min-h-screen bg-[#060608] text-white selection:bg-[#C95D42] selection:text-white">
-			{/* ═══ UNIFIED PAGE ATMOSPHERE ═══ */}
+		<div className="min-h-screen bg-[#060608] text-white selection:bg-[#C95D42] selection:text-white">
+			{/* Fixed structural texture — grid + noise */}
 			<div className="pointer-events-none fixed inset-0 z-0">
-				{/* Grid lines — primary texture */}
 				<div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-size-[72px_72px]" />
-				{/* Dot grid overlay */}
 				<div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(rgba(255,255,255,0.3)_1px,transparent_1px)] bg-size-[24px_24px]" />
-				{/* Noise texture */}
 				<div className="absolute inset-0 opacity-[0.025] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2EpIi8+PC9zdmc+')]" />
-				{/* Static color blobs — very faint ambient tint */}
-				<div className="absolute -top-32 left-[-15%] size-[800px] rounded-full bg-[#C95D42]/6 blur-[300px]" />
-				<div className="absolute right-[-10%] top-[15%] size-[600px] rounded-full bg-[#f4c06d]/4 blur-[300px]" />
-				<div className="absolute bottom-[-10%] left-[20%] size-[700px] rounded-full bg-[#7dd3fc]/3 blur-[300px]" />
-				<div className="absolute left-[60%] top-[50%] size-[500px] rounded-full bg-[#C95D42]/4 blur-[300px]" />
 			</div>
 
-			{/* ═══════════════ HERO ═══════════════ */}
-			<section className="relative z-10 min-h-dvh overflow-hidden">
+			{/* Main content wrapper — blobs are absolute inside, stretching to full content height */}
+			<main className="relative overflow-hidden">
+				{/* Page-level ambient blobs — absolute inset-0 so they cover full page */}
+				<div className="pointer-events-none absolute inset-0">
+					<div className="absolute -left-24 top-[-5%] size-[500px] rounded-full bg-[#C95D42]/12 blur-[160px]" />
+					<div className="absolute right-[-15%] top-[5%] size-[450px] rounded-full bg-[#f4c06d]/8 blur-[160px]" />
+					<div className="absolute left-[30%] top-[25%] size-[400px] rounded-full bg-[#7dd3fc]/5 blur-[180px]" />
+					<div className="absolute right-[10%] top-[45%] size-[450px] rounded-full bg-[#C95D42]/8 blur-[180px]" />
+					<div className="absolute left-[-10%] top-[65%] size-[400px] rounded-full bg-[#f4c06d]/6 blur-[180px]" />
+					<div className="absolute right-[-5%] top-[85%] size-[350px] rounded-full bg-[#7dd3fc]/5 blur-[160px]" />
+				</div>
+
+				{/* ═══════════════ HERO ═══════════════ */}
+				<section className="relative z-10 min-h-dvh">
 				<div
-					className="relative mx-auto grid min-h-dvh max-w-7xl items-center gap-12 px-6 pt-8 pb-14 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:px-10 lg:pt-32"
+					className="relative mx-auto grid min-h-dvh max-w-7xl items-center gap-12 px-6 pt-8 pb-14 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:px-10"
 				>
 					{/* Left — Editorial typography */}
 					<motion.div initial="hidden" animate="visible" variants={stagger} className="flex flex-col">
@@ -187,26 +200,25 @@ export default function LandingPage() {
 							</span>
 						</motion.p>
 
-						<motion.div variants={revealUp} className="mt-10 flex flex-wrap items-center gap-4">
-							{/* Gradient glow CTA — ported from legacy */}
+						<motion.div variants={fadeUp} className="mt-2 flex flex-wrap items-center gap-5">
 							<Button
 								asChild
 								size="lg"
-								className="group relative overflow-hidden rounded-xl bg-[#C95D42] px-8 py-6 text-base font-semibold text-white shadow-[0_18px_45px_rgba(201,93,66,0.35)] transition-all hover:shadow-[0_18px_55px_rgba(201,93,66,0.45)]"
+								className="relative overflow-hidden rounded-xl bg-[#2563eb] hover:bg-[#43c5ec] px-7 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(37,99,235,0.35)]"
 							>
-								<Link to="/dashboard" className="relative flex items-center gap-2.5">
-									<span className="absolute inset-0 rounded-xl bg-[radial-gradient(70%_80%_at_50%_100%,rgba(244,192,109,0.6),rgba(201,93,66,0)_70%)] opacity-70" />
-									<span className="absolute inset-px rounded-[11px] bg-[linear-gradient(180deg,rgba(255,255,255,0.25),rgba(255,255,255,0))]" />
-									<span className="relative z-10">Start screening</span>
+								<Link to="/dashboard" className="group relative flex items-center gap-2">
+									<span className="absolute inset-0 rounded-xl bg-[radial-gradient(70%_80%_at_50%_100%,rgba(125,211,252,0.7),rgba(37,99,235,0)_70%)] opacity-70" />
+									<span className="absolute inset-px rounded-[11px] bg-[linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0))]" />
+									<span className="relative z-10">Launch studio</span>
 									<ArrowRight className="relative z-10 size-4 transition-transform group-hover:translate-x-1" />
 									<span className="pointer-events-none absolute inset-0 z-0">
-										{Array.from({ length: 10 }).map((_, index) => (
+										{Array.from({ length: 15 }).map((_, index) => (
 											<span
 												key={`cta-point-${index}`}
-												className="absolute bottom-[-8px] h-1 w-1 rounded-full bg-white/80 opacity-0"
+												className="absolute -bottom-2 size-1 rounded-full bg-white/80 opacity-0"
 												style={{
-													left: `${8 + index * 9}%`,
-													animation: `cta-float 2.${index}s ease-in-out ${index * 0.2}s infinite`,
+													left: `${5 + index * 9}%`,
+													animation: `cta-float 1.${index}s ease-in-out ${index * 0.2}s infinite`,
 												}}
 											/>
 										))}
@@ -300,13 +312,10 @@ export default function LandingPage() {
 						</motion.div>
 					</motion.div>
 				</div>
-
-				{/* Bottom gradient fade */}
-				<div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-transparent to-[#060608]" />
 			</section>
 
 			{/* ═══════════════ WORKFLOW — Vertical Timeline ═══════════════ */}
-			<section className="relative z-10 py-32 overflow-hidden">
+			<section className="relative z-10 py-28 overflow-hidden">
 				<div className="relative mx-auto max-w-7xl px-6 lg:px-10">
 					<motion.div
 						initial="hidden"
@@ -322,22 +331,23 @@ export default function LandingPage() {
 							</h2>
 						</motion.div>
 
-						<div className="grid gap-0 lg:gap-0">
+						<div className="grid">
 							{WORKFLOW_STEPS.map((step, index) => (
 								<motion.div
 									key={step.num}
 									initial="idle"
 									whileInView="active"
-									viewport={{ once: false, amount: 0.6 }}
-									className={`relative grid items-center gap-8 border-b border-white/5 py-12 lg:grid-cols-[200px_1fr_1.2fr] lg:gap-16 ${
+									viewport={{ once: false, margin: "-45% 0px -45% 0px" }}
+									transition={{ staggerChildren: 0.08 }}
+									className={`relative grid min-h-[30vh] items-start gap-8 border-b border-white/5 pl-3 pt-12 pb-2 lg:grid-cols-[200px_1fr_1.2fr] lg:gap-16 ${
 										index === 0 ? "border-t" : ""
 									}`}
 								>
 									{/* Step number */}
-									<div className="flex items-baseline gap-3">
+									<div className="flex items-baseline">
 										<motion.span
 											variants={{ idle: { color: "rgba(255,255,255,0.06)" }, active: { color: "rgba(201,93,66,0.25)" } }}
-											transition={{ duration: 0.5 }}
+											transition={{ duration: 0.15, ease: "easeOut" }}
 											className="text-6xl font-bold lg:text-7xl"
 										>
 											{step.num}
@@ -345,10 +355,10 @@ export default function LandingPage() {
 									</div>
 
 									{/* Step label */}
-									<div>
+									<div className="pt-4">
 										<motion.h3
 											variants={{ idle: { color: "rgba(255,255,255,1)" }, active: { color: "#f4c06d" } }}
-											transition={{ duration: 0.5 }}
+											transition={{ duration: 0.15, ease: "easeOut" }}
 											className="text-3xl font-bold tracking-tight lg:text-4xl"
 										>
 											{step.label}
@@ -358,8 +368,8 @@ export default function LandingPage() {
 									{/* Step detail */}
 									<motion.p
 										variants={{ idle: { color: "rgba(255,255,255,0.4)" }, active: { color: "rgba(255,255,255,0.65)" } }}
-										transition={{ duration: 0.5 }}
-										className="text-base leading-relaxed lg:text-lg"
+										transition={{ duration: 0.15, ease: "easeOut" }}
+										className="text-base leading-relaxed lg:text-lg pt-2"
 									>
 										{step.detail}
 									</motion.p>
@@ -367,7 +377,7 @@ export default function LandingPage() {
 									{/* Scroll-triggered accent line */}
 									<motion.div
 										variants={{ idle: { opacity: 0 }, active: { opacity: 1 } }}
-										transition={{ duration: 0.4 }}
+										transition={{ duration: 0.2, ease: "easeOut" }}
 										className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-[#C95D42]"
 									/>
 								</motion.div>
@@ -378,7 +388,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* ═══════════════ STUDIO KIT — Card Mosaic (from legacy) ═══════════════ */}
-			<section className="relative z-10 py-32 overflow-hidden">
+			<section className="relative z-10 py-28 overflow-hidden">
 				<div className="relative mx-auto max-w-7xl px-6 lg:px-10">
 					<motion.div
 						initial="hidden"
@@ -516,7 +526,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* ═══════════════ CAPABILITIES — Figure-Labeled Editorial ═══════════════ */}
-			<section className="relative z-10 py-32 overflow-hidden">
+			<section className="relative z-10 py-28 overflow-hidden">
 				{/* Subtle separator line */}
 				<div className="absolute inset-x-0 top-0 mx-auto h-px max-w-5xl bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
@@ -567,7 +577,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* ═══════════════ FINAL CTA + SPONSORS ═══════════════ */}
-			<section className="relative z-10 overflow-hidden py-32">
+			<section className="relative z-10 overflow-hidden py-20">
 				<div className="relative mx-auto max-w-7xl px-6 text-center lg:px-10">
 					<motion.div
 						initial="hidden"
@@ -651,16 +661,15 @@ export default function LandingPage() {
 					</motion.div>
 				</div>
 			</section>
-
-			<AppFooter />
+		</main>
 
 			{/* CTA button float animation */}
-			<style>{`
+			{/* <style>{`
 				@keyframes cta-float {
 					0%, 100% { opacity: 0; transform: translateY(0); }
 					50% { opacity: 0.6; transform: translateY(-12px); }
 				}
-			`}</style>
+			`}</style> */}
 		</div>
 	);
 }
