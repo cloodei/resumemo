@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth"
 
-const frontendURL = import.meta.env.VITE_FRONTEND_URL ?? "http://localhost:5173"
+const frontendURL = "https://aan-sudo.id.vn"
 
 const providers = [
   {

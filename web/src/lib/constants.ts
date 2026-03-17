@@ -6,4 +6,4 @@ export {
 	FILE_INPUT_ACCEPT,
 } from "@resumemo/core/constants/file-uploads"
 
-export const BASE_URL = import.meta.env.VITE_AUTH_SERVER_URL ?? "http://localhost:8080"
+export const BASE_URL = "https://sv.aan-sudo.id.vn"
