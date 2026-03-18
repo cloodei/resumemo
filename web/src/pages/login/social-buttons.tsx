@@ -5,8 +5,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth"
-
-const frontendURL = "https://aan-sudo.id.vn"
+import { frontendURL } from "@/lib/constants"
 
 const providers = [
   {
