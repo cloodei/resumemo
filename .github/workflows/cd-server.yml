@@ -42,9 +42,9 @@ jobs:
           context: .
           file: api/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/resumemo-api:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:${{ github.sha }}
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:${{ github.sha }},mode=max
+          tags: ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
 
   deploy:
     needs: build-and-push
@@ -71,4 +71,4 @@ jobs:
             mkdir -p /opt/resumemo /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            API_IMAGE_TAG=${{ github.sha }} /opt/resumemo/deploy/ec2/deploy.sh
+            API_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
