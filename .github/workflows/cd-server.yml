@@ -43,8 +43,8 @@ jobs:
           file: api/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
+          # cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
+          # cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
 
   deploy:
     needs: build-and-push

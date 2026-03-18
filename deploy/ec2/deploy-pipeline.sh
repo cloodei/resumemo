@@ -9,7 +9,7 @@ ROLLBACK_ARCHIVE="${BACKUP_DIR}/pipeline-app-prev.tar.gz"
 ARTIFACT_PATH="${PIPELINE_ARTIFACT_PATH:-${APP_ROOT}/pipeline-deploy.tar.gz}"
 ENV_FILE="${APP_ROOT}/env/pipeline.env"
 SERVICE_NAME="resumemo-pipeline.service"
-# UV_BIN="${UV_BIN:-/usr/local/bin/uv}"
+UV_BIN="${UV_BIN:-~/.local/bin/uv}"
 
 LOG_DIR="/var/log/resumemo"
 LOG_FILE="${LOG_DIR}/pipeline-deploy.log"
@@ -48,10 +48,10 @@ ensure_prerequisites() {
 		exit 1
 	fi
 
-	# if [ ! -x "$UV_BIN" ]; then
-	# 	log_event "error" "uv_missing"
-	# 	exit 1
-	# fi
+	if [ ! -x "$UV_BIN" ]; then
+		log_event "error" "uv_missing"
+		exit 1
+	fi
 
 	local free_kb
 	free_kb="$(df -Pk "$APP_ROOT" | awk 'NR==2 { print $4 }')"
@@ -88,7 +88,7 @@ restore_snapshot() {
 
 	(
 		cd "$APP_DIR"
-		uv sync --frozen --no-dev
+		$UV_BIN sync --frozen --no-dev
 	)
 
 	sudo systemctl restart "$SERVICE_NAME"
@@ -129,8 +129,8 @@ log_event "info" "artifact_extracted app_dir=${APP_DIR}"
 CURRENT_STAGE="sync"
 (
 	cd "$APP_DIR"
-	uv sync --frozen --no-dev
-	uv run --no-sync python -c "import worker"
+	$UV_BIN sync --frozen --no-dev
+	$UV_BIN run --no-sync python -c "import worker"
 )
 log_event "info" "uv_sync_complete"
 
