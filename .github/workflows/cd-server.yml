@@ -46,21 +46,14 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
 
-      - name: Build and push pipeline image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/pipeline/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest,mode=max
-
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
+
+      - name: Package pipeline artifact
+        run: tar -czf pipeline-deploy.tar.gz services/pipeline
 
       - name: Copy deploy assets to EC2
         uses: appleboy/scp-action@v1
@@ -68,7 +61,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/nginx/api.conf,deploy/ec2/deploy.sh"
+          source: "docker-compose.prod.yml,deploy/nginx/api.conf,deploy/ec2/deploy.sh,deploy/ec2/deploy-pipeline.sh,deploy/ec2/systemd/resumemo-pipeline.service,deploy/ec2/logrotate/resumemo-pipeline-deploy,pipeline-deploy.tar.gz"
           target: "/opt/resumemo"
 
       - name: Deploy on EC2
@@ -78,6 +71,13 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            mkdir -p /opt/resumemo /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/ec2/systemd /opt/resumemo/deploy/ec2/logrotate /opt/resumemo/backups /opt/resumemo/pipeline-app /opt/resumemo/incoming /var/log/resumemo
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
+            chmod +x /opt/resumemo/deploy/ec2/deploy-pipeline.sh
+            sudo cp /opt/resumemo/deploy/ec2/systemd/resumemo-pipeline.service /etc/systemd/system/resumemo-pipeline.service
+            sudo cp /opt/resumemo/deploy/ec2/logrotate/resumemo-pipeline-deploy /etc/logrotate.d/resumemo-pipeline-deploy
+            sudo systemctl daemon-reload
+            sudo systemctl enable resumemo-pipeline.service
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
             API_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
+            DEPLOY_SHA=${{ github.sha }} DEPLOY_RUN_ID=${{ github.run_id }} PIPELINE_ARTIFACT_PATH=/opt/resumemo/pipeline-deploy.tar.gz /opt/resumemo/deploy/ec2/deploy-pipeline.sh

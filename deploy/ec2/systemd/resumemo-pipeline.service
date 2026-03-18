@@ -1,0 +1,17 @@
+[Unit]
+Description=Resumemo Pipeline Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/resumemo/pipeline-app
+EnvironmentFile=/opt/resumemo/env/pipeline.env
+ExecStart=uv run --no-sync celery -A worker worker --loglevel=info --queues=profiling.jobs --pool=solo --concurrency=2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -31,16 +31,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-  pipeline:
-    image: ghcr.io/${GHCR_OWNER}/resumemo-pipeline:${PIPELINE_IMAGE_TAG}
-    env_file:
-      - ./env/pipeline.env
-    restart: unless-stopped
-    depends_on:
-      api:
-        condition: service_healthy
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
