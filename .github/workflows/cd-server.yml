@@ -46,15 +46,15 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
 
-      # - name: Build and push pipeline image
-      #   uses: docker/build-push-action@v7
-      #   with:
-      #     context: .
-      #     file: services/pipeline/Dockerfile
-      #     push: true
-      #     tags: ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
-      #     cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
-      #     cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest,mode=max
+      - name: Build and push pipeline image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/pipeline/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest,mode=max
 
   deploy:
     needs: build-and-push
