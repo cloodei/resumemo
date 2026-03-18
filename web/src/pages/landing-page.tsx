@@ -3,7 +3,6 @@ import { motion, type Variants } from "motion/react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AppFooter } from "@/components/layout/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const scaleIn: Variants = {

@@ -402,13 +402,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 			if (!existingSession)
 				return status(404, { status: "error", message: "Session not found" });
-
-			if (existingSession.status === "processing" || existingSession.status === "retrying") {
-				return status(409, {
-					status: "error",
-					message: "This session is already running",
-				});
-			}
+			if (existingSession.status === "processing" || existingSession.status === "retrying")
+				return status(409, { status: "error", message: "This session is already running" });
 
 			const u = await db
 				.select({

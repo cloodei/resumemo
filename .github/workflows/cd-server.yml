@@ -90,4 +90,4 @@ jobs:
           script: |
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            API_IMAGE_TAG=latest PULL_PIPELINE=${{ needs.build-and-push.outputs.pipeline_changed }} /opt/resumemo/deploy/ec2/deploy.sh
+            API_IMAGE_TAG=latest PULL_PIPELINE=${{ steps.changes.outputs.pipeline }} /opt/resumemo/deploy/ec2/deploy.sh

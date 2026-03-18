@@ -6,6 +6,7 @@ import logging
 import re
 from typing import Any
 
+from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -23,7 +24,7 @@ from models import CandidateProfile, ScoringResult, SubScore
 from stages.parse import _get_nlp, _get_skills_taxonomy
 
 logger = logging.getLogger(__name__)
-_semantic_model: Any | None = None
+_semantic_model: SentenceTransformer | None = SentenceTransformer(SEMANTIC_MODEL_NAME)
 _semantic_backend = "sentence-transformers"
 
 EXPERIENCE_YEARS_PATTERN = re.compile(
@@ -159,8 +160,6 @@ def _get_semantic_model():
     global _semantic_backend
 
     if _semantic_model is None:
-        from sentence_transformers import SentenceTransformer
-
         _semantic_model = SentenceTransformer(SEMANTIC_MODEL_NAME)
         _semantic_backend = "sentence-transformers"
 
@@ -171,7 +170,7 @@ def _score_semantic_similarity_spacy(
     resume_text: str,
     job_description: str,
     primary_error: Exception | None = None,
-) -> float:
+):
     global _semantic_backend
 
     try:
