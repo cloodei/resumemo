@@ -1,0 +1,50 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "services/pipeline/**"
+      - "deploy/ec2/deploy-pipeline.sh"
+      - "deploy/ec2/systemd/resumemo-pipeline.service"
+      - "deploy/ec2/logrotate/resumemo-pipeline-deploy"
+      - "deploy/ec2/env/pipeline.env.example"
+      - ".github/workflows/cd-pipeline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Package pipeline artifact
+        run: tar -czf pipeline-deploy.tar.gz services/pipeline
+
+      - name: Copy pipeline deploy assets to EC2
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/ec2/deploy-pipeline.sh,deploy/ec2/systemd/resumemo-pipeline.service,deploy/ec2/logrotate/resumemo-pipeline-deploy,pipeline-deploy.tar.gz"
+          target: "/opt/resumemo"
+
+      - name: Deploy pipeline on EC2
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            mkdir -p /opt/resumemo /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/ec2/systemd /opt/resumemo/deploy/ec2/logrotate /opt/resumemo/backups /opt/resumemo/pipeline-app /opt/resumemo/incoming /var/log/resumemo
+            chmod +x /opt/resumemo/deploy/ec2/deploy-pipeline.sh
+            sudo cp /opt/resumemo/deploy/ec2/systemd/resumemo-pipeline.service /etc/systemd/system/resumemo-pipeline.service
+            sudo cp /opt/resumemo/deploy/ec2/logrotate/resumemo-pipeline-deploy /etc/logrotate.d/resumemo-pipeline-deploy
+            sudo systemctl daemon-reload
+            sudo systemctl enable resumemo-pipeline.service
+            DEPLOY_SHA=${{ github.sha }} DEPLOY_RUN_ID=${{ github.run_id }} PIPELINE_ARTIFACT_PATH=/opt/resumemo/pipeline-deploy.tar.gz /opt/resumemo/deploy/ec2/deploy-pipeline.sh
