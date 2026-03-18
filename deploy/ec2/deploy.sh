@@ -13,7 +13,7 @@ docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 docker compose -f "$COMPOSE_FILE" ps
 docker system prune --all --volumes --force
 
-for attempt in $(seq 1 8); do
+for attempt in $(seq 1 5); do
 	if curl -fsS "$HEALTH_URL" >/dev/null; then
 		echo "API healthcheck passed on attempt $attempt"
 		exit 0
