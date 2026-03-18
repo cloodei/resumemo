@@ -22,7 +22,6 @@ headers = {
     "Content-Type": "application/json",
 }
 
-
 def _post_callback(payload: JobPayload, body: dict):
     """POST a callback to the Elysia API with retry logic."""
     last_error: Exception | None = None

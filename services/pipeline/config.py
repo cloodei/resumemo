@@ -17,5 +17,5 @@ TFIDF_NGRAM_RANGE = (1, 2)
 SEMANTIC_MAX_CHARS = int(os.environ.get("SEMANTIC_MAX_CHARS", "15000"))
 SEMANTIC_MODEL_NAME = os.environ.get("SEMANTIC_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
 CALLBACK_RETRY_ATTEMPTS = 3
-CALLBACK_RETRY_BACKOFF = [1, 5, 15]
+CALLBACK_RETRY_BACKOFF = [2, 5, 15]
 SPACY_MODEL = os.environ.get("SPACY_MODEL", "en_core_web_md")
