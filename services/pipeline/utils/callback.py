@@ -41,13 +41,13 @@ def _post_callback(payload: JobPayload, body: dict):
                 time.sleep(delay)
 
     logger.error(
-        "All callback attempts failed",
-        extra={
-            "session_id": payload.session_id,
-            "run_id": payload.run_id,
-            "type": body.get("type"),
-            "error": str(last_error),
-        },
+        f"All callback attempts failed: {str(last_error)} | Session ID: {payload.session_id}",
+        # extra={
+        #     "session_id": payload.session_id,
+        #     "run_id": payload.run_id,
+        #     "type": body.get("type"),
+        #     "error": str(last_error),
+        # },
     )
     raise RuntimeError(f"Failed to send callback after {CALLBACK_RETRY_ATTEMPTS} attempts: {last_error}")
 
