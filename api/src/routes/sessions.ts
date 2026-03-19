@@ -1,11 +1,17 @@
-import { randomUUIDv7 } from "bun";
 import { Elysia, t } from "elysia";
+import { randomUUIDv7 } from "bun";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import * as schema from "@resumemo/core/schemas";
 import { MAX_FILES_PER_SESSION } from "@resumemo/core/constants/file-uploads";
 
 import { db } from "~/lib/db";
+import {
+	getOrSetSessionCache,
+	invalidateSessionList,
+	invalidateSessionNamespace,
+	sessionCacheKeys,
+} from "~/lib/session-cache";
 import { authMiddleware } from "~/lib/auth";
 import { validateFileMetadata } from "~/lib/upload-guard";
 import { publishPipelineJob, type PipelineJobPayload } from "~/lib/queue";
@@ -45,6 +51,35 @@ type SessionResultRecord = {
 	createdAt: Date;
 	originalName: string;
 };
+
+type SessionDetailResponse = {
+	session: unknown;
+	files: { id: number; originalName: string; mimeType: string; size: number }[];
+	results: SessionResultRecord[] | null;
+};
+
+type SessionResultsResponse = {
+	sessionId: string;
+	sessionStatus: string;
+	totalResults: number;
+	results: SessionResultRecord[];
+};
+
+type SessionResultDetailResponse = {
+	result: unknown;
+};
+
+type RouteErrorResponse = {
+	status: string;
+	message: string;
+};
+
+function isRouteErrorResponse(value: unknown): value is RouteErrorResponse {
+	if (!value || typeof value !== "object")
+		return false;
+
+	return "status" in value && "message" in value;
+}
 
 async function cleanupUploadedKeys(storageKeys: string[]) {
 	await Promise.all(storageKeys.map(async (storageKey) => {
@@ -349,6 +384,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					throw error;
 				}
 
+				invalidateSessionList(user.id);
+
 				return {
 					status: "processing" as const,
 					sessionId,
@@ -454,7 +491,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				switch (body.mode) {
 					case "rerun_current": {
 						const runId = randomUUIDv7();
-						publishPipelineJob(buildPipelinePayload({
+
+						await publishPipelineJob(buildPipelinePayload({
 							sessionId: existingSession.id,
 							runId,
 							jobDescription: existingSession.jobDescription,
@@ -474,6 +512,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								totalFiles: currentFiles.length,
 							})
 							.where(eq(schema.profilingSession.id, existingSession.id));
+
+						invalidateSessionNamespace(user.id, existingSession.id);
+						invalidateSessionList(user.id);
 
 						return {
 							status: "retrying" as const,
@@ -516,6 +557,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 							files: currentFiles,
 						}));
 
+						invalidateSessionNamespace(user.id, sessionId);
+						invalidateSessionList(user.id);
+
 						return {
 							status: "processing" as const,
 							sessionId,
@@ -557,6 +601,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 							files: currentFiles,
 						}));
 
+						invalidateSessionNamespace(user.id, sessionId);
+						invalidateSessionList(user.id);
+
 						return {
 							status: "processing" as const,
 							sessionId,
@@ -569,7 +616,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 
 					case "replace_with_updates": {
 						const runId = randomUUIDv7();
-						publishPipelineJob(buildPipelinePayload({
+
+						await publishPipelineJob(buildPipelinePayload({
 							sessionId: existingSession.id,
 							runId,
 							jobDescription: nextJobDescription,
@@ -589,6 +637,9 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								totalFiles: currentFiles.length,
 							})
 							.where(eq(schema.profilingSession.id, existingSession.id));
+
+						invalidateSessionNamespace(user.id, existingSession.id);
+						invalidateSessionList(user.id);
 
 						return {
 							status: "retrying" as const,
@@ -626,139 +677,166 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/",
 		async ({ user }) => {
-			const sessions = await db
-				.select()
-				.from(schema.profilingSession)
-				.where(eq(schema.profilingSession.userId, user.id))
-				.orderBy(desc(schema.profilingSession.createdAt));
+			return getOrSetSessionCache(sessionCacheKeys.list(user.id), async () => {
+				const sessions = await db
+					.select()
+					.from(schema.profilingSession)
+					.where(eq(schema.profilingSession.userId, user.id))
+					.orderBy(desc(schema.profilingSession.createdAt));
 
-			return { sessions };
+				return { sessions };
+			});
 		},
 		{ auth: true },
 	)
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
-			const [sessionRows, files] = await Promise.all([
-				db.select()
-					.from(schema.profilingSession)
-					.where(
-						and(
-							eq(schema.profilingSession.id, params.id),
-							eq(schema.profilingSession.userId, user.id),
-						),
-					),
-				db
-					.select({
-						id: schema.resumeFile.id,
-						originalName: schema.resumeFile.originalName,
-						mimeType: schema.resumeFile.mimeType,
-						size: schema.resumeFile.size,
-					})
-					.from(schema.profilingSessionFile)
-					.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-					.where(eq(schema.profilingSessionFile.sessionId, params.id)),
-			]);
+			const cacheKey = sessionCacheKeys.detail(user.id, params.id);
 
-			const session = sessionRows[0];
-			if (!session)
-				return status(404, { status: "error", message: "Session not found" });
+			const response = await getOrSetSessionCache<SessionDetailResponse | RouteErrorResponse>(
+				cacheKey,
+				async () => {
+					const [sessionRows, files] = await Promise.all([
+						db.select()
+							.from(schema.profilingSession)
+							.where(
+								and(
+									eq(schema.profilingSession.id, params.id),
+									eq(schema.profilingSession.userId, user.id),
+								),
+							),
+						db
+							.select({
+								id: schema.resumeFile.id,
+								originalName: schema.resumeFile.originalName,
+								mimeType: schema.resumeFile.mimeType,
+								size: schema.resumeFile.size,
+							})
+							.from(schema.profilingSessionFile)
+							.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+							.where(eq(schema.profilingSessionFile.sessionId, params.id)),
+					]);
 
-			if (files.length === 0)
-				return status(404, { status: "error", message: "Files not found" });
+					const session = sessionRows[0];
+					if (!session)
+						return { status: "error", message: "Session not found" };
+					if (files.length === 0)
+						return { status: "error", message: "Files not found" };
 
-			let results: SessionResultRecord[] | null = null;
-			if (session.status === "completed") {
-				results = await db
-					.select({
-						id: schema.candidateResult.id,
-						runId: schema.candidateResult.runId,
-						fileId: schema.candidateResult.fileId,
-						candidateName: schema.candidateResult.candidateName,
-						candidateEmail: schema.candidateResult.candidateEmail,
-						candidatePhone: schema.candidateResult.candidatePhone,
-						parsedProfile: schema.candidateResult.parsedProfile,
-						overallScore: schema.candidateResult.overallScore,
-						summary: schema.candidateResult.summary,
-						skillsMatched: schema.candidateResult.skillsMatched,
-						createdAt: schema.candidateResult.createdAt,
-						originalName: schema.resumeFile.originalName,
-					})
-					.from(schema.candidateResult)
-					.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-					.where(eq(schema.candidateResult.sessionId, params.id))
-					.orderBy(desc(schema.candidateResult.overallScore));
+					let results: SessionResultRecord[] | null = null;
+					if (session.status === "completed") {
+						results = await db
+							.select({
+								id: schema.candidateResult.id,
+								runId: schema.candidateResult.runId,
+								fileId: schema.candidateResult.fileId,
+								candidateName: schema.candidateResult.candidateName,
+								candidateEmail: schema.candidateResult.candidateEmail,
+								candidatePhone: schema.candidateResult.candidatePhone,
+								parsedProfile: schema.candidateResult.parsedProfile,
+								overallScore: schema.candidateResult.overallScore,
+								summary: schema.candidateResult.summary,
+								skillsMatched: schema.candidateResult.skillsMatched,
+								createdAt: schema.candidateResult.createdAt,
+								originalName: schema.resumeFile.originalName,
+							})
+							.from(schema.candidateResult)
+							.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
+							.where(eq(schema.candidateResult.sessionId, params.id))
+							.orderBy(desc(schema.candidateResult.overallScore));
 
-				results = filterActiveRunResults(results, session.activeRunId ?? null);
-			}
+						results = filterActiveRunResults(results, session.activeRunId ?? null);
+					}
 
-			return {
-				session,
-				files: files.map(file => ({
-					id: file.id,
-					originalName: file.originalName,
-					mimeType: file.mimeType,
-					size: Number(file.size),
-				})),
-				results,
-			};
+					return {
+						session,
+						files: files.map(file => ({
+							id: file.id,
+							originalName: file.originalName,
+							mimeType: file.mimeType,
+							size: Number(file.size),
+						})),
+						results,
+					};
+				},
+				value => !isRouteErrorResponse(value),
+			);
+
+			if (isRouteErrorResponse(response))
+				return status(404, response);
+
+			return response;
 		},
 		{ auth: true },
 	)
 	.get(
 		"/:id/results",
 		async ({ user, params, status, query }) => {
-			const sortDir = query.sort === "asc"
-				? schema.candidateResult.overallScore
-				: desc(schema.candidateResult.overallScore);
+			const sort = query.sort === "asc" ? "asc" : "desc";
+			const cacheKey = sessionCacheKeys.results(user.id, params.id, sort);
 
-			const [sessionRows, results] = await Promise.all([
-				db
-					.select({
-						id: schema.profilingSession.id,
-						status: schema.profilingSession.status,
-						activeRunId: schema.profilingSession.activeRunId,
-					})
-					.from(schema.profilingSession)
-					.where(
-						and(
-							eq(schema.profilingSession.id, params.id),
-							eq(schema.profilingSession.userId, user.id),
-						),
-					),
-				db
-					.select({
-						id: schema.candidateResult.id,
-						runId: schema.candidateResult.runId,
-						fileId: schema.candidateResult.fileId,
-						candidateName: schema.candidateResult.candidateName,
-						candidateEmail: schema.candidateResult.candidateEmail,
-						candidatePhone: schema.candidateResult.candidatePhone,
-						parsedProfile: schema.candidateResult.parsedProfile,
-						overallScore: schema.candidateResult.overallScore,
-						summary: schema.candidateResult.summary,
-						skillsMatched: schema.candidateResult.skillsMatched,
-						createdAt: schema.candidateResult.createdAt,
-						originalName: schema.resumeFile.originalName,
-					})
-					.from(schema.candidateResult)
-					.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-					.where(eq(schema.candidateResult.sessionId, params.id))
-					.orderBy(sortDir),
-			]);
+			const response = await getOrSetSessionCache<SessionResultsResponse | RouteErrorResponse>(
+				cacheKey,
+				async () => {
+					const sessionRows = await db
+						.select({
+							id: schema.profilingSession.id,
+							status: schema.profilingSession.status,
+							activeRunId: schema.profilingSession.activeRunId,
+						})
+						.from(schema.profilingSession)
+						.where(
+							and(
+								eq(schema.profilingSession.id, params.id),
+								eq(schema.profilingSession.userId, user.id),
+							),
+						);
 
-			const session = sessionRows[0];
-			if (!session)
-				return status(404, { status: "error", message: "Session not found" });
+					const session = sessionRows[0];
+					if (!session)
+						return { status: "error", message: "Session not found" };
 
-			const filteredResults = filterActiveRunResults(results, session.activeRunId ?? null);
+					const sortDir = query.sort === "asc"
+						? schema.candidateResult.overallScore
+						: desc(schema.candidateResult.overallScore);
 
-			return {
-				sessionId: params.id,
-				sessionStatus: session.status,
-				totalResults: filteredResults.length,
-				results: filteredResults,
-			};
+					const results = await db
+						.select({
+							id: schema.candidateResult.id,
+							runId: schema.candidateResult.runId,
+							fileId: schema.candidateResult.fileId,
+							candidateName: schema.candidateResult.candidateName,
+							candidateEmail: schema.candidateResult.candidateEmail,
+							candidatePhone: schema.candidateResult.candidatePhone,
+							parsedProfile: schema.candidateResult.parsedProfile,
+							overallScore: schema.candidateResult.overallScore,
+							summary: schema.candidateResult.summary,
+							skillsMatched: schema.candidateResult.skillsMatched,
+							createdAt: schema.candidateResult.createdAt,
+							originalName: schema.resumeFile.originalName,
+						})
+						.from(schema.candidateResult)
+						.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
+						.where(eq(schema.candidateResult.sessionId, params.id))
+						.orderBy(sortDir);
+
+					const filteredResults = filterActiveRunResults(results, session.activeRunId ?? null);
+
+					return {
+						sessionId: params.id,
+						sessionStatus: session.status,
+						totalResults: filteredResults.length,
+						results: filteredResults,
+					};
+				},
+				value => !isRouteErrorResponse(value),
+			);
+
+			if (isRouteErrorResponse(response))
+				return status(404, response);
+
+			return response;
 		},
 		{
 			auth: true,
@@ -770,57 +848,69 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id/results/:resultId",
 		async ({ user, params, status }) => {
-			const [sessionRows, resultRows] = await Promise.all([
-				db
-					.select({
-						id: schema.profilingSession.id,
-						activeRunId: schema.profilingSession.activeRunId,
-					})
-					.from(schema.profilingSession)
-					.where(
-						and(
-							eq(schema.profilingSession.id, params.id),
-							eq(schema.profilingSession.userId, user.id),
-						),
-					),
-				db
-					.select({
-						id: schema.candidateResult.id,
-						runId: schema.candidateResult.runId,
-						sessionId: schema.candidateResult.sessionId,
-						fileId: schema.candidateResult.fileId,
-						candidateName: schema.candidateResult.candidateName,
-						candidateEmail: schema.candidateResult.candidateEmail,
-						candidatePhone: schema.candidateResult.candidatePhone,
-						rawText: schema.candidateResult.rawText,
-						parsedProfile: schema.candidateResult.parsedProfile,
-						overallScore: schema.candidateResult.overallScore,
-						scoreBreakdown: schema.candidateResult.scoreBreakdown,
-						summary: schema.candidateResult.summary,
-						skillsMatched: schema.candidateResult.skillsMatched,
-						createdAt: schema.candidateResult.createdAt,
-						originalName: schema.resumeFile.originalName,
-						mimeType: schema.resumeFile.mimeType,
-					})
-					.from(schema.candidateResult)
-					.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-					.where(
-						and(
-							eq(schema.candidateResult.id, params.resultId),
-							eq(schema.candidateResult.sessionId, params.id),
-						),
-					),
-			]);
+			const cacheKey = sessionCacheKeys.result(user.id, params.id, params.resultId);
 
-			const session = sessionRows[0];
-			if (!session)
-				return status(404, { status: "error", message: "Session not found" });
+			const response = await getOrSetSessionCache<SessionResultDetailResponse | RouteErrorResponse>(
+				cacheKey,
+				async () => {
+					const sessionRows = await db
+						.select({
+							id: schema.profilingSession.id,
+							activeRunId: schema.profilingSession.activeRunId,
+						})
+						.from(schema.profilingSession)
+						.where(
+							and(
+								eq(schema.profilingSession.id, params.id),
+								eq(schema.profilingSession.userId, user.id),
+							),
+						);
 
-			const [result] = filterActiveRunResults(resultRows, session.activeRunId ?? null);
-			if (!result)
-				return status(404, { status: "error", message: "Result not found" });
+					const session = sessionRows[0];
+					if (!session)
+						return { status: "error", message: "Session not found" };
 
-			return { result };
+					const resultRows = await db
+						.select({
+							id: schema.candidateResult.id,
+							runId: schema.candidateResult.runId,
+							sessionId: schema.candidateResult.sessionId,
+							fileId: schema.candidateResult.fileId,
+							candidateName: schema.candidateResult.candidateName,
+							candidateEmail: schema.candidateResult.candidateEmail,
+							candidatePhone: schema.candidateResult.candidatePhone,
+							rawText: schema.candidateResult.rawText,
+							parsedProfile: schema.candidateResult.parsedProfile,
+							overallScore: schema.candidateResult.overallScore,
+							scoreBreakdown: schema.candidateResult.scoreBreakdown,
+							summary: schema.candidateResult.summary,
+							skillsMatched: schema.candidateResult.skillsMatched,
+							createdAt: schema.candidateResult.createdAt,
+							originalName: schema.resumeFile.originalName,
+							mimeType: schema.resumeFile.mimeType,
+						})
+						.from(schema.candidateResult)
+						.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
+						.where(
+							and(
+								eq(schema.candidateResult.id, params.resultId),
+								eq(schema.candidateResult.sessionId, params.id),
+							),
+						);
+
+					const [result] = filterActiveRunResults(resultRows, session.activeRunId ?? null);
+					if (!result)
+						return { status: "error", message: "Result not found" };
+
+					return { result };
+				},
+				value => !isRouteErrorResponse(value),
+			);
+
+			if (isRouteErrorResponse(response))
+				return status(404, response);
+
+			return response;
 		},
 		{ auth: true },
 	)

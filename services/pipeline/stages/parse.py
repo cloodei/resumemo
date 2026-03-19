@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _nlp = None
 _skills_taxonomy: set[str] | None = None
 
-SKILLS_TAXONOMY_PATH = Path(__file__).parent.parent.parent / "data" / "skills_taxonomy.json"
+SKILLS_TAXONOMY_PATH = Path(__file__).parent.parent / "data" / "skills_taxonomy.json"
 
 
 def _get_nlp():

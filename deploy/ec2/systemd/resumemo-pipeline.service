@@ -6,7 +6,6 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/resumemo/pipeline-app
-EnvironmentFile=/opt/resumemo/env/pipeline.env
 ExecStart=uv run --no-sync celery -A worker worker --loglevel=info --queues=profiling.jobs --without-mingle --without-gossip --without-heartbeat --pool=solo --concurrency=2
 Restart=always
 RestartSec=5
