@@ -25,6 +25,7 @@ import {
 	type FileStatus,
 	type SessionFormData,
 	useUploadActions,
+	useUploadStore,
 	useUploadFiles,
 	useUploadFormData,
 	useUploadPhase,
@@ -48,6 +49,8 @@ export default function NewProfilingPage() {
 	const files = useUploadFiles()
 	const phase = useUploadPhase()
 	const storedFormData = useUploadFormData()
+	const createErrorMessage = useUploadStore(state => state.createErrorMessage)
+	const createErrorDetails = useUploadStore(state => state.createErrorDetails)
 	const {
 		addFiles,
 		removeFile,
@@ -56,6 +59,7 @@ export default function NewProfilingPage() {
 		updateFileById,
 		setPhase,
 		setFormData,
+		setCreateError,
 	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
@@ -201,8 +205,9 @@ export default function NewProfilingPage() {
 		xhrRefs.current = []
 		abortRef.current = null
 		resetUploadingFilesToReady()
+		setCreateError(undefined)
 		setPhase(doneFiles.length > 0 ? "create_error" : "idle")
-		toast.info("Stopped the current attempt. Your uploaded files are still available.")
+		toast.info("Stopped the current attempt. You can try again when you're ready.")
 	}
 
 	const startSessionCreation = async (formData: SessionFormData, filesToCreate: Array<{
@@ -225,10 +230,34 @@ export default function NewProfilingPage() {
 		if (signal.aborted)
 			return
 
-		if (error || !data || data.status !== "processing")
-			throw new Error(getEdenErrorMessage(error) ?? "Session creation failed")
+		if (error || !data || data.status !== "processing") {
+			const errorValue = error?.value && typeof error.value === "object"
+				? error.value as Record<string, unknown>
+				: null
+			const message = errorValue && typeof errorValue.message === "string"
+				? errorValue.message
+				: undefined
+			const details = errorValue && typeof errorValue.details === "string"
+				? errorValue.details
+				: undefined
+			const targetSessionId = errorValue && typeof errorValue.targetSessionId === "string"
+				? errorValue.targetSessionId
+				: undefined
+
+			const creationError = new Error(getEdenErrorMessage(error) || message || "Session creation failed") as Error & {
+				messageForUi?: string
+				detailsForUi?: string
+				targetSessionIdForUi?: string
+			}
+			creationError.messageForUi = message
+			creationError.detailsForUi = details
+			creationError.targetSessionIdForUi = targetSessionId
+
+			throw creationError
+		}
 
 		setPhase("done")
+		setCreateError(undefined)
 		toast.success("Session created. Profiling has started.")
 		setTimeout(() => {
 			clearAll()
@@ -247,6 +276,7 @@ export default function NewProfilingPage() {
 		let stage: "uploading" | "creating" = pendingUploadFiles.length > 0 ? "uploading" : "creating"
 
 		try {
+			setCreateError(undefined)
 			const uploadedById = new Map<number, { storageKey: string }>()
 			for (const file of doneFiles) {
 				if (file.storageKey)
@@ -342,10 +372,29 @@ export default function NewProfilingPage() {
 			if (error instanceof DOMException && error.name === "AbortError")
 				return
 
+			const typedError = error as Error & { messageForUi?: string; detailsForUi?: string }
+			const targetSessionId = (error as Error & { targetSessionIdForUi?: string }).targetSessionIdForUi
+			const fallbackMessage = stage === "creating"
+				? "We couldn't start processing"
+				: "Could not finish uploading files"
+			const errorText = getErrorMessage(error, fallbackMessage)
+
+			if (stage === "creating") {
+				if (targetSessionId) {
+					clearAll()
+					toast.error(typedError.messageForUi ?? "We couldn't start processing.")
+					navigate(`/profiling/${targetSessionId}`)
+					return
+				}
+
+				setCreateError({
+					message: typedError.messageForUi ?? "We couldn't start processing.",
+					details: typedError.detailsForUi ?? "Please try again.",
+				})
+			}
+
 			setPhase(stage === "creating" ? "create_error" : "upload_error")
-			toast.error(getErrorMessage(error, stage === "creating"
-				? "Could not create the session"
-				: "Could not finish uploading files"))
+			toast.error(errorText)
 			console.error("[NewSession] Submit error:", error)
 		}
 		finally {
@@ -377,6 +426,8 @@ export default function NewProfilingPage() {
 					doneFilesCount={doneFiles.length}
 					failedFilesCount={failedFiles.length}
 					phase={phase}
+					createErrorMessage={createErrorMessage}
+					createErrorDetails={createErrorDetails}
 					maxFileMb={MAX_FILE_BYTES / 1024 / 1024}
 					maxFiles={MAX_FILES_PER_SESSION}
 					accept={FILE_INPUT_ACCEPT}
@@ -397,6 +448,8 @@ export default function NewProfilingPage() {
 			<NewSessionFileQueue
 				files={files}
 				phase={phase}
+				createErrorMessage={createErrorMessage}
+				createErrorDetails={createErrorDetails}
 				pendingUploadCount={pendingUploadFiles.length}
 				doneFilesCount={doneFiles.length}
 				isBusy={isBusy}

@@ -11,6 +11,8 @@ type NewSessionUploadPanelProps = {
 	doneFilesCount: number
 	failedFilesCount: number
 	phase: "idle" | "uploading" | "creating" | "upload_error" | "create_error" | "done"
+	createErrorMessage?: string
+	createErrorDetails?: string
 	maxFileMb: number
 	maxFiles: number
 	accept: string
@@ -28,6 +30,8 @@ export function NewSessionUploadPanel({
 	doneFilesCount,
 	failedFilesCount,
 	phase,
+	createErrorMessage,
+	createErrorDetails,
 	maxFileMb,
 	maxFiles,
 	accept,
@@ -41,7 +45,7 @@ export function NewSessionUploadPanel({
 		<Card className="border-dashed shadow-x">
 			<CardHeader className="border-b border-border/30 pb-4">
 				<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">Resume upload</CardTitle>
-				<CardDescription className="mt-1 text-sm">Uploaded files stay reusable if session creation fails.</CardDescription>
+				<CardDescription className="mt-1 text-sm">Uploaded files are prepared for this session before processing starts.</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-6">
 				<motion.div
@@ -76,7 +80,7 @@ export function NewSessionUploadPanel({
 						<p className="flex items-center gap-2 text-foreground">
 							<CheckCircle2 className="size-4 text-emerald-500" />
 							{filesCount} file{filesCount !== 1 ? "s" : ""} added
-							{doneFilesCount > 0 && ` • ${doneFilesCount} already uploaded`}
+							{doneFilesCount > 0 && ` • ${doneFilesCount} uploaded`}
 						</p>
 						{failedFilesCount > 0 && (
 							<p className="mt-1 text-xs text-destructive">
@@ -84,7 +88,7 @@ export function NewSessionUploadPanel({
 							</p>
 						)}
 						{phase === "create_error" && (
-							<p className="mt-1 text-xs text-muted-foreground">Uploads are already complete. You can retry creation immediately.</p>
+							<p className="mt-1 text-xs text-muted-foreground">{createErrorMessage ?? "We couldn't start processing."} {createErrorDetails ?? "Please try creating the session again."}</p>
 						)}
 					</div>
 				)}

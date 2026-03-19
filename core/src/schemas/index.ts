@@ -97,7 +97,6 @@ export const resumeFile = pgTable("resume_file", {
 		.notNull()
 }, (table) => [
 	index().on(table.userId),
-	uniqueIndex("resume_file_user_storage_key_unique").on(table.userId, table.storageKey),
 ]);
 
 export const profilingSessionFile = pgTable("profiling_session_file", {

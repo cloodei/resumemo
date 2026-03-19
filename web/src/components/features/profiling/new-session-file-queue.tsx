@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 type NewSessionFileQueueProps = {
 	files: UploadFile[]
 	phase: "idle" | "uploading" | "creating" | "upload_error" | "create_error" | "done"
+	createErrorMessage?: string
+	createErrorDetails?: string
 	pendingUploadCount: number
 	doneFilesCount: number
 	isBusy: boolean
@@ -27,6 +29,8 @@ type NewSessionFileQueueProps = {
 export function NewSessionFileQueue({
 	files,
 	phase,
+	createErrorMessage,
+	createErrorDetails,
 	pendingUploadCount,
 	doneFilesCount,
 	isBusy,
@@ -48,7 +52,7 @@ export function NewSessionFileQueue({
 						<CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/50 pb-4 dark:border-border/30">
 							<div>
 								<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">File queue</CardTitle>
-								<CardDescription className="mt-1 text-sm">{files.length} file{files.length !== 1 ? "s" : ""} • {pendingUploadCount} still need upload • {doneFilesCount} reusable</CardDescription>
+							<CardDescription className="mt-1 text-sm">{files.length} file{files.length !== 1 ? "s" : ""} • {pendingUploadCount} still need upload • {doneFilesCount} uploaded</CardDescription>
 							</div>
 							<div className="flex items-center gap-2">
 								{isBusy && <Badge variant="secondary" className="gap-1 text-xs"><Loader2 className="size-3 animate-spin" /> Working</Badge>}
@@ -95,8 +99,12 @@ export function NewSessionFileQueue({
 						<CardFooter className="flex flex-col items-start justify-between gap-4 border-t bg-muted/20 py-4 sm:flex-row sm:items-center">
 							<div className="flex items-center gap-3 text-sm text-muted-foreground">
 								{isBusy ? <Loader2 className="size-4 animate-spin text-sky-500" /> : phase === "done" ? <CheckCircle2 className="size-4 text-emerald-500" /> : phase === "upload_error" || phase === "create_error" ? <X className="size-4 text-destructive" /> : null}
-								<span>{phaseLabel[phase]}</span>
+								<span>{phase === "create_error" ? (createErrorMessage ?? phaseLabel[phase]) : phaseLabel[phase]}</span>
 							</div>
+
+							{phase === "create_error" && createErrorDetails && (
+								<p className="text-sm text-muted-foreground">{createErrorDetails}</p>
+							)}
 
 							<div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
 								{isBusy && <Button variant="destructive" className="gap-2" onClick={onCancel}><Ban className="size-4" />Stop</Button>}

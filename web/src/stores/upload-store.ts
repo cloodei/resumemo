@@ -59,6 +59,8 @@ interface UploadStore {
 	files: UploadFile[]
 	phase: UploadPhase
 	formData: SessionFormData
+	createErrorMessage?: string
+	createErrorDetails?: string
 
 	actions: {
 		addFiles: (newFiles: File[]) => void
@@ -68,6 +70,7 @@ interface UploadStore {
 		updateFileById: (id: number, updates: Partial<UploadFile>) => void
 		setPhase: (phase: UploadPhase) => void
 		setFormData: (data: Partial<SessionFormData>) => void
+		setCreateError: (payload?: { message?: string; details?: string }) => void
 	}
 }
 
@@ -77,6 +80,8 @@ const uploadStore = create<UploadStore>()(
 			files: [],
 			phase: "idle",
 			formData: { ...EMPTY_FORM },
+			createErrorMessage: undefined,
+			createErrorDetails: undefined,
 
 			actions: {
 				addFiles: (newFiles: File[]) => {
@@ -113,11 +118,11 @@ const uploadStore = create<UploadStore>()(
 				},
 
 				clearAll: () => {
-					set({ files: [], phase: "idle", formData: { ...EMPTY_FORM } })
+					set({ files: [], phase: "idle", formData: { ...EMPTY_FORM }, createErrorMessage: undefined, createErrorDetails: undefined })
 				},
 
 				clearFiles: () => {
-					set({ files: [], phase: "idle" })
+					set({ files: [], phase: "idle", createErrorMessage: undefined, createErrorDetails: undefined })
 				},
 
 				updateFileById: (id: number, updates: Partial<UploadFile>) => {
@@ -129,11 +134,23 @@ const uploadStore = create<UploadStore>()(
 				},
 
 				setPhase: (phase: UploadPhase) => {
-					set({ phase })
+					set(state => ({
+						phase,
+						createErrorMessage: phase === "create_error" ? state.createErrorMessage : undefined,
+						createErrorDetails: phase === "create_error" ? state.createErrorDetails : undefined,
+					}))
 				},
 
 				setFormData: (data: Partial<SessionFormData>) => {
 					set({ formData: { ...get().formData, ...data } })
+				},
+
+				setCreateError: (payload) => {
+					set({
+						createErrorMessage: payload?.message,
+						createErrorDetails: payload?.details,
+						phase: payload ? "create_error" : get().phase,
+					})
 				},
 			},
 		}),
@@ -143,6 +160,8 @@ const uploadStore = create<UploadStore>()(
 			partialize: (state) => ({
 				phase: state.phase,
 				formData: state.formData,
+				createErrorMessage: state.createErrorMessage,
+				createErrorDetails: state.createErrorDetails,
 				// Persist file metadata for display continuity, but File blobs
 				// are not serializable — rehydration handles this.
 				files: state.files.map(f => ({
@@ -171,6 +190,8 @@ const uploadStore = create<UploadStore>()(
 					state.files = []
 					state.phase = "idle"
 					state.formData = { ...EMPTY_FORM }
+					state.createErrorMessage = undefined
+					state.createErrorDetails = undefined
 					return
 				}
 
@@ -180,11 +201,15 @@ const uploadStore = create<UploadStore>()(
 
 				// Files without blobs are useless — clear them but keep form data
 				state.files = []
+				state.phase = "idle"
+				state.createErrorMessage = undefined
+				state.createErrorDetails = undefined
 			},
 		},
 	),
 )
 
+export const useUploadStore = uploadStore
 export const useUploadFiles = () => uploadStore(state => state.files)
 export const useUploadPhase = () => uploadStore(state => state.phase)
 export const useUploadFormData = () => uploadStore(state => state.formData)

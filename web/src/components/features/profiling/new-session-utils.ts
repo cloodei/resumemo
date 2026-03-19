@@ -34,7 +34,7 @@ export const phaseLabel = {
 	uploading: "Uploading resumes...",
 	creating: "Creating the profiling session...",
 	upload_error: "Some uploads failed. Retry only the failed files.",
-	create_error: "Your files are safe. Retry session creation without uploading again.",
+	create_error: "We couldn't start processing. Please try again.",
 	done: "Session created. Redirecting...",
 } as const
 
@@ -45,7 +45,7 @@ export function fileStatusLabel(status: FileStatus, errorMessage?: string) {
 		case "uploading":
 			return "Uploading"
 		case "done":
-			return "Uploaded and reusable"
+			return "Uploaded"
 		case "failed":
 			return errorMessage ?? "Upload failed"
 	}

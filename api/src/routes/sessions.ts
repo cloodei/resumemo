@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { randomUUIDv7 } from "bun";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import * as schema from "@resumemo/core/schemas";
 import { MAX_FILES_PER_SESSION } from "@resumemo/core/constants/file-uploads";
@@ -14,20 +14,13 @@ import {
 } from "~/lib/session-cache";
 import { authMiddleware } from "~/lib/auth";
 import { validateFileMetadata } from "~/lib/upload-guard";
-import { publishPipelineJob, type PipelineJobPayload } from "~/lib/queue";
+import { publishPipelineJob } from "~/lib/queue";
 import {
-	deleteFile,
 	generatePresignedUploadUrl,
 	generateStorageKey,
-	headFile,
+	cleanupUploadedKeys,
+	verifyUploads,
 } from "~/lib/storage";
-
-type ConfirmedUpload = {
-	storageKey: string;
-	fileName: string;
-	mimeType: string;
-	size: number;
-};
 
 type SessionFileRecord = {
 	fileId: number;
@@ -81,149 +74,9 @@ function isRouteErrorResponse(value: unknown): value is RouteErrorResponse {
 	return "status" in value && "message" in value;
 }
 
-async function cleanupUploadedKeys(storageKeys: string[]) {
-	await Promise.all(storageKeys.map(async (storageKey) => {
-		try {
-			await deleteFile(storageKey);
-		}
-		catch {
-			// Best-effort cleanup.
-		}
-	}));
-}
-
-function buildPipelinePayload(args: {
-	sessionId: string;
-	runId: string;
-	jobDescription: string;
-	files: SessionFileRecord[];
-}): PipelineJobPayload {
-	return {
-		session_id: args.sessionId,
-		run_id: args.runId,
-		job_description: args.jobDescription,
-		files: args.files.map(file => ({
-			file_id: file.fileId,
-			storage_key: file.storageKey,
-			original_name: file.originalName,
-		})),
-	};
-}
-
-async function verifyUploads(files: ConfirmedUpload[]) {
-	const headResults = await Promise.all(
-		files.map(async (file) => {
-			try {
-				const head = await headFile(file.storageKey);
-				const size = head.ContentLength ?? 0;
-				const mimeType = head.ContentType ?? "bad";
-				const check = validateFileMetadata({
-					fileName: file.fileName,
-					claimedMimeType: mimeType,
-					size,
-				});
-
-				if (!check.ok)
-					return { storageKey: file.storageKey, reason: check.message };
-
-				return null;
-			}
-			catch {
-				return {
-					storageKey: file.storageKey,
-					reason: "Uploaded object is missing or unreadable",
-				};
-			}
-		}),
-	);
-
-	return headResults.filter(
-		(result): result is { storageKey: string; reason: string } => result !== null,
-	);
-}
-
-async function getOrCreateSessionFiles(args: {
-	tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
-	userId: string;
-	files: ConfirmedUpload[];
-}) {
-	const storageKeys = args.files.map(file => file.storageKey);
-	const existingFiles = await args.tx
-		.select({
-			fileId: schema.resumeFile.id,
-			storageKey: schema.resumeFile.storageKey,
-			originalName: schema.resumeFile.originalName,
-			mimeType: schema.resumeFile.mimeType,
-			size: schema.resumeFile.size,
-		})
-		.from(schema.resumeFile)
-		.where(and(
-			eq(schema.resumeFile.userId, args.userId),
-			inArray(schema.resumeFile.storageKey, storageKeys),
-		));
-
-	const fileByStorageKey = new Map(existingFiles.map(file => [file.storageKey, file]));
-	const missingUploads = args.files.filter(file => !fileByStorageKey.has(file.storageKey));
-
-	if (missingUploads.length > 0) {
-		const insertedFiles = await args.tx
-			.insert(schema.resumeFile)
-			.values(missingUploads.map(file => ({
-				userId: args.userId,
-				originalName: file.fileName,
-				mimeType: file.mimeType,
-				size: BigInt(file.size),
-				storageKey: file.storageKey,
-			})))
-			.returning({
-				fileId: schema.resumeFile.id,
-				storageKey: schema.resumeFile.storageKey,
-				originalName: schema.resumeFile.originalName,
-				mimeType: schema.resumeFile.mimeType,
-				size: schema.resumeFile.size,
-			});
-
-		for (const file of insertedFiles)
-			fileByStorageKey.set(file.storageKey, file);
-	}
-
-	const sessionFiles = args.files.map((file) => {
-		const matched = fileByStorageKey.get(file.storageKey);
-		if (!matched)
-			throw new Error(`Missing stored file for ${file.fileName}`);
-
-		return matched;
-	});
-
-	return sessionFiles;
-}
-
-async function attachFilesToSession(args: {
-	tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
-	sessionId: string;
-	files: SessionFileRecord[];
-}) {
-	await args.tx.insert(schema.profilingSessionFile).values(
-		args.files.map(file => ({
-			sessionId: args.sessionId,
-			fileId: file.fileId,
-		})),
-	);
-}
-
-async function getSessionFileRecords(sessionId: string) {
-	return db
-		.select({
-			fileId: schema.resumeFile.id,
-			storageKey: schema.resumeFile.storageKey,
-			originalName: schema.resumeFile.originalName,
-			mimeType: schema.resumeFile.mimeType,
-			size: schema.resumeFile.size,
-		})
-		.from(schema.profilingSessionFile)
-		.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-		.where(eq(schema.profilingSessionFile.sessionId, sessionId));
-}
+const CREATE_SESSION_FAILED_MESSAGE = "We couldn't start processing. Please try again.";
+const RETRY_SESSION_FAILED_MESSAGE = "We couldn't restart processing. Please try again.";
+const RETRY_CLONE_FAILED_MESSAGE = "We couldn't start the new copied session. Please try again.";
 
 function filterActiveRunResults<T extends { runId?: string | null }>(results: T[], activeRunId: string | null) {
 	if (!activeRunId)
@@ -334,52 +187,78 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				});
 			}
 
+			let sessionId = "";
+			let sessionPersisted = false;
 			try {
 				const runId = randomUUIDv7();
-				let sessionId = "";
 				let sessionFiles: SessionFileRecord[] = [];
 
 				await db.transaction(async (tx) => {
-					const [createdSession] = await tx
-						.insert(schema.profilingSession)
-						.values({
-							userId: user.id,
-							name,
-							jobDescription,
-							jobTitle: jobTitle ?? null,
-							status: "processing",
-							activeRunId: runId,
-							totalFiles: files.length,
-							errorMessage: null,
-							lastCompletedAt: null,
-						})
-						.returning({ id: schema.profilingSession.id });
+					const [[createdSession], sessionFiles] = await Promise.all([
+						tx.insert(schema.profilingSession)
+							.values({
+								userId: user.id,
+								name,
+								jobDescription,
+								jobTitle: jobTitle ?? null,
+								status: "processing",
+								activeRunId: runId,
+								totalFiles: files.length,
+								errorMessage: null,
+								lastCompletedAt: null,
+							})
+							.returning({ id: schema.profilingSession.id }),
+						tx.insert(schema.resumeFile)
+							.values(files.map(file => ({
+								userId: user.id,
+								originalName: file.fileName,
+								mimeType: file.mimeType,
+								size: BigInt(file.size),
+								storageKey: file.storageKey,
+							})))
+							.returning({
+								fileId: schema.resumeFile.id,
+								storageKey: schema.resumeFile.storageKey,
+								originalName: schema.resumeFile.originalName,
+								mimeType: schema.resumeFile.mimeType,
+								size: schema.resumeFile.size,
+							})
+					]);
 
 					sessionId = createdSession.id;
-					sessionFiles = await getOrCreateSessionFiles({
-						tx,
-						userId: user.id,
-						files,
-					});
-					await attachFilesToSession({ tx, sessionId, files: sessionFiles });
+					await tx.insert(schema.profilingSessionFile).values(
+						sessionFiles.map(file => ({
+							sessionId,
+							fileId: file.fileId,
+						})),
+					);
 				});
+				sessionPersisted = true;
 
 				try {
-					await publishPipelineJob(buildPipelinePayload({
-						sessionId,
-						runId,
-						jobDescription,
-						files: sessionFiles,
-					}));
+					await publishPipelineJob({
+						session_id: sessionId,
+						run_id: runId,
+						job_description: jobDescription,
+						files: sessionFiles.map(file => ({
+							file_id: file.fileId,
+							storage_key: file.storageKey,
+							original_name: file.originalName,
+						})),
+					});
 				}
 				catch (error) {
 					await db
 						.update(schema.profilingSession)
 						.set({
 							status: "failed",
-							errorMessage: error instanceof Error ? error.message : "Failed to publish to queue",
+							errorMessage: CREATE_SESSION_FAILED_MESSAGE,
+							lastCompletedAt: null,
 						})
 						.where(eq(schema.profilingSession.id, sessionId));
+
+					invalidateSessionNamespace(user.id, sessionId);
+					invalidateSessionList(user.id);
 
 					throw error;
 				}
@@ -396,7 +275,10 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			catch {
 				return status(500, {
 					status: "error",
-					message: "Failed to submit job to processing queue",
+					message: "We couldn't start processing.",
+					details: "Please try again.",
+					retryable: true,
+					targetSessionId: sessionPersisted ? sessionId : null,
 				});
 			}
 		},
@@ -468,7 +350,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			if (reusableFailures.length > 0) {
 				return status(409, {
 					status: "error",
-					message: "Some existing uploads are no longer reusable",
+					message: "Some existing uploads are no longer available for retry",
 					failures: reusableFailures,
 				});
 			}
@@ -480,7 +362,17 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			const nextJobDescription = body.jobDescription?.trim() || existingSession.jobDescription;
 
 			try {
-				const currentFiles = await getSessionFileRecords(existingSession.id);
+				const currentFiles = await db
+					.select({
+						fileId: schema.resumeFile.id,
+						storageKey: schema.resumeFile.storageKey,
+						originalName: schema.resumeFile.originalName,
+						mimeType: schema.resumeFile.mimeType,
+						size: schema.resumeFile.size,
+					})
+					.from(schema.profilingSessionFile)
+					.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+					.where(eq(schema.profilingSessionFile.sessionId, existingSession.id));
 				if (currentFiles.length === 0) {
 					return status(404, {
 						status: "error",
@@ -491,13 +383,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				switch (body.mode) {
 					case "rerun_current": {
 						const runId = randomUUIDv7();
-
-						await publishPipelineJob(buildPipelinePayload({
-							sessionId: existingSession.id,
-							runId,
-							jobDescription: existingSession.jobDescription,
-							files: currentFiles,
-						}));
 
 						await db
 							.update(schema.profilingSession)
@@ -512,6 +397,39 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								totalFiles: currentFiles.length,
 							})
 							.where(eq(schema.profilingSession.id, existingSession.id));
+
+						try {
+							await publishPipelineJob({
+								session_id: existingSession.id,
+								run_id: runId,
+								job_description: existingSession.jobDescription,
+								files: currentFiles.map(file => ({
+									file_id: file.fileId,
+									storage_key: file.storageKey,
+									original_name: file.originalName,
+								})),
+							});
+						}
+						catch {
+							await db
+								.update(schema.profilingSession)
+								.set({
+									status: "failed",
+									errorMessage: RETRY_SESSION_FAILED_MESSAGE,
+									lastCompletedAt: null,
+								})
+								.where(eq(schema.profilingSession.id, existingSession.id));
+							invalidateSessionNamespace(user.id, existingSession.id);
+							invalidateSessionList(user.id);
+
+							return status(500, {
+								status: "error",
+								message: "We couldn't restart processing.",
+								details: "Please try again.",
+								retryable: true,
+								targetSessionId: existingSession.id,
+							});
+						}
 
 						invalidateSessionNamespace(user.id, existingSession.id);
 						invalidateSessionList(user.id);
@@ -547,15 +465,46 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								.returning({ id: schema.profilingSession.id });
 
 							sessionId = createdSession.id;
-							await attachFilesToSession({ tx, sessionId, files: currentFiles });
+							await tx.insert(schema.profilingSessionFile).values(
+								currentFiles.map(file => ({
+									sessionId: createdSession.id,
+									fileId: file.fileId,
+								})),
+							);
 						});
 
-						await publishPipelineJob(buildPipelinePayload({
-							sessionId,
-							runId,
-							jobDescription: existingSession.jobDescription,
-							files: currentFiles,
-						}));
+						try {
+							await publishPipelineJob({
+								session_id: sessionId,
+								run_id: runId,
+								job_description: existingSession.jobDescription,
+								files: currentFiles.map(file => ({
+									file_id: file.fileId,
+									storage_key: file.storageKey,
+									original_name: file.originalName,
+								})),
+							});
+						}
+						catch {
+							await db
+								.update(schema.profilingSession)
+								.set({
+									status: "failed",
+									errorMessage: RETRY_CLONE_FAILED_MESSAGE,
+									lastCompletedAt: null,
+								})
+								.where(eq(schema.profilingSession.id, sessionId));
+							invalidateSessionNamespace(user.id, sessionId);
+							invalidateSessionList(user.id);
+
+							return status(500, {
+								status: "error",
+								message: "We couldn't start the new copied session.",
+								details: "Please try again.",
+								retryable: true,
+								targetSessionId: sessionId,
+							});
+						}
 
 						invalidateSessionNamespace(user.id, sessionId);
 						invalidateSessionList(user.id);
@@ -591,15 +540,46 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								.returning({ id: schema.profilingSession.id });
 
 							sessionId = createdSession.id;
-							await attachFilesToSession({ tx, sessionId, files: currentFiles });
+							await tx.insert(schema.profilingSessionFile).values(
+								currentFiles.map(file => ({
+									sessionId: createdSession.id,
+									fileId: file.fileId,
+								})),
+							);
 						});
 
-						await publishPipelineJob(buildPipelinePayload({
-							sessionId,
-							runId,
-							jobDescription: nextJobDescription,
-							files: currentFiles,
-						}));
+						try {
+							await publishPipelineJob({
+								session_id: sessionId,
+								run_id: runId,
+								job_description: nextJobDescription,
+								files: currentFiles.map(file => ({
+									file_id: file.fileId,
+									storage_key: file.storageKey,
+									original_name: file.originalName,
+								})),
+							});
+						}
+						catch {
+							await db
+								.update(schema.profilingSession)
+								.set({
+									status: "failed",
+									errorMessage: RETRY_CLONE_FAILED_MESSAGE,
+									lastCompletedAt: null,
+								})
+								.where(eq(schema.profilingSession.id, sessionId));
+							invalidateSessionNamespace(user.id, sessionId);
+							invalidateSessionList(user.id);
+
+							return status(500, {
+								status: "error",
+								message: "We couldn't start the new copied session.",
+								details: "Please try again.",
+								retryable: true,
+								targetSessionId: sessionId,
+							});
+						}
 
 						invalidateSessionNamespace(user.id, sessionId);
 						invalidateSessionList(user.id);
@@ -617,13 +597,6 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 					case "replace_with_updates": {
 						const runId = randomUUIDv7();
 
-						await publishPipelineJob(buildPipelinePayload({
-							sessionId: existingSession.id,
-							runId,
-							jobDescription: nextJobDescription,
-							files: currentFiles,
-						}));
-
 						await db
 							.update(schema.profilingSession)
 							.set({
@@ -637,6 +610,39 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 								totalFiles: currentFiles.length,
 							})
 							.where(eq(schema.profilingSession.id, existingSession.id));
+
+						try {
+							await publishPipelineJob({
+								session_id: existingSession.id,
+								run_id: runId,
+								job_description: nextJobDescription,
+								files: currentFiles.map(file => ({
+									file_id: file.fileId,
+									storage_key: file.storageKey,
+									original_name: file.originalName,
+								})),
+							});
+						}
+						catch {
+							await db
+								.update(schema.profilingSession)
+								.set({
+									status: "failed",
+									errorMessage: RETRY_SESSION_FAILED_MESSAGE,
+									lastCompletedAt: null,
+								})
+								.where(eq(schema.profilingSession.id, existingSession.id));
+							invalidateSessionNamespace(user.id, existingSession.id);
+							invalidateSessionList(user.id);
+
+							return status(500, {
+								status: "error",
+								message: "We couldn't restart processing.",
+								details: "Please try again.",
+								retryable: true,
+								targetSessionId: existingSession.id,
+							});
+						}
 
 						invalidateSessionNamespace(user.id, existingSession.id);
 						invalidateSessionList(user.id);
@@ -655,7 +661,12 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			catch {
 				return status(500, {
 					status: "error",
-					message: "Failed to start the selected retry flow",
+					message: "We couldn't restart processing.",
+					details: "Please try again.",
+					retryable: true,
+					targetSessionId: body.mode === "clone_current" || body.mode === "clone_with_updates"
+						? null
+						: existingSession.id,
 				});
 			}
 		},

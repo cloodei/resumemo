@@ -1,6 +1,7 @@
 import { randomUUIDv7 } from "bun";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { validateFileMetadata } from "./upload-guard";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
@@ -72,6 +73,56 @@ function headFile(storageKey: string) {
 	return r2Client.send(command);
 }
 
+async function cleanupUploadedKeys(storageKeys: string[]) {
+	await Promise.all(storageKeys.map(async (storageKey) => {
+		try {
+			await deleteFile(storageKey);
+		}
+		catch {
+			// Best-effort cleanup.
+		}
+	}));
+}
+
+type ConfirmedUpload = {
+	storageKey: string;
+	fileName: string;
+	mimeType: string;
+	size: number;
+};
+
+async function verifyUploads(files: ConfirmedUpload[]) {
+	const headResults = await Promise.all(
+		files.map(async (file) => {
+			try {
+				const head = await headFile(file.storageKey);
+				const size = head.ContentLength ?? 0;
+				const mimeType = head.ContentType ?? "bad";
+				const check = validateFileMetadata({
+					fileName: file.fileName,
+					claimedMimeType: mimeType,
+					size,
+				});
+
+				if (!check.ok)
+					return { storageKey: file.storageKey, reason: check.message };
+
+				return null;
+			}
+			catch {
+				return {
+					storageKey: file.storageKey,
+					reason: "Uploaded object is missing or unreadable",
+				};
+			}
+		}),
+	);
+
+	return headResults.filter(
+		(result): result is { storageKey: string; reason: string } => result !== null,
+	);
+}
+
 export {
 	r2Client,
 	R2_BUCKET_NAME,
@@ -79,4 +130,6 @@ export {
 	generatePresignedUploadUrl,
 	deleteFile,
 	headFile,
+	cleanupUploadedKeys,
+	verifyUploads
 };

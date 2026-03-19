@@ -55,7 +55,7 @@ export function FailedSessionSection({ session, onOpenRetry }: FailedSessionSect
 			</div>
 			<h2 className="mb-2 text-2xl font-semibold tracking-tight">Screening stopped before completion</h2>
 			<p className="mb-6 max-w-lg text-muted-foreground">
-				You can retry this session instantly with the same resumes, or create a separate follow-up session if you want to preserve this attempt.
+				Processing could not continue for this session. You can retry now, or create a separate follow-up session if you want to preserve this attempt.
 			</p>
 			<div className="flex flex-wrap items-center justify-center gap-3">
 				<Button className="gap-2" onClick={() => onOpenRetry("rerun_current")}>
@@ -69,7 +69,7 @@ export function FailedSessionSection({ session, onOpenRetry }: FailedSessionSect
 			</div>
 			{session.errorMessage && (
 				<div className="mt-6 max-w-2xl rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-left text-sm text-muted-foreground">
-					<p className="font-medium text-foreground">Technical details</p>
+					<p className="font-medium text-foreground">What happened</p>
 					<p className="mt-1 break-words">{session.errorMessage}</p>
 				</div>
 			)}
@@ -88,7 +88,7 @@ export function UploadedDocumentsSection({ files, formatFileSize }: UploadedDocu
 			<Card className="overflow-hidden border-border/60 shadow-m dark:border-border/40">
 				<CardHeader className="border-b border-border/50 pb-4 dark:border-border/30">
 					<CardTitle className="bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-lg font-semibold">Uploaded documents</CardTitle>
-					<CardDescription className="mt-1 text-sm">{files.length} resume{files.length !== 1 ? "s" : ""} reusable for retry or rerun flows</CardDescription>
+					<CardDescription className="mt-1 text-sm">{files.length} resume{files.length !== 1 ? "s" : ""} stored for this session</CardDescription>
 				</CardHeader>
 				<CardContent className="pt-6">
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

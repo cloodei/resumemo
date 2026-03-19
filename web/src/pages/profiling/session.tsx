@@ -64,8 +64,31 @@ function ProfilingSessionContent() {
 				: { mode: selectedRetryMode }
 
 			const { data, error } = await api.api.v2.sessions({ id }).retry.post(payload)
-			if (error || !data)
-				throw new Error(getEdenErrorMessage(error) ?? "Could not start retry flow")
+			if (error || !data) {
+				const errorValue = error?.value && typeof error.value === "object"
+					? error.value as Record<string, unknown>
+					: null
+				const message = errorValue && typeof errorValue.message === "string"
+					? errorValue.message
+					: undefined
+				const details = errorValue && typeof errorValue.details === "string"
+					? errorValue.details
+					: undefined
+				const targetSessionId = errorValue && typeof errorValue.targetSessionId === "string"
+					? errorValue.targetSessionId
+					: undefined
+
+				const retryError = new Error(getEdenErrorMessage(error) || message || "Could not start retry flow") as Error & {
+					messageForUi?: string
+					detailsForUi?: string
+					targetSessionIdForUi?: string
+				}
+				retryError.messageForUi = message
+				retryError.detailsForUi = details
+				retryError.targetSessionIdForUi = targetSessionId
+
+				throw retryError
+			}
 
 			return data
 		},
@@ -87,7 +110,29 @@ function ProfilingSessionContent() {
 			await queryClient.invalidateQueries({ queryKey: ["profiling-session", id] })
 		},
 		onError: (error) => {
-			toast.error(getErrorMessage(error, "Could not start retry flow"))
+			const typedError = error as Error & {
+				messageForUi?: string
+				detailsForUi?: string
+				targetSessionIdForUi?: string
+			}
+
+			if (typedError.targetSessionIdForUi) {
+				void queryClient.invalidateQueries({ queryKey: ["profiling-session", typedError.targetSessionIdForUi] })
+
+				if (typedError.targetSessionIdForUi === id) {
+					toast.error(typedError.messageForUi ?? "We couldn't restart processing.")
+					return
+				}
+
+				toast.error(typedError.messageForUi ?? "We couldn't restart processing.")
+				navigate(`/profiling/${typedError.targetSessionIdForUi}`)
+				return
+			}
+
+			toast.error([
+				typedError.messageForUi,
+				typedError.detailsForUi,
+			].filter(Boolean).join(" ") || getErrorMessage(error, "Could not start retry flow"))
 		},
 	})
 
