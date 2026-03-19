@@ -25,6 +25,6 @@ COPY --from=builder /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-	CMD ["uv", "run", "--no-sync", "celery", "-A", "worker", "inspect", "ping", "--timeout=5"]
+	CMD ["sh", "-c", "uv run --no-sync celery -A worker inspect ping -d \"pipeline@$HOSTNAME\" --timeout=5"]
 
-CMD ["uv", "run", "--no-sync", "celery", "-A", "worker", "worker", "--loglevel=info", "--queues=profiling.jobs", "--pool=solo", "--concurrency=2"]
+CMD ["uv", "run", "--no-sync", "celery", "-A", "worker", "worker", "--hostname=pipeline@%h", "--loglevel=info", "--queues=profiling.jobs", "--without-mingle", "--without-gossip", "--without-heartbeat", "--pool=solo", "--concurrency=2"]

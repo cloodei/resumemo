@@ -3,7 +3,7 @@
 set -euo pipefail
 
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg python3 python3-venv python3-pip logrotate
+sudo apt-get install -y ca-certificates curl gnupg rsync
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -11,7 +11,5 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker "$USER"
-curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
-sudo mkdir -p /opt/resumemo/env /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/ec2/systemd /opt/resumemo/deploy/ec2/logrotate /opt/resumemo/deploy/nginx /opt/resumemo/pipeline-app /opt/resumemo/backups /opt/resumemo/incoming /var/log/resumemo
+sudo mkdir -p /opt/resumemo/env /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx
 sudo chown -R "$USER":"$USER" /opt/resumemo
-sudo chown -R "$USER":"$USER" /var/log/resumemo

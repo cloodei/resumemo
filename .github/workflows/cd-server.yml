@@ -6,9 +6,10 @@ on:
       - main
     paths:
       - "api/**"
-      - "packages/shared/**"
-      - "deploy/ec2/deploy.sh"
-      - "deploy/nginx/api.conf"
+      - "core/**"
+      - "services/pipeline/**"
+      - "deploy/ec2/**"
+      - "deploy/nginx/**"
       - "docker-compose.prod.yml"
       - ".dockerignore"
       - "bun.lock"
@@ -52,14 +53,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
+      - name: Package deploy assets
+        run: tar -czf server-deploy-assets.tar.gz .dockerignore docker-compose.prod.yml deploy/ec2 deploy/nginx services/pipeline
+
       - name: Copy deploy assets to EC2
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/nginx/api.conf,deploy/ec2/deploy.sh"
-          target: "/opt/resumemo"
+          source: "server-deploy-assets.tar.gz"
+          target: "/tmp/resumemo-server-upload"
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.2.5
@@ -68,7 +72,17 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mkdir -p /opt/resumemo /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx
-            chmod +x /opt/resumemo/deploy/ec2/deploy.sh
+            mkdir -p /opt/resumemo /tmp/resumemo-server-upload
+            tar -xzf /tmp/resumemo-server-upload/server-deploy-assets.tar.gz -C /tmp/resumemo-server-upload
+            rm -f /opt/resumemo/.dockerignore /opt/resumemo/docker-compose.prod.yml
+            rm -rf /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx /opt/resumemo/services/pipeline
+            mkdir -p /opt/resumemo/deploy /opt/resumemo/services
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            API_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
+            cp /tmp/resumemo-server-upload/.dockerignore /opt/resumemo/.dockerignore
+            cp /tmp/resumemo-server-upload/docker-compose.prod.yml /opt/resumemo/docker-compose.prod.yml
+            cp -R /tmp/resumemo-server-upload/deploy/ec2 /opt/resumemo/deploy/ec2
+            cp -R /tmp/resumemo-server-upload/deploy/nginx /opt/resumemo/deploy/nginx
+            cp -R /tmp/resumemo-server-upload/services/pipeline /opt/resumemo/services/pipeline
+            chmod +x /opt/resumemo/deploy/ec2/deploy.sh
+            GHCR_OWNER=${{ github.repository_owner }} API_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
+            rm -rf /tmp/resumemo-server-upload
