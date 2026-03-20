@@ -5,31 +5,17 @@ import * as schema from "@resumemo/core/schemas";
 import { db } from "~/lib/db";
 import { repositoryCache } from "~/lib/repository-cache";
 
+
 export type SessionSort = "asc" | "desc";
 type CandidateResultRow = typeof schema.candidateResult.$inferSelect;
-
 export type SessionRepositoryError = {
 	code: "session-not-found" | "files-not-found" | "result-not-found" | "session-not-completed";
 	message: string;
 };
-
 type SessionRepositoryResult<T> =
 	| { ok: true; data: T }
 	| { ok: false; error: SessionRepositoryError };
-
-function sessionRepositorySuccess<T>(data: T): SessionRepositoryResult<T> {
-	return { ok: true, data };
-}
-
-function sessionRepositoryFailure(
-	code: SessionRepositoryError["code"],
-	message: string,
-): SessionRepositoryResult<never> {
-	return {
-		ok: false,
-		error: { code, message },
-	};
-}
+	
 
 const listSessionsByUserStatement = db
 	.select()
@@ -264,6 +250,21 @@ export const sessionRepositoryCacheKeys = {
 	resultEntity: (sessionId: string, resultId: string) => `result:entity:${sessionId}:${resultId}` as const,
 };
 
+
+function sessionRepositorySuccess<T>(data: T): SessionRepositoryResult<T> {
+	return { ok: true, data };
+}
+
+function sessionRepositoryFailure(
+	code: SessionRepositoryError["code"],
+	message: string,
+): SessionRepositoryResult<never> {
+	return {
+		ok: false,
+		error: { code, message },
+	};
+}
+
 export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>): value is {
 	ok: false;
 	error: SessionRepositoryError
@@ -385,7 +386,7 @@ function patchSessionState(payload: {
 
 	repositoryCache.update(
 		sessionRepositoryCacheKeys.detail(session.userId, session.id),
-		current => ({
+		_ => ({
 			session,
 			files: payload.files,
 			results: payload.results,

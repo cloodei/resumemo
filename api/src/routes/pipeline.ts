@@ -5,7 +5,7 @@
  * Authenticated by shared secret (PIPELINE_CALLBACK_SECRET), not user auth.
  */
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import * as schema from "@resumemo/core/schemas";
@@ -43,7 +43,7 @@ const completionBody = t.Object({
 	status: t.Literal("completed"),
 	results: t.Array(resultSchema),
 });
-type CompletionBody = typeof completionBody.static;
+// type CompletionBody = typeof completionBody.static;
 
 const errorBody = t.Object({
 	type: t.Literal("error"),
@@ -53,7 +53,7 @@ const errorBody = t.Object({
 	error: t.String(),
 	partial_results: t.Array(resultSchema),
 });
-type ErrorBody = typeof errorBody.static;
+// type ErrorBody = typeof errorBody.static;
 
 const callbackBody = t.Union([completionBody, errorBody]);
 
