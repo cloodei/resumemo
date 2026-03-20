@@ -107,7 +107,6 @@ export function NewSessionFileQueue({
 							)}
 
 							<div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-								{isBusy && <Button variant="destructive" className="gap-2" onClick={onCancel}><Ban className="size-4" />Stop</Button>}
 								{phase === "upload_error" && (
 									<>
 										<Button variant="secondary" className="gap-2" onClick={onRetry}><RefreshCw className="size-4" />Retry failed uploads</Button>
@@ -119,6 +118,7 @@ export function NewSessionFileQueue({
 								<Button className="gap-2" disabled={!canSubmit} onClick={onRetry}>
 									{isBusy ? <><Loader2 className="size-4 animate-spin" />Working...</> : phase === "create_error" ? <><span>Retry session creation</span><ArrowRight className="size-4" /></> : phase === "upload_error" ? <><span>Retry failed uploads</span><ArrowRight className="size-4" /></> : <><span>Upload and create session</span><ArrowRight className="size-4" /></>}
 								</Button>
+								{isBusy && <Button variant="destructive" className="gap-2" onClick={onCancel}><Ban className="size-4" />Stop</Button>}
 							</div>
 						</CardFooter>
 					</Card>

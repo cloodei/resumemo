@@ -11,7 +11,7 @@ import { Elysia, t } from "elysia";
 import * as schema from "@resumemo/core/schemas";
 
 import { db } from "~/lib/db";
-import { invalidateSessionList, invalidateSessionNamespace } from "~/lib/session-cache";
+import { sessionRepository } from "~/repositories/session-repository";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
 const PIPELINE_SECRET_HEADER_NAME = (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase();
@@ -82,14 +82,21 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 
 			switch (body.type) {
 				case "completion":
-					await handleCompletion(body);
-					invalidateSessionNamespace(session.userId, session.id);
-					invalidateSessionList(session.userId);
+					await sessionRepository.applyPipelineCompletion({
+						userId: session.userId,
+						sessionId: body.session_id,
+						runId: body.run_id,
+						results: body.results,
+					});
 					break;
 				case "error":
-					await handleError(body);
-					invalidateSessionNamespace(session.userId, session.id);
-					invalidateSessionList(session.userId);
+					await sessionRepository.applyPipelineError({
+						userId: session.userId,
+						sessionId: body.session_id,
+						runId: body.run_id,
+						error: body.error,
+						partialResults: body.partial_results,
+					});
 					break;
 			}
 
@@ -97,117 +104,3 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 		},
 		{ body: callbackBody },
 	);
-
-async function handleCompletion(body: CompletionBody) {
-	await db.transaction(async (tx) => {
-		if (body.results.length === 0) {
-			await tx.delete(schema.candidateResult)
-				.where(
-					and(
-						eq(schema.candidateResult.sessionId, body.session_id),
-						eq(schema.candidateResult.runId, body.run_id)
-					)
-				);
-
-			await tx.update(schema.profilingSession)
-				.set({
-					status: "completed",
-					errorMessage: null,
-					lastCompletedAt: new Date()
-				})
-				.where(
-					and(
-						eq(schema.profilingSession.id, body.session_id),
-						eq(schema.profilingSession.activeRunId, body.run_id)
-					)
-				);
-
-			return;
-		}
-
-		await tx.delete(schema.candidateResult)
-			.where(
-				and(
-					eq(schema.candidateResult.sessionId, body.session_id),
-					eq(schema.candidateResult.runId, body.run_id)
-				)
-			);
-
-		await tx.update(schema.profilingSession)
-			.set({
-				status: "completed",
-				errorMessage: null,
-				lastCompletedAt: new Date()
-			})
-			.where(
-				and(
-					eq(schema.profilingSession.id, body.session_id),
-					eq(schema.profilingSession.activeRunId, body.run_id)
-				)
-			);
-
-		await tx.insert(schema.candidateResult).values(
-			body.results.map(result => ({
-				sessionId: body.session_id,
-				runId: body.run_id,
-				fileId: result.file_id,
-				candidateName: result.candidate_name,
-				candidateEmail: result.candidate_email,
-				candidatePhone: result.candidate_phone,
-				rawText: result.raw_text,
-				parsedProfile: result.parsed_profile,
-				overallScore: String(result.overall_score),
-				scoreBreakdown: result.score_breakdown,
-				summary: result.summary,
-				skillsMatched: result.skills_matched,
-			}))
-		);
-	});
-}
-
-async function handleError(body: ErrorBody) {
-	await db.transaction(async (tx) => {
-		await tx
-			.delete(schema.candidateResult)
-			.where(
-				and(
-					eq(schema.candidateResult.sessionId, body.session_id),
-					eq(schema.candidateResult.runId, body.run_id),
-				),
-			);
-
-		await tx
-			.update(schema.profilingSession)
-			.set({
-				status: "failed",
-				errorMessage: body.error,
-				lastCompletedAt: null,
-			})
-			.where(
-				and(
-					eq(schema.profilingSession.id, body.session_id),
-					eq(schema.profilingSession.activeRunId, body.run_id),
-				),
-			);
-
-		if (body.partial_results.length === 0)
-			return;
-
-		await tx.insert(schema.candidateResult).values(
-			body.partial_results.map(result => ({
-				sessionId: body.session_id,
-				runId: body.run_id,
-				fileId: result.file_id,
-				candidateName: result.candidate_name,
-				candidateEmail: result.candidate_email,
-				candidatePhone: result.candidate_phone,
-				rawText: result.raw_text,
-				parsedProfile: result.parsed_profile,
-				overallScore: String(result.overall_score),
-				scoreBreakdown: result.score_breakdown,
-				summary: result.summary,
-				skillsMatched: result.skills_matched,
-			})),
-		);
-	});
-}

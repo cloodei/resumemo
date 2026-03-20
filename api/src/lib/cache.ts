@@ -45,6 +45,24 @@ export class MemoryCache<K, V> {
 		return value;
 	}
 
+	update(
+		key: K,
+		updater: (currentValue: V) => V | undefined,
+		ttlMs = this.options.defaultTtlMs,
+	): V | undefined {
+		const currentValue = this.get(key);
+		if (currentValue === undefined)
+			return undefined;
+
+		const nextValue = updater(currentValue);
+		if (nextValue === undefined) {
+			this.delete(key);
+			return undefined;
+		}
+
+		return this.set(key, nextValue, ttlMs);
+	}
+
 	delete(key: K): void {
 		this.values.delete(key);
 		this.pending.delete(key);
