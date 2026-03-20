@@ -4,16 +4,16 @@ import { motion } from "motion/react"
 import { Briefcase, FileText, Plus, Search } from "lucide-react"
 import { Link, useSearchParams } from "react-router-dom"
 
-import { profilingSessionsQueryOptions, type ProfilingSession } from "@/lib/profiling-queries"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionsSkeleton } from "@/components/feedback/route-skeletons"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { profilingSessionsQueryOptions, type ProfilingSession } from "@/lib/profiling-queries"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
 

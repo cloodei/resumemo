@@ -47,13 +47,13 @@ jobs:
           # cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest
           # cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/resumemo-api:latest,mode=max
 
-      - name: Build and push pipeline image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/pipeline/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
+      # - name: Build and push pipeline image
+      #   uses: docker/build-push-action@v7
+      #   with:
+      #     context: .
+      #     file: services/pipeline/Dockerfile
+      #     push: true
+      #     tags: ghcr.io/${{ github.repository_owner }}/resumemo-pipeline:latest
 
   deploy:
     needs: build-and-push
@@ -61,17 +61,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Package deploy assets
-        run: tar -czf server-deploy-assets.tar.gz docker-compose.prod.yml deploy/ec2/deploy.sh deploy/nginx/api.conf
+      - name: Prepare temporary deploy directories on EC2
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            rm -rf /tmp/resumemo-deploy
+            mkdir -p /tmp/resumemo-deploy/deploy/ec2 /tmp/resumemo-deploy/deploy/nginx
 
-      - name: Copy deploy assets to EC2
+      - name: Upload runtime deploy files
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "server-deploy-assets.tar.gz"
-          target: "/tmp/resumemo-server-upload"
+          source: docker-compose.prod.yml,deploy/ec2/deploy.sh,deploy/nginx/api.conf
+          target: /tmp/resumemo-deploy
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.2.5
@@ -80,15 +87,14 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mkdir -p /opt/resumemo /tmp/resumemo-server-upload
-            tar -xzf /tmp/resumemo-server-upload/server-deploy-assets.tar.gz -C /tmp/resumemo-server-upload
+            mkdir -p /opt/resumemo
             rm -f /opt/resumemo/docker-compose.prod.yml
             rm -rf /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx
             mkdir -p /opt/resumemo/deploy/ec2 /opt/resumemo/deploy/nginx
+            cp /tmp/resumemo-deploy/docker-compose.prod.yml /opt/resumemo/docker-compose.prod.yml
+            cp /tmp/resumemo-deploy/deploy/ec2/deploy.sh /opt/resumemo/deploy/ec2/deploy.sh
+            cp /tmp/resumemo-deploy/deploy/nginx/api.conf /opt/resumemo/deploy/nginx/api.conf
+            rm -rf /tmp/resumemo-deploy
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            cp /tmp/resumemo-server-upload/docker-compose.prod.yml /opt/resumemo/docker-compose.prod.yml
-            cp /tmp/resumemo-server-upload/deploy/ec2/deploy.sh /opt/resumemo/deploy/ec2/deploy.sh
-            cp /tmp/resumemo-server-upload/deploy/nginx/api.conf /opt/resumemo/deploy/nginx/api.conf
             chmod +x /opt/resumemo/deploy/ec2/deploy.sh
             GHCR_OWNER=${{ github.repository_owner }} API_IMAGE_TAG=latest PIPELINE_IMAGE_TAG=latest /opt/resumemo/deploy/ec2/deploy.sh
-            rm -rf /tmp/resumemo-server-upload
