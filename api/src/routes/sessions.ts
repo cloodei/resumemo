@@ -58,10 +58,6 @@ type SessionResultsResponse = {
 	results: SessionResultRecord[];
 };
 
-type SessionResultDetailResponse = {
-	result: unknown;
-};
-
 type RouteErrorResponse = {
 	status: string;
 	message: string;
@@ -154,6 +150,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			}),
 		},
 	)
+
 	.post(
 		"/create",
 		async ({ user, body, status }) => {
@@ -300,6 +297,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			}),
 		},
 	)
+
+
 	.post(
 		"/:id/retry",
 		async ({ user, params, body, status }) => {
@@ -685,6 +684,8 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			}),
 		},
 	)
+
+
 	.get(
 		"/",
 		async ({ user }) => {
@@ -700,6 +701,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		},
 		{ auth: true },
 	)
+
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
@@ -861,7 +863,28 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		async ({ user, params, status }) => {
 			const cacheKey = sessionCacheKeys.result(user.id, params.id, params.resultId);
 
-			const response = await getOrSetSessionCache<SessionResultDetailResponse | RouteErrorResponse>(
+			const response = await getOrSetSessionCache<{
+				result: {
+						id: string;
+						runId: string;
+						sessionId: string;
+						fileId: number;
+						candidateName: string | null;
+						candidateEmail: string | null;
+						candidatePhone: string | null;
+						rawText: string;
+						parsedProfile: unknown;
+						overallScore: string;
+						scoreBreakdown: unknown;
+						summary: string;
+						skillsMatched: unknown;
+						createdAt: Date;
+						originalName: string;
+						mimeType: string;
+				};
+				status?: undefined;
+				message?: undefined;
+			} | RouteErrorResponse>(
 				cacheKey,
 				async () => {
 					const sessionRows = await db

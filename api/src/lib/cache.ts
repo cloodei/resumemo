@@ -11,8 +11,11 @@ type CacheEntry<V> = {
 export class MemoryCache<K, V> {
 	private readonly values = new Map<K, CacheEntry<V>>();
 	private readonly pending = new Map<K, Promise<V>>();
+	private readonly options: MemoryCacheOptions;
 
-	constructor(private readonly options: MemoryCacheOptions) {}
+	constructor(options: MemoryCacheOptions) {
+		this.options = options;
+	}
 
 	get(key: K): V | undefined {
 		const entry = this.values.get(key);
