@@ -1,163 +1,229 @@
-# Codebase Operations Guide
+# Codebase Operations
 
-## Project Summary
+This guide covers current repo operations, commands, environment touchpoints, and deployment references for Resumemo.
 
-Recruiter-facing resume screening platform with AI-assisted ranking, search, export, and analytics. Built with Vite + React for UI, ElysiaJS on Bun for API services, Postgres for data, and Drizzle ORM for typed persistence.
+## Repo shape
 
-## Status
-
-> ⚠️ **Early Development**: The AI pipeline and core features are functional but undergoing active iteration. Expect breaking changes.
-
-## Stack Overview
-
-| Layer | Technology |
-|-------|------------|
-| **Runtime** | Bun 1.3.6 |
-| **Frontend** | Vite + React 19 + React Router DOM, Tailwind CSS v4 |
-| **Backend** | ElysiaJS (Bun runtime), TypeScript |
-| **Database** | PostgreSQL with Drizzle ORM |
-| **Storage** | Cloudflare R2 (S3-compatible) for raw resumes |
-| **AI Pipeline** | Python 3.12+, Celery workers, spaCy, scikit-learn |
-| **Message Broker** | RabbitMQ via CloudAMQP |
-| **Infrastructure** | Docker Compose for local services, Turborepo for monorepo orchestration |
-
-## Repository Layout
-
-```
+```text
 resumemo/
-├── web/                        # Vite React application (port 5000)
-├── api/                        # ElysiaJS API server (port 8080)
-├── packages/shared/            # Types, Drizzle schemas, constants
-├── services/pipeline/          # Python AI pipeline (Celery workers)
-├── docs/                       # Project documentation
-├── docker-compose.yml          # Local RabbitMQ + pipeline worker
-└── turbo.json                  # Turborepo configuration
+|- web/                    Vite + React app
+|- api/                    Elysia API on Bun
+|- core/                   shared TypeScript workspace
+|- services/pipeline/      standalone Python worker project
+|- deploy/                 deployment scripts, env examples, nginx config
+|- docs/                   project docs and plans
+|- docker-compose.yml      local RabbitMQ + pipeline worker helper
+`- docker-compose.prod.yml production compose runtime
 ```
 
-## Key Domains
+## Package and runtime overview
 
-- **Resume Intake**: upload, file storage, metadata tracking.
-- **Parsing**: text extraction, structured candidate fields.
-- **Scoring**: model scoring and explainability payloads.
-- **Search/Filter**: role, skills, experience, education, signals.
-- **Export**: CSV/JSON results aligned with filters.
-- **History**: past screening sessions and dashboards.
+- Root workspace packages: `web`, `api`, `core`
+- Root package manager: `bun@1.3.9`
+- Web runtime: Vite + React
+- API runtime: Bun + Elysia
+- Pipeline runtime: Python + Celery + uv
 
-## Operational Conventions
+The pipeline is not part of the Bun workspaces. It is a separate project under `services/pipeline/`.
 
-- Keep raw files immutable; derived data is versioned.
-- Every score includes explanation metadata for auditability.
-- Search filters must be deterministic and cached where possible.
-- Candidate data never mutates historical screens.
+## Commands
 
-## Environment Variables
+Do not treat every listed command as part of normal onboarding. Use only what matches the task.
 
-### API (`.env`)
+### Root
+
+Common root commands:
 
 ```bash
-DATABASE_URL=postgres://...
-CLOUDAMQP_URL=amqps://user:pass@host.cloudamqp.com/vhost
-PIPELINE_CALLBACK_SECRET=shared-secret-here
-
-# R2 Storage
-R2_ENDPOINT_URL=...
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET_NAME=resumemo
-
-# Auth
-BETTER_AUTH_SECRET=...
+bun install
+bun run dev
+bun run web
+bun run api
+bun run pipeline
+bun run build
+bun run lint
+bun run start
+bun run clean
 ```
 
-### Pipeline (`services/pipeline/.env`)
+What they do:
 
-```bash
-CELERY_BROKER_URL=amqps://...
-R2_ENDPOINT_URL=...
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET_NAME=resumemo
-PIPELINE_CALLBACK_SECRET=shared-secret-here
-```
-
-## Common Commands
-
-### Root (Turborepo)
-
-```bash
-bun run dev              # Start web + api in dev mode
-bun run build            # Build all packages
-bun run lint             # Lint all packages
-bun run start            # Production mode
-bun run web              # Dev mode web only
-bun run api              # Dev mode api only
-bun run clean            # Clean build artifacts
-```
+- `bun run dev` -> Turbo dev for workspace apps
+- `bun run web` -> web dev server only
+- `bun run api` -> API dev server only
+- `bun run pipeline` -> starts the Python worker from `services/pipeline/`
+- `bun run start` -> runs web preview and the compiled API binary together; build first so `api/main` exists
 
 ### Web
 
+Common web commands:
+
 ```bash
 cd web
-bun run dev              # Start dev server (port 5000)
-bun run build            # Production build
-bun run lint             # Run ESLint
-bun run preview          # Preview production build
+bun run dev
+bun run build
+bun run lint
+bun run preview
 ```
+
+Notes:
+
+- Vite dev usually serves on `http://localhost:5173`.
+- `bun run preview` delegates to `npm run build && wrangler dev`.
+- Wrangler deploy scripts also exist in `web/package.json` as `up` and `deploy`.
 
 ### API
 
+Common API commands:
+
 ```bash
 cd api
-bun run dev              # Watch mode (port 8080)
-bun run build            # Compile to standalone binary
-bun run push             # Push Drizzle schema to database
-bun run generate         # Generate Better Auth files
+bun run dev
+bun run build
+bun run start
+bun run push
+bun run generate
 ```
 
-### Pipeline (Docker Compose)
+Notes:
 
-```bash
-# Start local RabbitMQ + pipeline worker
-docker-compose up -d
+- Local API listens on port `8080`.
+- `bun run build` compiles a standalone binary named `main`.
+- `bun run push` pushes the Drizzle schema to the configured database.
+- `bun run generate` runs Better Auth code generation.
 
-# View logs
-docker-compose logs -f pipeline-worker
+### Pipeline
 
-# Stop
-docker-compose down
-```
-
-### Pipeline (Local Python)
+Common pipeline commands:
 
 ```bash
 cd services/pipeline
-
-# Install with uv
-uv sync
-
-# Run worker
-celery -A worker worker --loglevel=info --queues=profiling.jobs
+bun run sync
+bun run spacy
+bun run dev
 ```
 
-## Onboarding Checklist
+Notes:
 
-1. Install Bun 1.3.6+
-2. Configure environment variables (`.env` files)
-3. Run `bun install`
-4. Start database and run migrations: `cd api && bun run push`
-5. Start services: `bun run dev`
-6. (Optional) Start pipeline worker: `docker-compose up -d`
+- `bun run sync` installs Python dependencies through `uv`.
+- `bun run spacy` installs the configured spaCy model wheel.
+- `bun run dev` starts the Celery worker for the `profiling.jobs` queue.
+- The worker needs a reachable broker through `CELERY_BROKER_URL`.
+- The worker also needs callback settings such as `PIPELINE_CALLBACK_URL`, `PIPELINE_CALLBACK_SECRET`, and usually `PIPELINE_SECRET_HEADER_NAME`.
 
-## AI Pipeline Documentation
+## Local runtime options
 
-The AI profiling pipeline is fully specified in [`docs/pipeline-spec.md`](./pipeline-spec.md). That document is the authoritative reference covering:
+### Web + API only
 
-- Architecture (Celery workers on Python, RabbitMQ via CloudAMQP, HTTP callbacks to Elysia)
-- Pipeline stages (text extraction, structured parsing, TF-IDF scoring, template-based summarization)
-- Message contracts (job messages, progress/completion/error callbacks)
-- Database schema additions (`pipeline_job`, `candidate_result`)
-- API surface changes (callback endpoint, results endpoints, export)
-- Infrastructure, configuration, error handling, security, versioning
-- Implementation phases and decision log
+```bash
+bun install
+bun run dev
+```
 
-The pipeline lives in `services/pipeline/` as a standalone Python project, separate from the Bun workspace.
+This is enough for frontend and API work that does not require background processing.
+
+### Local queue + worker helper
+
+`docker-compose.yml` is for RabbitMQ plus the worker:
+
+```bash
+docker compose up -d rabbitmq pipeline-worker
+```
+
+What it gives you:
+
+- local RabbitMQ on `5672`
+- RabbitMQ management UI on `15672`
+- a pipeline worker container wired to the local broker
+
+What it does not give you:
+
+- no web container
+- no API container
+- no database container
+
+If your API is running locally, make sure the worker callback URL points somewhere the worker can reach.
+
+## Environment touchpoints
+
+Prefer example env files under `deploy/ec2/env/` as the durable reference for production-style variables:
+
+- `deploy/ec2/env/api.env.example`
+- `deploy/ec2/env/pipeline.env.example`
+
+Common API env areas:
+
+- database connection: `DATABASE_URL`
+- auth: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`
+- frontend origins: `FRONTEND_URL`, `FRONTEND_URLS`, `AUTH_COOKIE_CROSS_SITE`
+- queue access: `CELERY_BROKER_URL`
+- callback auth: `PIPELINE_CALLBACK_SECRET`, `PIPELINE_SECRET_HEADER_NAME`
+- object storage: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+- social auth providers: Google and GitHub client credentials
+
+Common pipeline env areas:
+
+- queue access: `CELERY_BROKER_URL`
+- worker behavior: `CELERY_WORKER_POOL`, `CELERY_WORKER_CONCURRENCY`
+- storage access: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+- callback target and auth: `PIPELINE_CALLBACK_URL`, `PIPELINE_CALLBACK_SECRET`, `PIPELINE_SECRET_HEADER_NAME`
+- NLP/model settings: `SPACY_MODEL`, `SEMANTIC_MODEL_NAME`
+
+Practical note: a working pipeline run needs both broker connectivity and callback configuration. A broker alone is not enough.
+
+## Deployment references
+
+### `deploy/`
+
+Use `deploy/` as the home for deployment support files:
+
+- `deploy/ec2/README.md` - current EC2 deployment runbook
+- `deploy/ec2/bootstrap.sh` - host bootstrap helper
+- `deploy/ec2/deploy.sh` - deployment script used on the server
+- `deploy/ec2/env/*.example` - production env templates
+- `deploy/nginx/api.conf` - nginx config for the API-facing production stack
+
+### Production compose file
+
+`docker-compose.prod.yml` defines a simple server runtime with:
+
+- `nginx`
+- `api`
+- `pipeline`
+
+The production compose file expects env files at:
+
+- `./env/api.env`
+- `./env/pipeline.env`
+
+It does not define RabbitMQ, so production broker access must come from env configuration.
+
+## Current mounted runtime surface
+
+Useful operational endpoints and routes today:
+
+- `GET /health` on the API
+- Better Auth endpoints mounted by `authMiddleware`
+- profiling session routes under `/api/v2/sessions`
+- internal worker callback at `/api/internal/pipeline/callback`
+
+Repo note: `api/src/routes/files.ts` and `api/src/routes/system.ts` exist, but they are not mounted by `api/src/index.ts` today.
+
+## Onboarding checklist
+
+1. Install Bun and Python 3.12+.
+2. Run `bun install` at repo root.
+3. For pipeline work, run `cd services/pipeline && bun run sync`.
+4. Create local env files based on the relevant examples and current deployment docs.
+5. Start `bun run dev` for web + API.
+6. If you need background profiling locally, either:
+   - provide a real `CELERY_BROKER_URL` and run `bun run pipeline`, or
+   - run `docker compose up -d rabbitmq pipeline-worker` and configure the callback URL correctly.
+
+## Operational guardrails
+
+- Prefer `core/` when documenting shared contracts; do not refer to `packages/shared`.
+- Prefer `docker compose` spelling in docs and commands.
+- Avoid stale local port claims; web is usually `5173`, API is `8080`.
+- Keep pipeline notes explicit about external dependencies: broker access, object storage access, and callback auth all matter.
+- When runtime entry points change, update `README.md`, `docs/README.md`, and `AGENTS.md` in the same pass.

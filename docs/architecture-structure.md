@@ -1,174 +1,157 @@
-# Architecture and Structure Guidelines
+# Architecture and Structure
 
-## Goal
+This document is a current snapshot of the Resumemo codebase and runtime shape.
 
-Provide a scalable, modular architecture for a recruiter-focused resume screening platform built with Vite + React (frontend) and ElysiaJS (backend on Bun), backed by Postgres and Drizzle ORM.
+Resumemo is a recruiter-facing profiling app. Recruiters sign in, create profiling sessions from a job brief, upload resumes, wait for background processing, then review ranked candidates and export results.
 
-This document is written in a system prompt style for AI agents and contributors.
+## Current status
 
-## Status
+- The active app is narrower than the long-term product vision. Prefer live code over older design notes.
+- The Python/Celery worker in `services/pipeline/` is the current implementation, not a permanent architecture requirement.
+- The important contract today is: API publishes profiling jobs, a worker processes them, and the worker reports completion or failure back to the API.
 
-> ⚠️ **Early Development**: The AI pipeline and core features are functional but undergoing active iteration. Expect breaking changes.
+## Repository structure
 
-## Architectural Principles
-
-- Separate UI, API, and ML services for clean ownership and scaling.
-- Keep parsing and ranking pipelines independent from core app logic.
-- Optimize for explainability, auditability, and reproducibility.
-- Favor modular, versioned services over monolith-only deployments.
-
-## System Components
-
-**Frontend (Vite + React 19)**
-- Recruiter UI for upload, search, scoring, and exports.
-- Admin UI for roles, permissions, and configuration.
-- Dashboard UI for pipeline metrics and historical review.
-
-**Backend (ElysiaJS on Bun)**
-- API gateway for auth, resume ingestion, and candidate data access.
-- Parsing service interface (pipeline orchestration layer).
-- Scoring service interface (model routing, weights, rule adjustments).
-
-**AI Pipeline (Python + Celery)**
-- Background workers for text extraction, NLP parsing, and scoring.
-- RabbitMQ message queue for job distribution.
-- HTTP callbacks for result persistence.
-
-**Data Layer**
-- Postgres for canonical data (candidates, roles, job postings, scores).
-- Cloudflare R2 for raw resume storage.
-- Drizzle ORM for typed schema and queries.
-
-## Service Boundaries (Logical)
-
-- **Resume Service**: Ingestion, storage pointers, and parsing initiation.
-- **Candidate Service**: Structured fields, search index, filters.
-- **Scoring Service**: Model routing, scoring policies, explainability data.
-- **Export Service**: CSV/JSON export with filter context.
-- **Audit Service**: Immutable logs of uploads, exports, and score changes.
-
-## Folder Structure
-
-```
+```text
 resumemo/
-├── web/                        # Vite React application
-│   ├── src/pages/              # Route pages
-│   ├── src/components/         # React components (ui/ for primitives)
-│   ├── src/hooks/              # Custom hooks
-│   ├── src/stores/             # Zustand stores
-│   ├── src/lib/                # API client, utilities, auth
-│   ├── src/routes/             # React Router definitions
-│   └── src/layouts/            # Layout components
-├── api/                        # ElysiaJS API server
-│   ├── src/index.ts            # Server entry
-│   ├── src/routes/             # HTTP routes per domain
-│   │   ├── sessions/           # Profiling session endpoints
-│   │   ├── files.ts            # File upload endpoints
-│   │   ├── pipeline.ts         # Internal callback endpoint
-│   │   └── system.ts           # Health/auth endpoints
-│   └── src/lib/                # DB, auth, storage, utilities
-├── packages/
-│   └── shared/                 # Types, Drizzle schemas, constants
-│       └── src/
-│           ├── schemas/        # Database table definitions
-│           ├── types/          # TypeScript type exports
-│           └── constants/      # Shared constants
-├── services/
-│   └── pipeline/               # Python AI pipeline (Celery workers)
-│       ├── pipeline/           # Core modules (extract, parse, score, summarize)
-│       ├── worker.py           # Celery worker entry
-│       └── pyproject.toml      # Python dependencies
-├── docs/                       # Documentation
-├── docker-compose.yml          # Local RabbitMQ + pipeline worker
-└── turbo.json                  # Turborepo configuration
+|- web/                    Vite + React recruiter UI
+|- api/                    Elysia API on Bun
+|- core/                   shared TypeScript schemas, types, constants
+|- services/pipeline/      standalone Python worker project
+|- deploy/                 deployment scripts, env examples, nginx config
+|- docs/                   current docs and plans
+|- docker-compose.yml      local RabbitMQ + pipeline worker
+`- docker-compose.prod.yml production runtime compose file
 ```
 
-## Backend (ElysiaJS) Layout
+## Subsystems
 
-```
-api/
-  src/
-    index.ts                # Server entry, route composition
-    routes/                 # HTTP routes per domain
-      sessions/             # Profiling session endpoints (v1, v2)
-      files.ts              # File upload endpoints
-      pipeline.ts           # Internal callback endpoint
-      system.ts             # Health/auth endpoints
-    lib/
-      db.ts                 # Drizzle database connection
-      auth.ts               # Better Auth + auth macro
-      storage.ts            # R2/S3 file operations
-      queue.ts              # RabbitMQ publishing
-```
+### `web/`
 
-## Frontend (Vite + React) Layout
+- Recruiter-facing frontend built with Vite, React, React Router, TanStack Query, React Hook Form, and Zustand.
+- Route definitions live in `web/src/routes/route-defs.tsx`.
+- Current route surface includes `/`, `/login`, `/dashboard`, `/profiling`, `/profiling/new`, and `/profiling/:id`.
+- Main UI responsibilities:
+  - sign-in and session-aware navigation
+  - dashboard metrics and recent sessions
+  - new profiling session flow with presigned uploads
+  - session list, session detail, retry actions, and result export
 
-```
-web/
-  src/
-    main.tsx                # Entry point
-    App.tsx                 # Route composition
-    routes/
-      route-defs.tsx        # Central route definitions
-    pages/                  # Route page components
-    components/             # UI building blocks
-      ui/                   # shadcn-style primitives
-    hooks/                  # Custom React hooks
-    stores/                 # Zustand stores
-    lib/
-      api.ts                # Eden Treaty client
-      auth.ts               # Better Auth client
-      utils.ts              # Utilities (cn, etc.)
-    layouts/                # Layout components
-```
+### `api/`
 
-## Agent Guidance (Prompt Style)
+- Bun + Elysia service listening on port `8080` in local development.
+- Entrypoint is `api/src/index.ts`.
+- Current mounted runtime surface is intentionally small:
+  - `GET /health`
+  - Better Auth handler mounted through `authMiddleware`
+  - profiling session routes under `/api/v2/sessions`
+  - internal worker callback at `/api/internal/pipeline/callback`
+- Session orchestration and data shaping live mainly in `api/src/repositories/session-repository.ts` and supporting `lib/` helpers.
+- Storage, upload verification, and queue publishing stay in API-side helpers instead of the web app.
 
-- Prefer domain service boundaries over route logic.
-- Keep search/filter logic centralized and reusable.
-- Persist both raw and extracted candidate data for auditability.
-- Preserve historical screening snapshots; do not overwrite prior results.
-- Ensure every candidate score stores an explanation payload.
+Important note: `api/src/routes/files.ts` and `api/src/routes/system.ts` exist in the repo, but they are not mounted by `api/src/index.ts` today. They should not be documented as active runtime surface unless they are wired in.
 
-## Data Flow (High Level)
+### `core/`
 
-1. Recruiter uploads resumes.
-2. API stores file metadata + raw file in R2.
-3. Recruiter starts profiling session.
-4. API publishes job to RabbitMQ.
-5. Pipeline worker fetches files, extracts text, parses, scores.
-6. Worker POSTs results to API callback endpoint.
-7. API stores results in Postgres.
-8. UI queries and displays ranked candidates.
+- Shared workspace for cross-package TypeScript contracts.
+- Holds shared schemas, auth types, and constants such as file upload limits.
+- `web` and `api` depend on `core`; the Python worker does not.
 
-## Extensibility Notes
+### `services/pipeline/`
 
-- Parsing/scoring services are modular and can be updated independently.
-- Version scoring models and track which model produced each score.
-- Pipeline uses HTTP callbacks, allowing workers to be deployed separately from the API.
+- Standalone Python 3.12+ worker project.
+- Current implementation uses Celery with the `profiling.jobs` queue.
+- Main flow in `worker.py` is:
+  - fetch resume file from object storage
+  - extract text
+  - parse structured profile data
+  - score against the job description
+  - summarize the candidate
+  - POST completion or error data back to the API
+- Stage modules live in `services/pipeline/stages/`; shared helpers live in `services/pipeline/utils/`.
 
-## Roadmap
+Treat this worker as replaceable. The queue-plus-callback contract matters to the app today; Python, Celery, and the current stage internals do not need to be permanent.
 
-### Current Focus (Early Stage)
+### `deploy/`
 
-- [ ] Pipeline stability and error handling
-- [ ] Frontend results page improvements
-- [ ] Export functionality (CSV/JSON)
-- [ ] Session history and dashboards
+- Holds deployment support files rather than application runtime code.
+- `deploy/ec2/` contains bootstrap and deploy scripts plus example env files.
+- `deploy/nginx/` contains the nginx config used by the production compose stack.
 
-### Planned Features
+## Runtime topology
 
-- [ ] OCR support for scanned PDFs
-- [ ] Semantic embeddings (sentence-transformers)
-- [ ] Real-time progress (WebSocket/SSE)
-- [ ] Multi-language support
-- [ ] Custom-trained NER model
+### Local development
 
-### Deferred Decisions
+Typical local shape:
 
-| Question | Current State | Revisit When |
-|----------|---------------|--------------|
-| OCR for scanned PDFs | Not supported; produces score 0 | User feedback indicates need |
-| Semantic embeddings vs TF-IDF | TF-IDF for simplicity | Scoring accuracy needs improvement |
-| Real-time progress | Frontend polls for status | Polling latency unacceptable |
-| Celery result backend | Not used; callbacks via HTTP | Need monitoring dashboards |
+1. `web` runs through Vite, usually at `http://localhost:5173`.
+2. `api` runs on `http://localhost:8080`.
+3. The worker can run separately with `bun run pipeline` if `CELERY_BROKER_URL` and callback settings are valid.
+4. For a fully local queue + worker setup, `docker-compose.yml` starts `rabbitmq` and `pipeline-worker`.
+
+`docker-compose.yml` does not start the web app or API. It is a queue/worker helper for local profiling runs.
+
+### Production-oriented compose runtime
+
+`docker-compose.prod.yml` defines:
+
+- `nginx`
+- `api`
+- `pipeline`
+
+It does not define RabbitMQ. The broker is expected to be provided through environment configuration such as `CELERY_BROKER_URL`.
+
+## Boundaries and responsibilities
+
+### Web -> API
+
+- The frontend does not score resumes locally.
+- It requests presigned upload URLs, uploads files to object storage, creates profiling sessions, polls/query-fetches session state, triggers retries, and downloads exports.
+
+### API -> storage and queue
+
+- The API validates upload metadata and ownership.
+- It persists session and file records.
+- It publishes profiling jobs to the broker.
+- It owns session status transitions, result persistence, export generation, and run-aware retry behavior.
+
+### Pipeline -> API callback
+
+- The worker reads job payloads from the queue.
+- It reads resume bytes from object storage, processes them, then calls the internal callback endpoint.
+- Callback application is guarded by a shared secret and by `run_id`, so stale worker responses can be ignored.
+
+## Current workflow data flow
+
+1. Recruiter signs in and opens the new profiling flow.
+2. The web app asks the API for presigned upload URLs.
+3. The browser uploads resume files directly to object storage.
+4. The web app calls `/api/v2/sessions/create` with session metadata and uploaded file references.
+5. The API stores session state and publishes a `profiling.jobs` message.
+6. The worker processes each file and sends completion or error data to `/api/internal/pipeline/callback`.
+7. The API stores current-run results and exposes them through session detail, results, and export endpoints.
+8. The web app shows processing, retrying, completed, or failed session states and lets the recruiter review or retry.
+
+## Current API surface that matters to the product
+
+The active recruiter workflow centers on `/api/v2/sessions`:
+
+- `POST /presign`
+- `POST /create`
+- `POST /:id/retry`
+- `GET /`
+- `GET /:id`
+- `GET /:id/results`
+- `GET /:id/results/:resultId`
+- `GET /:id/export`
+
+Internal worker integration uses:
+
+- `POST /api/internal/pipeline/callback`
+
+## Documentation guardrails
+
+- Do not refer to `packages/shared`; the shared workspace is `core/`.
+- Do not document admin-only consoles or speculative back-office surfaces as if they exist today.
+- Do not assume a local web port of `5000`; current Vite development is typically `5173`.
+- When describing the pipeline, distinguish the external contract from the current Python/Celery implementation.

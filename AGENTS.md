@@ -1,500 +1,212 @@
 ## Project Overview
 
-**Resumemo** is a recruiter-facing resume screening platform with AI-assisted ranking, search, and export capabilities.
+Resumemo is a recruiter-facing resume screening app. Recruiters create profiling sessions from a job brief, upload resumes, wait for background processing, then review ranked candidates and export results.
 
-### Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Runtime** | Bun 1.3.6 |
-| **Build System** | Turborepo |
-| **Frontend** | Vite + React 19 + React Router DOM |
-| **Styling** | Tailwind CSS v4 |
-| **Backend** | ElysiaJS (Bun web framework) |
-| **Database** | PostgreSQL with Drizzle ORM |
-| **Auth** | Better Auth (email/password + Google/GitHub OAuth) |
-| **AI Pipeline** | Python 3.12+ with Celery, spaCy, scikit-learn |
-| **Message Queue** | RabbitMQ (CloudAMQP in production) |
-| **Storage** | Cloudflare R2 (S3-compatible) |
-
-### Status
-
-> ⚠️ **Early Development**: The AI pipeline and core features are functional but undergoing active iteration. Expect breaking changes.
-
----
+Use this file for contributor and agent workflow guidance. Prefer live code over older plans when anything conflicts.
 
 ## Repository Structure
 
-```
+```text
 resumemo/
-├── web/                          # Vite React app (port 5000)
-│   ├── src/
-│   │   ├── pages/                # Route page components
-│   │   ├── components/           # React components
-│   │   │   └── ui/               # shadcn-style UI primitives
-│   │   ├── hooks/                # Custom React hooks
-│   │   ├── stores/               # Zustand stores
-│   │   ├── lib/                  # Utilities, API client, auth
-│   │   ├── routes/               # Route definitions
-│   │   └── layouts/              # Layout components
-│   └── vite.config.ts            # Uses rolldown-vite (Rust bundler)
-│
-├── api/                          # Elysia API server (port 8080)
-│   ├── src/
-│   │   ├── index.ts              # Main entry, route composition
-│   │   ├── routes/               # HTTP routes by domain
-│   │   │   ├── sessions/         # Profiling session endpoints
-│   │   │   ├── files.ts          # File upload endpoints
-│   │   │   ├── pipeline.ts       # Internal callback endpoint
-│   │   │   └── system.ts         # Health/auth endpoints
-│   │   └── lib/                  # DB, auth, storage, utilities
-│   └── drizzle.config.ts
-│
-├── packages/
-│   └── shared/                   # Shared types and Zod schemas
-│       └── src/
-│           ├── schemas/          # Drizzle table definitions
-│           ├── types/            # TypeScript type exports
-│           └── constants/        # Shared constants
-│
-├── services/
-│   └── pipeline/                 # Python AI pipeline
-│       ├── pipeline/             # Core pipeline modules
-│       │   ├── extract.py        # Text extraction (PDF, DOCX, TXT)
-│       │   ├── parse.py          # NLP parsing (spaCy)
-│       │   ├── score.py          # TF-IDF scoring
-│       │   ├── summarize.py      # Template-based summaries
-│       │   └── ...
-│       ├── worker.py             # Celery worker entry
-│       └── pyproject.toml
-│
-├── docs/                         # Human-readable documentation
-├── docker-compose.yml            # Local RabbitMQ + pipeline worker
-└── turbo.json                    # Turborepo task config
+|- web/                       Vite + React app
+|  |- src/pages/             route pages
+|  |- src/components/        feature, layout, and ui components
+|  |- src/layouts/           app shell layouts
+|  |- src/lib/               api client, auth, queries, utils
+|  |- src/routes/            route definitions and titles
+|  `- src/stores/            Zustand upload flow state
+|- api/                       Elysia API
+|  |- src/lib/               auth, db, queue, storage helpers
+|  |- src/repositories/      session and file data access
+|  `- src/routes/            HTTP route modules
+|- core/                      shared schemas, types, constants
+|  `- src/
+|     |- schemas/
+|     |- types/
+|     `- constants/
+|- services/pipeline/         standalone Python worker project
+|  |- worker.py              Celery entrypoint
+|  |- stages/                extract, parse, score, summarize
+|  |- utils/                 callback and storage helpers
+|  |- config.py              environment loading
+|  `- celeryconfig.py        queue config
+|- deploy/                    deployment scripts, env examples, nginx config
+|- docs/                      current docs and working plans
+|- docker-compose.yml         local RabbitMQ + pipeline worker
+`- docker-compose.prod.yml    production compose stack
 ```
 
----
+## Commands
 
-## Build/Lint/Test Commands
+You **must not** run build, lint, or test commands unless the user explicitly asks.
 
-> **INFO**: Refrain from running direct tests/lints or build during code generation or development. They will be ran manually except explicitly being said to run. If so you can run these commands from the root directory.
-
-### Root Commands
+### Root
 
 ```bash
-bun run dev              # Start web + api in dev mode
-bun run build            # Build all packages
-bun run lint             # Lint all packages
-bun run start            # Production mode (web preview + api)
-bun run web              # Dev mode web only
-bun run api              # Dev mode api only
-bun run clean            # Clean build artifacts and node_modules
+bun run dev
+bun run web
+bun run api
+bun run pipeline
+bun run build
+bun run lint
+bun run start
+bun run clean
 ```
 
-### Web Commands
+### Web
 
 ```bash
 cd web
-bun run dev              # Start dev server (port 5000)
-bun run build            # Production build (tsc + vite)
-bun run lint             # Run ESLint
-bun run preview          # Preview production build
+bun run dev
+bun run build
+bun run lint
+bun run preview
 ```
 
-### API Commands
+Notes:
+
+- Vite dev usually serves on `http://localhost:5173`.
+- `bun run preview` delegates to `npm run build && wrangler dev`.
+
+### API
 
 ```bash
 cd api
-bun run dev              # Watch mode (port 8080)
-bun run build            # Compile to standalone binary
-bun run push             # Push Drizzle schema to database
-bun run generate         # Generate Better Auth files
+bun run dev
+bun run build
+bun run start
+bun run push
+bun run generate
 ```
 
-### Pipeline Commands
+### Pipeline
 
 ```bash
 cd services/pipeline
-
-# Install (using uv)
-uv sync/uv add
-
-# Run worker locally
-celery -A worker worker --loglevel=info --queues=profiling.jobs
-
-# Or via Docker Compose (from repo root)
-docker-compose up -d rabbitmq pipeline-worker
+bun run sync
+bun run spacy
+bun run dev
 ```
 
-### Testing
+Notes:
 
-No testing framework currently configured. When adding tests:
-- Prefer Vitest for Bun/TypeScript compatibility
-- Place test files adjacent to source: `component.test.tsx`
-- Run: `bun test path/to/file.test.ts`
+- `bun run dev` for the worker expects RabbitMQ to already be reachable through `CELERY_BROKER_URL`.
 
----
 
-## Code Style Guidelines
+## Conventions
 
-### Formatting
+### Formatting and style
 
-- **Indentation**: Tabs (width: 2)
-- **Imports**: Auto-sorted by ESLint
-- **Lint**: Run `bun run lint` in web directory
+- Use tabs with width 2.
+- Keep TypeScript strict.
+- Prefer `type` over `interface` unless there is a clear reason not to.
+- Keep file names kebab-case and React components PascalCase.
 
-### TypeScript
+### Path aliases
 
-- Strict mode enabled across all packages
-- Use explicit typing for function parameters and return types
-- Prefer `type` over `interface` for object types
-- Export types alongside implementations
+```ts
+// web
+@/* -> web/src/*
+@resumemo/core/* -> core/src/*
+@api -> api/src/index.ts
 
-### Path Aliases
-
-```typescript
-// Web (vite.config.ts)
-import { cn } from "@/lib/utils"              // @/* -> web/src/*
-import { userSchema } from "@resumemo/core/schemas"  // @resumemo/core/* -> packages/shared/src/*
-
-// API (tsconfig paths)
-import { db } from "~/lib/db"                 // ~/* -> api/src/*
-import * as schema from "@resumemo/core/schemas"     // @resumemo/core/* -> packages/shared/src/*
+// api
+~/* -> api/src/*
+@resumemo/core -> core/src
+@resumemo/core/* -> core/src/*
 ```
 
-### Naming Conventions
+### Shared contracts
 
-| Entity | Convention | Example |
-|--------|------------|---------|
-| Files | kebab-case | `auth-provider.tsx`, `use-mobile.ts` |
-| Components | PascalCase | `SignInForm`, `Button` |
-| Hooks | camelCase with `use` prefix | `useIsMobile`, `useSession` |
-| Functions | camelCase | `handleSubmit`, `onSubmit` |
-| Constants | SCREAMING_SNAKE_CASE | `MOBILE_BREAKPOINT` |
-| Types | PascalCase | `SignInFormValues`, `UserSchema` |
-| Zod schemas | camelCase with `Schema` suffix | `userSchema` |
+- Put shared TypeScript schemas, constants, and cross-package types in `core/`.
+- Keep documentation and imports aligned to the current `core/` workspace layout.
 
----
+## Architecture Notes
 
-## Frontend Patterns
+### Frontend
 
-### Routing (React Router DOM)
+- React Router routes live in `web/src/routes/route-defs.tsx`.
+- Current user-facing routes include `/`, `/login`, `/dashboard`, `/profiling`, `/profiling/new`, and `/profiling/:id`.
+- The dashboard and profiling pages use TanStack Query for server data.
+- New session upload state lives in `web/src/stores/upload-store.ts`.
+- UI primitives follow the local shadcn-style pattern in `web/src/components/ui/`.
 
-Routes are defined centrally in `web/src/routes/route-defs.tsx`:
+### Backend
 
-```typescript
-import { Routes, Route, Navigate } from "react-router-dom"
+- API entrypoint is `api/src/index.ts`.
+- Current mounted API surface centers on:
+  - health check at `/health`
+  - profiling session presign, create, retry, list, detail, results, result detail, and export routes under `/api/v2/sessions`
+  - internal worker callback at `/api/internal/pipeline/callback`
+- Session orchestration and persistence logic live in `api/src/repositories/session-repository.ts` and related helpers.
+- Keep route handlers thin; push database and workflow logic into repository and lib layers.
 
-export const ROUTES = [
-  { path: "/", element: <LandingPage />, layout: "none" },
-  { path: "/dashboard", element: <DashboardPage />, layout: "app" },
-  // ...
-] as const
+### Pipeline
 
-// In App.tsx
-<Routes>
-  {ROUTES.map((route) => (
-    <Route key={route.path} path={route.path} 
-      element={route.layout === "app" ? <AppLayout>{route.element}</AppLayout> : route.element}
-    />
-  ))}
-</Routes>
-```
+- `services/pipeline/` is an active worker project today.
+- The worker consumes `profiling.jobs`, reads resume files from object storage, runs staged extraction/parsing/scoring/summarization, and POSTs results back to the API.
+- Treat the external contract as important, but treat the Python/Celery implementation as replaceable.
+- When documenting or modifying pipeline behavior, say "current implementation" unless a contract is intentionally permanent.
 
-### Components
+### Deployment surface
 
-```typescript
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+- Production compose stack lives in `docker-compose.prod.yml`.
+- Server deployment assets live under `deploy/ec2/` and `deploy/nginx/`.
+- Web also carries Wrangler-based deploy scripts in `web/package.json`.
 
-type Props = {
-  className?: string
-  onSubmit?: () => void
-}
+## Frontend Guidance
 
-export function MyComponent({ className, onSubmit }: Props) {
-  const [state, setState] = useState(false)
-  
-  return (
-    <div className={cn("base-styles", className)}>
-      <Button onClick={onSubmit}>Submit</Button>
-    </div>
-  )
-}
-```
+- Follow existing React Router page patterns rather than introducing framework-specific conventions.
+- Use TanStack Query for API-backed state, React Hook Form for forms, and Zustand only for client-side workflow state that spans components.
+- Reuse existing profiling feature modules in `web/src/components/features/` before creating new top-level patterns.
+- This is Vite + React, not Next.js. Do not add `use client` or Next-specific APIs.
 
-> **Note**: This is Vite + React, NOT Next.js. Do not use `"use client"` directives or Next.js-specific patterns.
+## Backend Guidance
 
-### UI Components (shadcn/ui pattern)
+- Use Elysia route modules in `api/src/routes/` and keep request validation close to the route.
+- Reuse `core` exports for shared schema and type needs.
+- Maintain `run_id`-aware pipeline behavior; callbacks should only apply to the active run for a session.
+- Preserve current error response shape where possible because the web app depends on it for retry and export UX.
 
-- Use CVA (class-variance-authority) for variants
-- Wrap Radix primitives with Tailwind styling
-- Export component + variants + types
-- Use `cn()` utility for class merging (clsx + tailwind-merge)
+## Pipeline Guidance
 
-### Forms
+- Keep the worker self-contained inside `services/pipeline/`.
+- Favor small stage-specific changes in `services/pipeline/stages/` and shared helpers in `services/pipeline/utils/`.
+- If the worker contract changes, update `docs/pipeline-spec.md`, `README.md`, and `AGENTS.md` in the same work.
 
-- Use React Hook Form with Zod validation
-- Use `@hookform/resolvers` for schema integration
-- Show loading state in submit buttons
-- Use `toast` from sonner for feedback
-
-```typescript
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { toast } from "sonner"
-
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-})
-
-type FormValues = z.infer<typeof schema>
-
-function MyForm() {
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-  })
-  
-  const onSubmit = async (data: FormValues) => {
-    const { error } = await someApiCall(data)
-    if (error) {
-      toast.error(error.message ?? "Something went wrong")
-      return
-    }
-    toast.success("Success!")
-  }
-  
-  return <form onSubmit={form.handleSubmit(onSubmit)}>...</form>
-}
-```
-
-### State Management
-
-| Use Case | Solution |
-|----------|----------|
-| Server state | TanStack Query (via `@tanstack/react-query`) |
-| Form state | React Hook Form |
-| Global client state | Zustand (stores in `web/src/stores/`) |
-
-### API Client (Eden Treaty)
-
-Type-safe API client using Elysia's Eden:
-
-```typescript
-// web/src/lib/api.ts
-import { treaty } from "@elysiajs/eden"
-import type { API } from "@api"  // Type import from api
-
-export const api = treaty<API>(BASE_URL, {
-  fetch: { credentials: "include" },
-  onResponse: (response) => {
-    if (response.status === 401)
-      window.location.href = "/login"
-  },
-})
-
-// Usage
-const { data, error } = await api.api.v2.sessions({ id }).get()
-```
-
----
-
-## Backend Patterns
-
-### Elysia Routes
-
-Routes are organized by domain in `api/src/routes/`:
-
-```typescript
-// api/src/routes/sessions/v2.ts
-import { Elysia, t } from "elysia"
-
-export const sessionRoutesV2 = new Elysia({ prefix: "/api/v2/sessions" })
-  .get("/:id", async ({ params, user }) => {
-    // Protected by auth macro
-  }, { auth: true })
-```
-
-### Authentication
-
-Backend uses Better Auth with a custom auth macro:
-
-```typescript
-// Routes requiring auth use { auth: true }
-.get("/api/me", ({ user, session }) => ({ user, session }), { auth: true })
-
-// Frontend uses authClient from better-auth
-import { authClient } from "@/lib/auth"
-
-const { data: session } = authClient.useSession()
-await authClient.signIn.email({ email, password })
-```
-
-### Error Handling
-
-```typescript
-// Frontend API calls
-const { data, error } = await api.some.endpoint.post({ body })
-if (error) {
-  toast.error(error.message ?? "Fallback error message")
-  return
-}
-
-// Backend with Elysia
-.post("/endpoint", async ({ body, status }) => {
-  if (!valid) {
-    return status(400, { message: "Invalid input" })
-  }
-  return { success: true }
-})
-```
-
-### Database (Drizzle ORM)
-
-Schemas are defined in `packages/shared/src/schemas/index.ts`:
-
-```typescript
-import { randomUUIDv7 } from "bun"
-import { pgTable, uuid, varchar, timestamp, index } from "drizzle-orm/pg-core"
-
-export const user = pgTable("user", {
-  id: uuid("id")
-    .$defaultFn(randomUUIDv7)
-    .primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
-}, (table) => [
-  index().on(table.name),
-])
-```
-
-**Conventions:**
-- Use UUID v7 for primary keys: `uuid("id").$defaultFn(randomUUIDv7).primaryKey()`
-- Always include timestamps with timezone: `timestamp("created_at", { withTimezone: true })`
-- Add `$onUpdate(() => new Date())` for `updatedAt` columns
-- Define indexes in table callback
-
----
-
-## AI Pipeline Integration
-
-### Architecture Overview
-
-```
-┌─────────────┐     publish      ┌─────────────┐     consume     ┌──────────────┐
-│  Elysia API │ ───────────────> │  RabbitMQ   │ ───────────────>│ Celery Worker│
-│  (Bun/TS)   │                  │ (CloudAMQP) │                 │  (Python)    │
-│             │<─────────────────│             │<────────────────│              │
-└─────────────┘   HTTP callback  └─────────────┘                 └──────────────┘
-       │                                                              │
-       v                                                              v
-┌─────────────┐                                              ┌──────────────┐
-│  PostgreSQL │                                              │ Cloudflare R2│
-└─────────────┘                                              └──────────────┘
-```
-
-### Flow
-
-1. **Trigger**: `POST /api/v2/sessions/:id/start`
-   - Validates session, sets status to `processing`
-   - Creates `pipeline_job` row
-   - Publishes job to RabbitMQ `profiling.jobs` queue
-
-2. **Processing**: Celery worker receives job
-   - Fetches files from R2
-   - Extracts text (PDF/DOCX/TXT)
-   - Parses with spaCy NER
-   - Scores with TF-IDF + skill matching
-   - Generates template-based summary
-
-3. **Completion**: Worker POSTs to `/api/internal/pipeline/callback`
-   - API validates shared secret
-   - Stores `candidate_result` rows
-   - Updates session status to `completed`
-
-### Key Tables
-
-| Table | Purpose |
-|-------|---------|
-| `profiling_session` | User's screening session |
-| `profiling_session_file` | Files attached to session |
-| `resume_file` | Uploaded resume metadata + R2 key |
-| `pipeline_job` | Pipeline execution tracking |
-| `candidate_result` | Scored candidate output |
-
-### Environment Variables
-
-```bash
-# API (.env)
-CLOUDAMQP_URL=amqps://user:pass@host.cloudamqp.com/vhost
-PIPELINE_CALLBACK_SECRET=shared-secret-here
-
-# Pipeline (services/pipeline/.env)
-CELERY_BROKER_URL=amqps://...
-R2_ENDPOINT_URL=https://account-id.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET_NAME=resumemo
-PIPELINE_CALLBACK_SECRET=...
-```
-
----
-
-## File Creation Guidelines
+## File Placement
 
 | What | Where |
-|------|-------|
+| --- | --- |
+| Route pages | `web/src/pages/` |
+| Feature components | `web/src/components/features/` |
 | UI primitives | `web/src/components/ui/` |
-| Feature components | `web/src/components/` |
-| Page components | `web/src/pages/` |
-| Custom hooks | `web/src/hooks/` |
-| Zustand stores | `web/src/stores/` |
-| Route definitions | `web/src/routes/route-defs.tsx` |
-| Shared types | `packages/shared/src/types/` |
-| Database schemas | `packages/shared/src/schemas/` |
+| Layout components | `web/src/components/layout/` or `web/src/layouts/` |
+| Client stores | `web/src/stores/` |
+| Shared TS contracts | `core/src/` |
 | API routes | `api/src/routes/` |
-| Pipeline modules | `services/pipeline/pipeline/` |
+| API repositories | `api/src/repositories/` |
+| Pipeline stages | `services/pipeline/stages/` |
+| Deployment assets | `deploy/` |
+| Plans and long-form docs | `docs/` |
 
----
+## Documentation Maintenance
 
-## Roadmap
+- Keep `README.md` as the entry point for humans.
+- Keep `docs/README.md` as the map of record for the documentation set.
+- Keep `AGENTS.md` focused on contributor and coding-agent workflow, not product vision.
+- When routes, scripts, workspace layout, or deployment entry points change, update these three files together:
+  - `README.md`
+  - `docs/README.md`
+  - `AGENTS.md`
+- Mark unstable areas explicitly instead of implying long-term architectural certainty.
 
-### Current Focus (Early Stage)
+## References
 
-- [ ] Pipeline stability and error handling
-- [ ] Frontend results page improvements
-- [ ] Export functionality (CSV/JSON)
-- [ ] Session history and dashboards
-
-### Planned Features
-
-- [ ] OCR support for scanned PDFs
-- [ ] Semantic embeddings (sentence-transformers)
-- [ ] Real-time progress (WebSocket/SSE)
-- [ ] Multi-language support
-- [ ] Custom-trained NER model
-
-### Deferred Decisions
-
-| Question | Current State | Revisit When |
-|----------|---------------|--------------|
-| OCR for scanned PDFs | Not supported; produces score 0 | User feedback indicates need |
-| Semantic embeddings vs TF-IDF | TF-IDF for simplicity | Scoring accuracy needs improvement |
-| Real-time progress | Frontend polls for status | Polling latency unacceptable |
-| Celery result backend | Not used; callbacks via HTTP | Need monitoring dashboards |
-
----
-
-## Reference Documents
-
-- **[docs/pipeline-spec.md](./docs/pipeline-spec.md)** - Complete pipeline specification (authoritative)
-- **[docs/system-guidelines.md](./docs/system-guidelines.md)** - Product intent and user workflows
-- **[docs/architecture-structure.md](./docs/architecture-structure.md)** - High-level architecture
+- `README.md` - project entry point
+- `docs/README.md` - documentation map
+- `docs/architecture-structure.md` - architecture snapshot; verify against live code during the current docs refresh
+- `docs/system-guidelines.md` - current product workflow notes
+- `docs/codebase-operations.md` - operational guidance; verify commands against package scripts during the current docs refresh
+- `docs/pipeline-spec.md` - current pipeline contract
+- `deploy/ec2/README.md` - EC2 deployment runbook

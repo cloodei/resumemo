@@ -1,98 +1,102 @@
-# System Guidelines: AI Resume Screening Platform
+# System Guidelines
 
-> ⚠️ **Early Development**: This document describes the product vision. The AI pipeline and core features are functional but undergoing active iteration.
+This document describes the product behavior Resumemo supports today, with light guidance for future-safe changes.
 
-## Purpose and Intent (Why)
-This system enables recruiters and hiring teams to ingest, analyze, and manage applicant resumes at scale. The primary capability is AI-assisted ranking via NLP pipelines and machine learning models, but the platform is intentionally broader: it delivers end-to-end resume workflow management, searchable candidate insights, and exportable outcomes to support hiring decisions.
+## Product intent
 
-**Key intent**
-- Reduce time-to-screen while preserving recruiter oversight and transparency.
-- Standardize evaluation criteria and remove inconsistent manual scoring.
-- Provide a secure, auditable workflow for resume intake, review, and export.
+Resumemo helps recruiters screen batches of resumes against a hiring brief without turning the workflow into a black box.
 
-## System Identity (What)
-This is a recruiter-facing platform that:
-- Accepts candidate resumes in multiple formats (PDF, DOCX).
-- Extracts structured data (skills, experience, education, role alignment).
-- Ranks and scores candidates by configurable criteria.
-- Offers robust search/filtering across all candidates.
-- Enables resume viewing/downloading and export of ranked results.
-- Provides dashboards and historical tracking for hiring pipelines.
+Current product goals:
 
-## Core Workflows (How)
-### 1) Resume Intake
-- Recruiters upload resumes individually or in bulk.
-- The system stores raw files in object storage and metadata in Postgres.
-- Pre-processing normalizes document text and detects document language.
+- reduce the time needed to review many resumes
+- keep recruiters in control of the final judgment
+- show ranked outputs that can be reviewed, retried, and exported
+- preserve a practical workflow around uploads, background processing, and follow-up review
 
-### 2) NLP & Feature Extraction
-- Text is parsed into structured fields: work history, skills, education, projects.
-- Candidate feature vectors are generated for ranking models and filtering.
-- Extraction output is stored to enable fast search and explainability.
+## What the product is today
 
-### 3) Scoring and Ranking
-- ML models generate a relevance score per job role.
-- Weighted criteria and configurable rule layers modify scoring.
-- Rankings are transparent: each candidate shows a breakdown of why.
+Today, Resumemo is a recruiter-facing profiling workflow with these core pieces:
 
-### 4) Recruiter Review
-- Recruiters search and filter results by role fit, skills, education, and signals.
-- Recruiters view original resume and parsed summaries side-by-side.
-- Recruiters can download or export results in CSV/JSON for handoff.
+- sign-in
+- dashboard overview of existing profiling sessions
+- session list with search and status filtering
+- new profiling session flow from a job title, job description, and uploaded files
+- background processing of resumes
+- session detail view for processing, retrying, failed, and completed states
+- ranked result review with candidate detail drill-down
+- retry actions for failed or stale sessions
+- result export
 
-### 5) Reporting & History
-- Dashboards show pipeline counts, top candidates, and score distributions.
-- Historical views retain prior screenings with job metadata and timestamps.
+It is not yet a broad hiring operations suite. Avoid describing unbuilt admin tooling, global analytics, or governance surfaces as if they already exist.
 
-## Functional Scope (What it Can Do)
-**Primary AI Feature**
-- Resume ranking by role relevance with explainability.
+## Recruiter workflow today
 
-**Expanded Product Features**
-- Search and filter across candidates and extracted attributes.
-- Resume viewing, preview, and download.
-- Export results (CSV, JSON, structured reports).
-- Recruiter dashboards and screening history.
-- Role-based access: recruiters, hiring managers, admins.
-- Audit trails and screening logs.
+### 1. Start a profiling session
 
-## LLM/Agent Guidance (System Prompt-Style)
-Use the following guidelines when interpreting or extending system behavior.
+- The recruiter enters a session name, optional job title, and a required job description.
+- The recruiter uploads resume files through the browser.
+- Current upload rules come from shared code in `core/`:
+  - supported formats: PDF, DOCX, TXT
+  - max 50 files per session
+  - max 2 MB per file
 
-**System Objective**
-- Prioritize recruiter workflow efficiency with transparent AI outputs.
-- Always provide structured, searchable candidate insights.
-- Maintain integrity of scoring by surfacing evidence and rationale.
+### 2. Background processing
 
-**Operational Constraints**
-- Never overwrite original resume files.
-- Store derived data separately from raw input for traceability.
-- Ensure every score is explainable with visible features or criteria.
+- After upload verification, the API creates a profiling session and queues background work.
+- The session moves through running states such as `processing` or `retrying`.
+- The recruiter does not need to keep the page open while the worker runs.
 
-**Behavioral Rules**
-- Provide summaries before raw data when presenting candidates.
-- Prefer explicit, deterministic filters over implicit scoring bias.
-- Preserve historical results; do not mutate past screening records.
+### 3. Session review
 
-**Output Expectations**
-- Return stable, reproducible candidate lists.
-- Each candidate record should include: score, role match, top skills, key flags.
-- Exports must align with the current recruiter’s filters and sorting.
+- The session list shows current status and supports search by session name or job title.
+- A completed session shows ranked candidate results.
+- Candidate review focuses on practical screening signals already produced by the current pipeline, such as score, summary, matched skills, contact details, and parsed profile fields.
 
-## Interfaces and Components
-- **Recruiter UI** (Vite + React): Resume ingestion, search, review, export, dashboards.
-- **Admin Console**: Role and permission management, data governance.
-- **API Service** (ElysiaJS): Auth, file handling, session management, results serving.
-- **Pipeline Service** (Python + Celery): Document processing, NLP extraction, scoring.
-- **Message Queue** (RabbitMQ): Job distribution between API and pipeline workers.
-- **Storage** (Cloudflare R2): Raw resume file storage.
+### 4. Failure and retry handling
 
-## Data & Security
-- Resumes are PII-heavy; enforce encryption at rest and in transit.
-- Access to resumes and rankings is role-gated.
-- Audit logs should capture uploads, exports, and scoring changes.
+- Failed sessions stay visible rather than disappearing.
+- The current product supports multiple retry paths:
+  - rerun the current session
+  - clone the current session
+  - clone with updated brief data
+  - replace the current session contents with updated brief data
+- Retry behavior is tied to the active `run_id`, so stale worker callbacks should not overwrite a newer run.
 
-## Future-Proofing (AI Expansion)
-- Keep AI pipeline modular: parsing and ranking must be replaceable.
-- Allow multiple models and versioned scoring policies.
-- Prepare interfaces for model evaluation, bias testing, and policy review.
+### 5. Export
+
+- The API currently supports `csv` and `json` export formats for completed sessions.
+- The current web flow downloads CSV.
+- Exports should reflect the stored results for the active run of the selected session.
+
+## UX and behavior expectations
+
+- Keep recruiter-facing language clear and operational, not research-heavy.
+- Prefer showing status and next actions over exposing pipeline internals.
+- Preserve original uploads and treat derived resume analysis as secondary data.
+- Show failures in a recoverable way when retry is possible.
+- Keep session history understandable: one session can have multiple runs, but the UI should emphasize the active result set.
+
+## Current result interpretation rules
+
+- Scores are useful ranking signals, not final hiring decisions.
+- Summaries should help a recruiter triage quickly, not replace reading the resume.
+- Parsed data can be incomplete or noisy, especially for low-quality documents.
+- Empty or unreadable documents may legitimately result in low scores or minimal extracted data.
+
+## System boundaries
+
+- The frontend is a recruiter workflow client.
+- The API is the source of truth for auth, sessions, files, statuses, results, and exports.
+- The pipeline is an internal processing subsystem. Its current implementation is replaceable as long as the job and callback contract is preserved.
+
+## Future direction, stated carefully
+
+These are reasonable extension areas, but they should be described as future work unless implemented in live code:
+
+- richer recruiter collaboration and review workflows
+- more detailed progress reporting during long-running jobs
+- broader search and filtering across candidate result attributes
+- stronger model/version visibility and evaluation tooling
+- alternate worker implementations behind the same API-facing contract
+
+When adding docs or features, separate "current behavior" from "future direction" instead of blending them together.

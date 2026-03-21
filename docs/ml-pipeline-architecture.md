@@ -1,10 +1,35 @@
-# ML Pipeline Architecture and File Handling
+# Historical ML Pipeline Architecture and File Handling
 
-> **Superseded**: This document described the original high-level intent for the ML pipeline. It has been replaced by [`docs/pipeline-spec.md`](./pipeline-spec.md), which contains the full implementation specification including architecture, message contracts, database schemas, pipeline stages, infrastructure, and phased implementation plan. Refer to that document for all pipeline-related decisions and details.
+> STOP: this file is historical reference only.
+>
+> It does not describe the current pipeline contract, runtime behavior, auth model, queue payloads, callback payloads, or persistence rules.
+>
+> For any current implementation or integration work, use `docs/pipeline-spec.md` instead.
 
 ---
 
-*The original content is preserved below for historical reference.*
+This document is preserved only as an early design snapshot from before the current worker and callback contract were implemented. Some assumptions below are now outdated or intentionally incomplete.
+
+Important current differences before the preserved draft starts:
+
+- the live system uses the API callback route at `/api/internal/pipeline/callback`
+- session updates are run-aware, so stale worker callbacks are ignored
+- results are persisted directly in `candidate_result` for the active run rather than through the artifact-pointer model described below
+
+Use it only for background context on earlier design direction. Do not treat it as a source of truth for:
+
+- queue schema
+- callback auth or callback body formats
+- session status rules
+- run-aware behavior
+- storage and persistence details
+- current worker structure
+
+Current source of truth: `docs/pipeline-spec.md`
+
+---
+
+*Original draft preserved below without being normalized to the live repo.*
 
 ---
 
