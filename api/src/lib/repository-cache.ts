@@ -1,7 +1,8 @@
 import { MemoryCache } from "./cache";
+import { type SessionSort } from "~/utils/types";
 
 const REPOSITORY_CACHE_TTL_MS = 15 * 60 * 1000;
-const REPOSITORY_CACHE_MAX_ENTRIES = 50_000;
+const REPOSITORY_CACHE_MAX_ENTRIES = 500_000;
 
 const repositoryMemoryCache = new MemoryCache<string, unknown>({
 	defaultTtlMs: REPOSITORY_CACHE_TTL_MS,
@@ -65,3 +66,14 @@ export const repositoryCache = {
 		repositoryMemoryCache.deleteWhere(predicate);
 	},
 };
+
+export const sessionRepositoryCacheKeys = {
+	entity: (sessionId: string) => `session:entity:${sessionId}` as const,
+	files: (sessionId: string) => `session:files:${sessionId}` as const,
+	list: (userId: string) => `session:list:${userId}` as const,
+	detail: (userId: string, sessionId: string) => `session:detail:${userId}:${sessionId}` as const,
+	results: (userId: string, sessionId: string, sort: SessionSort) => `session:results:${userId}:${sessionId}:${sort}` as const,
+	resultsData: (sessionId: string, sort: SessionSort, activeRunId: string | null) => `session:results-data:${sessionId}:${sort}:${activeRunId ?? "none"}` as const,
+	result: (userId: string, sessionId: string, resultId: string) => `session:result:${userId}:${sessionId}:${resultId}` as const,
+	resultEntity: (sessionId: string, resultId: string) => `result:entity:${sessionId}:${resultId}` as const,
+}

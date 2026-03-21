@@ -4,7 +4,7 @@ import { randomUUIDv7 } from "bun";
 import { MAX_FILES_PER_SESSION } from "@resumemo/core/constants/file-uploads";
 
 import {
-	type RetrySourceFile,
+	type RetryFile,
 	isSessionRepositoryFailure,
 	sessionRepository,
 } from "~/repositories/session-repository";
@@ -235,7 +235,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 				? body.jobTitle.trim() || null
 				: existingSession.jobTitle;
 			const nextJobDescription = body.jobDescription?.trim() || existingSession.jobDescription;
-			const currentFiles: RetrySourceFile[] = preview.files;
+			const currentFiles: RetryFile[] = preview.files;
 
 			try {
 				switch (body.mode) {

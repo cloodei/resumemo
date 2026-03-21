@@ -1,305 +1,137 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm"
 
-import * as schema from "@resumemo/core/schemas";
+import * as schema from "@resumemo/core/schemas"
+import * as sessionQueries from "~/sql/session"
+import { db } from "~/lib/db"
+import { type SessionSort } from "~/utils/types"
+import { repositoryCache, sessionRepositoryCacheKeys } from "~/lib/repository-cache"
 
-import { db } from "~/lib/db";
-import { repositoryCache } from "~/lib/repository-cache";
+type CandidateResultRow = typeof schema.candidateResult.$inferSelect
 
-
-export type SessionSort = "asc" | "desc";
-type CandidateResultRow = typeof schema.candidateResult.$inferSelect;
 export type SessionRepositoryError = {
-	code: "session-not-found" | "files-not-found" | "result-not-found" | "session-not-completed";
-	message: string;
-};
+	code: "session-not-found" | "files-not-found" | "result-not-found" | "session-not-completed"
+	message: string
+}
+
 type SessionRepositoryResult<T> =
 	| { ok: true; data: T }
-	| { ok: false; error: SessionRepositoryError };
-	
+	| { ok: false; error: SessionRepositoryError }
 
-const listSessionsByUserStatement = db
-	.select()
-	.from(schema.profilingSession)
-	.where(eq(schema.profilingSession.userId, sql.placeholder("userId")))
-	.orderBy(desc(schema.profilingSession.createdAt))
-	.prepare("session_list_by_user");
-const getOwnedSessionStatement = db
-	.select()
-	.from(schema.profilingSession)
-	.where(
-		and(
-			eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-			eq(schema.profilingSession.userId, sql.placeholder("userId")),
-		),
-	)
-	.prepare("session_get_owned_base");
-
-const getSessionFilesStatement = db
-	.select({
-		id: schema.resumeFile.id,
-		originalName: schema.resumeFile.originalName,
-		mimeType: schema.resumeFile.mimeType,
-		size: schema.resumeFile.size,
-	})
-	.from(schema.profilingSessionFile)
-	.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-	.where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-	.prepare("session_get_files_by_session_id");
-
-const getSessionResultsDescStatement = db
-	.select({
-		id: schema.candidateResult.id,
-		runId: schema.candidateResult.runId,
-		fileId: schema.candidateResult.fileId,
-		candidateName: schema.candidateResult.candidateName,
-		candidateEmail: schema.candidateResult.candidateEmail,
-		candidatePhone: schema.candidateResult.candidatePhone,
-		parsedProfile: schema.candidateResult.parsedProfile,
-		overallScore: schema.candidateResult.overallScore,
-		summary: schema.candidateResult.summary,
-		skillsMatched: schema.candidateResult.skillsMatched,
-		createdAt: schema.candidateResult.createdAt,
-		originalName: schema.resumeFile.originalName,
-	})
-	.from(schema.candidateResult)
-	.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-	.where(eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")))
-	.orderBy(desc(schema.candidateResult.overallScore))
-	.prepare("session_get_results_desc");
-
-const getSessionResultsAscStatement = db
-	.select({
-		id: schema.candidateResult.id,
-		runId: schema.candidateResult.runId,
-		fileId: schema.candidateResult.fileId,
-		candidateName: schema.candidateResult.candidateName,
-		candidateEmail: schema.candidateResult.candidateEmail,
-		candidatePhone: schema.candidateResult.candidatePhone,
-		parsedProfile: schema.candidateResult.parsedProfile,
-		overallScore: schema.candidateResult.overallScore,
-		summary: schema.candidateResult.summary,
-		skillsMatched: schema.candidateResult.skillsMatched,
-		createdAt: schema.candidateResult.createdAt,
-		originalName: schema.resumeFile.originalName,
-	})
-	.from(schema.candidateResult)
-	.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-	.where(eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")))
-	.orderBy(schema.candidateResult.overallScore)
-	.prepare("session_get_results_asc");
-
-const getSessionResultDetailStatement = db
-	.select({
-		id: schema.candidateResult.id,
-		runId: schema.candidateResult.runId,
-		sessionId: schema.candidateResult.sessionId,
-		fileId: schema.candidateResult.fileId,
-		candidateName: schema.candidateResult.candidateName,
-		candidateEmail: schema.candidateResult.candidateEmail,
-		candidatePhone: schema.candidateResult.candidatePhone,
-		rawText: schema.candidateResult.rawText,
-		parsedProfile: schema.candidateResult.parsedProfile,
-		overallScore: schema.candidateResult.overallScore,
-		scoreBreakdown: schema.candidateResult.scoreBreakdown,
-		summary: schema.candidateResult.summary,
-		skillsMatched: schema.candidateResult.skillsMatched,
-		createdAt: schema.candidateResult.createdAt,
-		originalName: schema.resumeFile.originalName,
-		mimeType: schema.resumeFile.mimeType,
-	})
-	.from(schema.candidateResult)
-	.innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
-	.where(
-		and(
-			eq(schema.candidateResult.id, sql.placeholder("resultId")),
-			eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")),
-		),
-	)
-	.prepare("session_get_result_detail");
-
-const getRetrySessionStatement = db
-	.select({
-		id: schema.profilingSession.id,
-		userId: schema.profilingSession.userId,
-		name: schema.profilingSession.name,
-		jobTitle: schema.profilingSession.jobTitle,
-		jobDescription: schema.profilingSession.jobDescription,
-		status: schema.profilingSession.status,
-	})
-	.from(schema.profilingSession)
-	.where(
-		and(
-			eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-			eq(schema.profilingSession.userId, sql.placeholder("userId")),
-		),
-	)
-	.prepare("session_get_retry_preview");
-
-const getRetryFilesStatement = db
-	.select({
-		fileId: schema.resumeFile.id,
-		storageKey: schema.resumeFile.storageKey,
-		originalName: schema.resumeFile.originalName,
-		mimeType: schema.resumeFile.mimeType,
-		size: schema.resumeFile.size,
-	})
-	.from(schema.profilingSessionFile)
-	.innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-	.where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-	.prepare("session_get_retry_files");
-
-const markSessionFailedStatement = db
-	.update(schema.profilingSession)
-	.set({
-		status: schema.profilingSession.status,
-		errorMessage: schema.profilingSession.errorMessage,
-		lastCompletedAt: schema.profilingSession.lastCompletedAt,
-	})
-	.where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
-	.returning()
-	.prepare("session_mark_failed");
-
-const updateSessionRetryingStatement = db
-	.update(schema.profilingSession)
-	.set({
-		name: schema.profilingSession.name,
-		jobTitle: schema.profilingSession.jobTitle,
-		jobDescription: schema.profilingSession.jobDescription,
-		status: schema.profilingSession.status,
-		activeRunId: schema.profilingSession.activeRunId,
-		errorMessage: schema.profilingSession.errorMessage,
-		lastCompletedAt: schema.profilingSession.lastCompletedAt,
-		totalFiles: schema.profilingSession.totalFiles,
-	})
-	.where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
-	.returning()
-	.prepare("session_update_retrying");
-
-export type SessionListItem = Awaited<ReturnType<typeof listSessionsByUserStatement.execute>>[number];
-export type ProfilingSession = Awaited<ReturnType<typeof getOwnedSessionStatement.execute>>[number];
-export type SessionResultSummary = Awaited<ReturnType<typeof getSessionResultsDescStatement.execute>>[number];
-export type SessionResultDetail = Awaited<ReturnType<typeof getSessionResultDetailStatement.execute>>[number];
-type SessionFileRow = Awaited<ReturnType<typeof getSessionFilesStatement.execute>>[number];
-export type SessionFileView = Omit<SessionFileRow, "size"> & { size: number };
+export type SessionListItem = Awaited<ReturnType<typeof sessionQueries.listSessionsByUserStatement.execute>>[number]
+export type ProfilingSession = Awaited<ReturnType<typeof sessionQueries.getOwnedSessionStatement.execute>>[number]
+export type SessionResultSummary = Awaited<ReturnType<typeof sessionQueries.getSessionResultsDescStatement.execute>>[number]
+export type SessionResultDetail = Awaited<ReturnType<typeof sessionQueries.getSessionResultDetailStatement.execute>>[number]
+// export type RetrySession = Awaited<ReturnType<typeof sessionQueries.getRetrySessionStatement.execute>>[number]
+export type RetryFile = Awaited<ReturnType<typeof sessionQueries.getRetryFilesStatement.execute>>[number]
+type SessionFileRow = Awaited<ReturnType<typeof sessionQueries.getSessionFilesStatement.execute>>[number]
+export type SessionFileView = Omit<SessionFileRow, "size"> & { size: number }
 
 export type SessionCreateInputFile = {
-	storageKey: string;
-	fileName: string;
-	mimeType: string;
-	size: number;
-};
+	storageKey: string
+	fileName: string
+	mimeType: string
+	size: number
+}
 
 export type SessionCreatedFileRecord = {
-	fileId: number;
-	storageKey: string;
-	originalName: string;
-	mimeType: string;
-	size: bigint;
-};
+	fileId: number
+	storageKey: string
+	originalName: string
+	mimeType: string
+	size: bigint
+}
 
 export type CreateSessionInput = {
-	userId: string;
-	name: string;
-	jobDescription: string;
-	jobTitle: string | null;
-	runId: string;
-	files: SessionCreateInputFile[];
-};
+	userId: string
+	name: string
+	jobDescription: string
+	jobTitle: string | null
+	runId: string
+	files: SessionCreateInputFile[]
+}
 
-export type RetrySourceFile = {
-	fileId: number;
-	storageKey: string;
-	originalName: string;
-	mimeType: string;
-	size: bigint;
-};
-export type SessionRetryMode = "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates";
+// export type RetrySourceFile = {
+// 	fileId: number
+// 	storageKey: string
+// 	originalName: string
+// 	mimeType: string
+// 	size: bigint
+// }
+
+// export type SessionRetryMode = "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
 
 export type RetryMutationInput = {
-	mode: SessionRetryMode;
-	userId: string;
-	sessionId: string;
-	runId: string;
-	name: string;
-	jobTitle: string | null;
-	jobDescription: string;
-	files: RetrySourceFile[];
-};
+	mode: "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
+	userId: string
+	sessionId: string
+	runId: string
+	name: string
+	jobTitle: string | null
+	jobDescription: string
+	files: RetryFile[]
+}
 
 export type SessionResultUpsertInput = {
-	file_id: number;
-	candidate_name: string | null;
-	candidate_email: string | null;
-	candidate_phone: string | null;
-	raw_text: string;
-	parsed_profile: Record<string, unknown>;
-	overall_score: number;
-	score_breakdown: Record<string, unknown>;
-	summary: string;
-	skills_matched: string[];
-};
-
-export const sessionRepositoryCacheKeys = {
-	entity: (sessionId: string) => `session:entity:${sessionId}` as const,
-	files: (sessionId: string) => `session:files:${sessionId}` as const,
-	list: (userId: string) => `session:list:${userId}` as const,
-	detail: (userId: string, sessionId: string) => `session:detail:${userId}:${sessionId}` as const,
-	results: (userId: string, sessionId: string, sort: SessionSort) => `session:results:${userId}:${sessionId}:${sort}` as const,
-	resultsData: (sessionId: string, sort: SessionSort, activeRunId: string | null) => `session:results-data:${sessionId}:${sort}:${activeRunId ?? "none"}` as const,
-	result: (userId: string, sessionId: string, resultId: string) => `session:result:${userId}:${sessionId}:${resultId}` as const,
-	resultEntity: (sessionId: string, resultId: string) => `result:entity:${sessionId}:${resultId}` as const,
-};
-
-
-function sessionRepositorySuccess<T>(data: T): SessionRepositoryResult<T> {
-	return { ok: true, data };
+	file_id: number
+	candidate_name: string | null
+	candidate_email: string | null
+	candidate_phone: string | null
+	raw_text: string
+	parsed_profile: Record<string, unknown>
+	overall_score: number
+	score_breakdown: Record<string, unknown>
+	summary: string
+	skills_matched: string[]
 }
 
-function sessionRepositoryFailure(
-	code: SessionRepositoryError["code"],
-	message: string,
-): SessionRepositoryResult<never> {
-	return {
-		ok: false,
-		error: { code, message },
-	};
+function success<T>(data: T): SessionRepositoryResult<T> {
+	return { ok: true, data }
 }
 
-export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>): value is {
-	ok: false;
-	error: SessionRepositoryError
-} {
-	return !value.ok;
+function failure(code: SessionRepositoryError["code"], message: string): SessionRepositoryResult<never> {
+	return { ok: false, error: { code, message } }
+}
+
+export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>): value is { ok: false; error: SessionRepositoryError } {
+	return !value.ok
+}
+
+async function getCachedProjection<T>(
+	key: string,
+	loader: () => Promise<SessionRepositoryResult<T>>,
+) {
+	const cached = repositoryCache.get<T>(key)
+	if (cached !== undefined)
+		return success(cached)
+
+	const result = await loader()
+	if (result.ok)
+		repositoryCache.set(key, result.data)
+
+	return result
 }
 
 function filterActiveRunResults<T extends { runId?: string | null }>(results: T[], activeRunId: string | null) {
 	if (!activeRunId)
-		return results;
+		return results
 
-	return results.filter(result => result.runId === activeRunId);
+	return results.filter(result => result.runId === activeRunId)
 }
 
-function patchSessionListEntry(
-	sessions: SessionListItem[],
-	nextSession: ProfilingSession,
-	prependIfMissing?: boolean,
-) {
-	let found = false;
+function patchSessionListEntry(sessions: SessionListItem[], nextSession: ProfilingSession, prependIfMissing?: boolean) {
+	let found = false
 	const patched = sessions.map((session) => {
 		if (session.id !== nextSession.id)
-			return session;
+			return session
 
-		found = true;
-		return {
-			...session,
-			...nextSession,
-		};
-	});
+		found = true
+		return { ...session, ...nextSession }
+	})
 
 	if (!found && prependIfMissing)
-		return [nextSession, ...patched];
+		return [nextSession, ...patched]
 
-	return patched;
+	return patched
 }
 
 function setSessionResultsCaches(
@@ -309,27 +141,27 @@ function setSessionResultsCaches(
 	sessionStatus: ProfilingSession["status"],
 	results: SessionResultSummary[],
 ) {
-	for (const sort of ["asc", "desc"] as const) {
-		repositoryCache.set(
-			sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId),
-			sort === "asc"
-				? [...results].sort((left, right) => Number(left.overallScore) - Number(right.overallScore))
-				: [...results].sort((left, right) => Number(right.overallScore) - Number(left.overallScore)),
-		);
+	const ascResults = [...results].sort((left, right) => Number(left.overallScore) - Number(right.overallScore))
+	const descResults = [...results].sort((left, right) => Number(right.overallScore) - Number(left.overallScore))
 
-		repositoryCache.set(sessionRepositoryCacheKeys.results(userId, sessionId, sort), {
-			sessionId,
-			sessionStatus,
-			totalResults: results.length,
-			results: sort === "asc"
-				? [...results].sort((left, right) => Number(left.overallScore) - Number(right.overallScore))
-				: [...results].sort((left, right) => Number(right.overallScore) - Number(left.overallScore)),
-		});
-	}
+	repositoryCache.set(sessionRepositoryCacheKeys.resultsData(sessionId, "asc", activeRunId), ascResults)
+	repositoryCache.set(sessionRepositoryCacheKeys.resultsData(sessionId, "desc", activeRunId), descResults)
+	repositoryCache.set(sessionRepositoryCacheKeys.results(userId, sessionId, "asc"), {
+		sessionId,
+		sessionStatus,
+		totalResults: ascResults.length,
+		results: ascResults,
+	})
+	repositoryCache.set(sessionRepositoryCacheKeys.results(userId, sessionId, "desc"), {
+		sessionId,
+		sessionStatus,
+		totalResults: descResults.length,
+		results: descResults,
+	})
 
 	for (const result of results) {
-		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result);
-		repositoryCache.deleteWhere(key => key === sessionRepositoryCacheKeys.result(userId, sessionId, result.id));
+		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
+		repositoryCache.delete(sessionRepositoryCacheKeys.result(userId, sessionId, result.id))
 	}
 }
 
@@ -337,283 +169,182 @@ function clearSessionResultCaches(userId: string, sessionId: string) {
 	repositoryCache.deleteMany([
 		sessionRepositoryCacheKeys.results(userId, sessionId, "asc"),
 		sessionRepositoryCacheKeys.results(userId, sessionId, "desc"),
-	]);
-	repositoryCache.deleteWhere(key => key.startsWith(`session:results-data:${sessionId}:`));
-	repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`));
-	repositoryCache.deleteWhere(key => key.startsWith(`result:entity:${sessionId}:`));
+	])
+	repositoryCache.deleteWhere(key => key.startsWith(`session:results-data:${sessionId}:`))
+	repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
+	repositoryCache.deleteWhere(key => key.startsWith(`result:entity:${sessionId}:`))
 }
 
 function primeSessionCaches(payload: {
-	session: ProfilingSession;
-	files: SessionFileView[];
-	results: SessionResultSummary[] | null;
+	session: ProfilingSession
+	files: SessionFileView[]
+	results: SessionResultSummary[] | null
 }) {
-	const session = payload.session;
-	repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session);
-	repositoryCache.set(sessionRepositoryCacheKeys.files(session.id), payload.files);
-
+	repositoryCache.set(sessionRepositoryCacheKeys.entity(payload.session.id), payload.session)
+	repositoryCache.set(sessionRepositoryCacheKeys.files(payload.session.id), payload.files)
 	repositoryCache.update<{ sessions: SessionListItem[] }>(
-		sessionRepositoryCacheKeys.list(session.userId),
-		current => ({
-			sessions: patchSessionListEntry(current.sessions, session, true),
-		}),
-	);
-
-	repositoryCache.set(sessionRepositoryCacheKeys.detail(session.userId, session.id), {
-		session,
-		files: payload.files,
-		results: payload.results,
-	});
-
-	setSessionResultsCaches(session.userId, session.id, session.activeRunId, session.status, payload.results ?? []);
+		sessionRepositoryCacheKeys.list(payload.session.userId),
+		current => ({ sessions: patchSessionListEntry(current.sessions, payload.session, true) }),
+	)
+	repositoryCache.set(sessionRepositoryCacheKeys.detail(payload.session.userId, payload.session.id), payload)
+	setSessionResultsCaches(payload.session.userId, payload.session.id, payload.session.activeRunId, payload.session.status, payload.results ?? [])
 }
 
 function patchSessionState(payload: {
-	session: ProfilingSession;
-	files: SessionFileView[];
-	results: SessionResultSummary[] | null;
+	session: ProfilingSession
+	files: SessionFileView[]
+	results: SessionResultSummary[] | null
 }) {
-	const session = payload.session;
-	repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session);
-	repositoryCache.set(sessionRepositoryCacheKeys.files(session.id), payload.files);
-
+	repositoryCache.set(sessionRepositoryCacheKeys.entity(payload.session.id), payload.session)
+	repositoryCache.set(sessionRepositoryCacheKeys.files(payload.session.id), payload.files)
 	repositoryCache.update<{ sessions: SessionListItem[] }>(
-		sessionRepositoryCacheKeys.list(session.userId),
-		current => ({
-			sessions: patchSessionListEntry(current.sessions, session),
-		}),
-	);
-
+		sessionRepositoryCacheKeys.list(payload.session.userId),
+		current => ({ sessions: patchSessionListEntry(current.sessions, payload.session) }),
+	)
 	repositoryCache.update(
-		sessionRepositoryCacheKeys.detail(session.userId, session.id),
-		_ => ({
-			session,
-			files: payload.files,
-			results: payload.results,
-		}),
-	);
-
-	clearSessionResultCaches(session.userId, session.id);
-	setSessionResultsCaches(session.userId, session.id, session.activeRunId, session.status, payload.results ?? []);
+		sessionRepositoryCacheKeys.detail(payload.session.userId, payload.session.id),
+		() => payload,
+	)
+	clearSessionResultCaches(payload.session.userId, payload.session.id)
+	setSessionResultsCaches(payload.session.userId, payload.session.id, payload.session.activeRunId, payload.session.status, payload.results ?? [])
 }
 
-function buildResultSummaryFromInsert(result: CandidateResultRow, file: SessionFileView | undefined): SessionResultSummary {
-	return {
-		id: result.id,
-		runId: result.runId,
-		fileId: result.fileId,
-		candidateName: result.candidateName,
-		candidateEmail: result.candidateEmail,
-		candidatePhone: result.candidatePhone,
-		parsedProfile: result.parsedProfile,
-		overallScore: result.overallScore,
-		summary: result.summary,
-		skillsMatched: result.skillsMatched,
-		createdAt: result.createdAt,
-		originalName: file?.originalName ?? "Unknown file",
-	};
-}
-
-function buildResultDetailFromInsert(result: CandidateResultRow, file: SessionFileView | undefined): SessionResultDetail {
-	return {
-		id: result.id,
-		runId: result.runId,
-		sessionId: result.sessionId,
-		fileId: result.fileId,
-		candidateName: result.candidateName,
-		candidateEmail: result.candidateEmail,
-		candidatePhone: result.candidatePhone,
-		rawText: result.rawText,
-		parsedProfile: result.parsedProfile,
-		overallScore: result.overallScore,
-		scoreBreakdown: result.scoreBreakdown,
-		summary: result.summary,
-		skillsMatched: result.skillsMatched,
-		createdAt: result.createdAt,
-		originalName: file?.originalName ?? "Unknown file",
-		mimeType: file?.mimeType ?? "application/octet-stream",
-	};
-}
-
-async function getOwnedSession(userId: string, sessionId: string): Promise<ProfilingSession | null> {
-	const entityKey = sessionRepositoryCacheKeys.entity(sessionId);
-	const cached = repositoryCache.get<ProfilingSession>(entityKey);
+async function getOwnedSession(userId: string, sessionId: string) {
+	const cached = repositoryCache.get<ProfilingSession>(sessionRepositoryCacheKeys.entity(sessionId))
 	if (cached && cached.userId === userId)
-		return cached;
+		return cached
 
-	const rows = await getOwnedSessionStatement.execute({ userId, sessionId });
-	const session = rows[0] ?? null;
+	const rows = await sessionQueries.getOwnedSessionStatement.execute({ userId, sessionId })
+	const session = rows[0] ?? null
 	if (session)
-		repositoryCache.set(entityKey, session);
+		repositoryCache.set(sessionRepositoryCacheKeys.entity(sessionId), session)
 
-	return session;
+	return session
 }
 
-async function getSessionFiles(sessionId: string): Promise<SessionFileView[]> {
-	const filesKey = sessionRepositoryCacheKeys.files(sessionId);
-	const cached = repositoryCache.get<SessionFileView[]>(filesKey);
+async function getSessionFiles(sessionId: string) {
+	const cached = repositoryCache.get<SessionFileView[]>(sessionRepositoryCacheKeys.files(sessionId))
 	if (cached)
-		return cached;
+		return cached
 
-	const rows = await getSessionFilesStatement.execute({ sessionId });
+	const rows = await sessionQueries.getSessionFilesStatement.execute({ sessionId })
 	const files = rows.map(file => ({
 		id: file.id,
 		originalName: file.originalName,
 		mimeType: file.mimeType,
 		size: Number(file.size),
-	}));
+	}))
 
-	repositoryCache.set(filesKey, files);
-	return files;
+	repositoryCache.set(sessionRepositoryCacheKeys.files(sessionId), files)
+	return files
 }
 
-async function getSessionResultsFromSource(
-	sessionId: string,
-	sort: SessionSort,
-	activeRunId: string | null,
-): Promise<SessionResultSummary[]> {
-	const resultsKey = sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId);
-	const cached = repositoryCache.get<SessionResultSummary[]>(resultsKey);
+async function getSessionResultsFromSource(sessionId: string, sort: SessionSort, activeRunId: string | null) {
+	const cached = repositoryCache.get<SessionResultSummary[]>(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId))
 	if (cached)
-		return cached;
+		return cached
 
 	const rows = sort === "asc"
-		? await getSessionResultsAscStatement.execute({ sessionId })
-		: await getSessionResultsDescStatement.execute({ sessionId });
+		? await sessionQueries.getSessionResultsAscStatement.execute({ sessionId })
+		: await sessionQueries.getSessionResultsDescStatement.execute({ sessionId })
 
-	const filteredResults = filterActiveRunResults(rows, activeRunId);
-	repositoryCache.set(resultsKey, filteredResults);
+	const results = filterActiveRunResults(rows, activeRunId)
+	repositoryCache.set(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId), results)
 
-	for (const result of filteredResults)
-		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result);
+	for (const result of results)
+		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
 
-	return filteredResults;
+	return results
 }
-
-function toSessionFileView(file: { fileId: number; originalName: string; mimeType: string; size: bigint }): SessionFileView {
-	return {
-		id: file.fileId,
-		originalName: file.originalName,
-		mimeType: file.mimeType,
-		size: Number(file.size),
-	};
-}
-
-async function getRetryPreview(userId: string, sessionId: string) {
-	const sessions = await getRetrySessionStatement.execute({ userId, sessionId });
-	const session = sessions[0] ?? null;
-	if (!session)
-		return null;
-
-	const files = await getRetryFilesStatement.execute({ sessionId });
-	return { session, files };
-}
-
-
 
 export const sessionRepository = {
 	async getRetryPreview(userId: string, sessionId: string) {
-		return await getRetryPreview(userId, sessionId);
+		const sessions = await sessionQueries.getRetrySessionStatement.execute({ userId, sessionId })
+		const session = sessions[0] ?? null
+		if (!session)
+			return null
+
+		const files = await sessionQueries.getRetryFilesStatement.execute({ sessionId })
+		return { session, files }
 	},
 
 	async listByUser(userId: string) {
 		return await repositoryCache.getOrLoad(
 			sessionRepositoryCacheKeys.list(userId),
 			async () => {
-				const sessions = await listSessionsByUserStatement.execute({ userId });
+				const sessions = await sessionQueries.listSessionsByUserStatement.execute({ userId })
 				for (const session of sessions)
-					repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session);
+					repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session)
 
-				return { sessions };
+				return { sessions }
 			},
-		);
+		)
 	},
 
 	async getDetail(userId: string, sessionId: string) {
-		const cached = repositoryCache.get<{
-			session: ProfilingSession;
-			files: SessionFileView[];
-			results: SessionResultSummary[] | null;
-		}>(sessionRepositoryCacheKeys.detail(userId, sessionId));
-		if (cached)
-			return sessionRepositorySuccess(cached);
+		return await getCachedProjection(sessionRepositoryCacheKeys.detail(userId, sessionId), async () => {
+			const session = await getOwnedSession(userId, sessionId)
+			if (!session)
+				return failure("session-not-found", "Session not found")
 
-		const session = await getOwnedSession(userId, sessionId);
-		if (!session)
-			return sessionRepositoryFailure("session-not-found", "Session not found");
+			const files = await getSessionFiles(sessionId)
+			if (files.length === 0)
+				return failure("files-not-found", "Files not found")
 
-		const files = await getSessionFiles(sessionId);
-		if (files.length === 0)
-			return sessionRepositoryFailure("files-not-found", "Files not found");
-
-		let results: SessionResultSummary[] | null = null;
-		if (session.status === "completed")
-			results = await getSessionResultsFromSource(sessionId, "desc", session.activeRunId ?? null);
-
-		const data = { session, files, results };
-		repositoryCache.set(sessionRepositoryCacheKeys.detail(userId, sessionId), data);
-		return sessionRepositorySuccess(data);
+			return success({
+				session,
+				files,
+				results: session.status === "completed"
+					? await getSessionResultsFromSource(sessionId, "desc", session.activeRunId ?? null)
+					: null,
+			})
+		})
 	},
 
 	async getResults(userId: string, sessionId: string, sort: SessionSort) {
-		const cached = repositoryCache.get<{
-			sessionId: string;
-			sessionStatus: ProfilingSession["status"];
-			totalResults: number;
-			results: SessionResultSummary[];
-		}>(sessionRepositoryCacheKeys.results(userId, sessionId, sort));
-		if (cached)
-			return sessionRepositorySuccess(cached);
+		return await getCachedProjection(sessionRepositoryCacheKeys.results(userId, sessionId, sort), async () => {
+			const session = await getOwnedSession(userId, sessionId)
+			if (!session)
+				return failure("session-not-found", "Session not found")
 
-		const session = await getOwnedSession(userId, sessionId);
-		if (!session)
-			return sessionRepositoryFailure("session-not-found", "Session not found");
-
-		const results = await getSessionResultsFromSource(sessionId, sort, session.activeRunId ?? null);
-		const data = {
-			sessionId,
-			sessionStatus: session.status,
-			totalResults: results.length,
-			results,
-		};
-		repositoryCache.set(sessionRepositoryCacheKeys.results(userId, sessionId, sort), data);
-		return sessionRepositorySuccess(data);
+			const results = await getSessionResultsFromSource(sessionId, sort, session.activeRunId ?? null)
+			return success({
+				sessionId,
+				sessionStatus: session.status,
+				totalResults: results.length,
+				results,
+			})
+		})
 	},
 
 	async getResult(userId: string, sessionId: string, resultId: string) {
-		const cached = repositoryCache.get<{ result: SessionResultDetail }>(
-			sessionRepositoryCacheKeys.result(userId, sessionId, resultId),
-		);
-		if (cached)
-			return sessionRepositorySuccess(cached);
+		return await getCachedProjection(sessionRepositoryCacheKeys.result(userId, sessionId, resultId), async () => {
+			const session = await getOwnedSession(userId, sessionId)
+			if (!session)
+				return failure("session-not-found", "Session not found")
 
-		const session = await getOwnedSession(userId, sessionId);
-		if (!session)
-			return sessionRepositoryFailure("session-not-found", "Session not found");
+			const rows = await sessionQueries.getSessionResultDetailStatement.execute({ sessionId, resultId })
+			const [result] = filterActiveRunResults(rows, session.activeRunId ?? null)
+			if (!result)
+				return failure("result-not-found", "Result not found")
 
-		const rows = await getSessionResultDetailStatement.execute({ sessionId, resultId });
-		const [result] = filterActiveRunResults(rows, session.activeRunId ?? null);
-		if (!result)
-			return sessionRepositoryFailure("result-not-found", "Result not found");
-
-		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result);
-		const data = { result };
-		repositoryCache.set(sessionRepositoryCacheKeys.result(userId, sessionId, resultId), data);
-		return sessionRepositorySuccess(data);
+			repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
+			return success({ result })
+		})
 	},
 
 	async getExportData(userId: string, sessionId: string) {
-		const session = await getOwnedSession(userId, sessionId);
+		const session = await getOwnedSession(userId, sessionId)
 		if (!session)
-			return sessionRepositoryFailure("session-not-found", "Session not found");
+			return failure("session-not-found", "Session not found")
 		if (session.status !== "completed")
-			return sessionRepositoryFailure("session-not-completed", "Session is not completed yet");
+			return failure("session-not-completed", "Session is not completed yet")
 
-		const resultsResponse = await this.getResults(userId, sessionId, "desc");
+		const resultsResponse = await this.getResults(userId, sessionId, "desc")
 		if (isSessionRepositoryFailure(resultsResponse))
-			return resultsResponse;
+			return resultsResponse
 
-		return sessionRepositorySuccess({
+		return success({
 			session: {
 				id: session.id,
 				name: session.name,
@@ -621,25 +352,12 @@ export const sessionRepository = {
 				activeRunId: session.activeRunId,
 			},
 			results: resultsResponse.data.results,
-		});
+		})
 	},
 
 	async createSession(input: CreateSessionInput) {
-		let sessionSnapshot: {
-			id: string;
-			name: string;
-			createdAt: Date;
-			updatedAt: Date;
-			userId: string;
-			jobDescription: string;
-			jobTitle: string | null;
-			status: "processing" | "retrying" | "completed" | "failed";
-			totalFiles: number;
-			activeRunId: string | null;
-			errorMessage: string | null;
-			lastCompletedAt: Date | null;
-		} | undefined;
-		let createdFiles: SessionCreatedFileRecord[] = [];
+		let sessionSnapshot: ProfilingSession | undefined
+		let createdFiles: SessionCreatedFileRecord[] = []
 
 		await db.transaction(async (tx) => {
 			const [[createdSession], created] = await Promise.all([
@@ -670,75 +388,59 @@ export const sessionRepository = {
 						originalName: schema.resumeFile.originalName,
 						mimeType: schema.resumeFile.mimeType,
 						size: schema.resumeFile.size,
-					})
-			]);
+					}),
+			])
 
-			createdFiles = created;
+			createdFiles = created
 			await tx.insert(schema.profilingSessionFile).values(
 				createdFiles.map(file => ({
 					sessionId: createdSession.id,
 					fileId: file.fileId,
 				})),
-			);
+			)
 
-			sessionSnapshot = createdSession;
-		});
+			sessionSnapshot = createdSession
+		})
 
 		if (!sessionSnapshot)
-			throw new Error("Session create transaction did not return a session");
+			throw new Error("Session create transaction did not return a session")
 
-		const cachePayload = {
+		primeSessionCaches({
 			session: sessionSnapshot,
-			files: createdFiles.map(toSessionFileView),
+			files: createdFiles.map(file => ({
+				id: file.fileId,
+				originalName: file.originalName,
+				mimeType: file.mimeType,
+				size: Number(file.size),
+			})),
 			results: [],
-		};
+		})
 
-		primeSessionCaches(cachePayload);
-
-		return {
-			session: sessionSnapshot,
-			files: createdFiles,
-			cachePayload,
-		};
+		return { session: sessionSnapshot, files: createdFiles, totalConfirmed: createdFiles.length }
 	},
 
 	async markSessionFailed(userId: string, sessionId: string, message: string) {
-		const rows = await markSessionFailedStatement.execute({
+		const [session] = await sessionQueries.markSessionFailedStatement.execute({
 			sessionId,
 			status: "failed",
 			errorMessage: message,
 			lastCompletedAt: null,
-		});
-		const [session] = rows;
+		})
 
 		if (!session)
-			return;
+			return
 
-		const files = await getSessionFiles(sessionId);
 		patchSessionState({
 			session,
-			files,
+			files: await getSessionFiles(sessionId),
 			results: [],
-		});
-		repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`));
+		})
+		repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
 	},
 
 	async applyRetryMutation(input: RetryMutationInput) {
 		if (input.mode === "clone_current" || input.mode === "clone_with_updates") {
-			let sessionSnapshot: {
-				id: string;
-				name: string;
-				createdAt: Date;
-				updatedAt: Date;
-				userId: string;
-				jobDescription: string;
-				jobTitle: string | null;
-				status: "processing" | "retrying" | "completed" | "failed";
-				totalFiles: number;
-				activeRunId: string | null;
-				errorMessage: string | null;
-				lastCompletedAt: Date | null;
-			} | undefined;
+			let sessionSnapshot: ProfilingSession | undefined
 			await db.transaction(async (tx) => {
 				const [createdSession] = await tx.insert(schema.profilingSession)
 					.values({
@@ -752,37 +454,39 @@ export const sessionRepository = {
 						errorMessage: null,
 						lastCompletedAt: null,
 					})
-					.returning();
+					.returning()
 
 				await tx.insert(schema.profilingSessionFile).values(
 					input.files.map(file => ({
 						sessionId: createdSession.id,
 						fileId: file.fileId,
 					})),
-				);
+				)
 
-				sessionSnapshot = createdSession;
-			});
+				sessionSnapshot = createdSession
+			})
 
 			if (!sessionSnapshot)
-				throw new Error("Clone retry transaction did not return a session");
+				throw new Error("Clone retry transaction did not return a session")
 
-			const cachePayload = {
+			primeSessionCaches({
 				session: sessionSnapshot,
-				files: input.files.map(toSessionFileView),
+				files: input.files.map(file => ({
+					id: file.fileId,
+					originalName: file.originalName,
+					mimeType: file.mimeType,
+					size: Number(file.size),
+				})),
 				results: [],
-			};
-
-			primeSessionCaches(cachePayload);
+			})
 
 			return {
 				targetSessionId: sessionSnapshot.id,
-				status: "processing",
-				cachePayload,
-			};
+				status: "processing" as const,
+			}
 		}
 
-		const rows = await updateSessionRetryingStatement.execute({
+		const [session] = await sessionQueries.updateSessionRetryingStatement.execute({
 			sessionId: input.sessionId,
 			name: input.name,
 			jobTitle: input.jobTitle,
@@ -792,125 +496,47 @@ export const sessionRepository = {
 			errorMessage: null,
 			lastCompletedAt: null,
 			totalFiles: input.files.length,
-		});
-		const [session] = rows;
+		})
 
 		if (!session)
-			throw new Error("Retry update did not return a session");
-
-		const cachePayload = {
-			session,
-			files: input.files.map(toSessionFileView),
-			results: [],
-		};
-
-		patchSessionState(cachePayload);
-
-		return {
-			targetSessionId: session.id,
-			status: "retrying",
-			cachePayload,
-		};
-	},
-
-	async applyPipelineCompletion(params: {
-		userId: string;
-		sessionId: string;
-		runId: string;
-		results: SessionResultUpsertInput[];
-	}) {
-		let session: ProfilingSession | null = null;
-		let insertedResults: CandidateResultRow[] = [];
-
-		await db.transaction(async (tx) => {
-			const [_, updatedSessions, inserted] = await Promise.all([
-				tx.delete(schema.candidateResult)
-					.where(
-						and(
-							eq(schema.candidateResult.sessionId, params.sessionId),
-							eq(schema.candidateResult.runId, params.runId),
-						),
-					),
-				tx.update(schema.profilingSession)
-					.set({
-						status: "completed",
-						errorMessage: null,
-						lastCompletedAt: new Date(),
-					})
-					.where(
-						and(
-							eq(schema.profilingSession.id, params.sessionId),
-							eq(schema.profilingSession.activeRunId, params.runId),
-						),
-					)
-					.returning(),
-				params.results.length > 0 ? tx.insert(schema.candidateResult).values(
-					params.results.map(result => ({
-						sessionId: params.sessionId,
-						runId: params.runId,
-						fileId: result.file_id,
-						candidateName: result.candidate_name,
-						candidateEmail: result.candidate_email,
-						candidatePhone: result.candidate_phone,
-						rawText: result.raw_text,
-						parsedProfile: result.parsed_profile,
-						overallScore: String(result.overall_score),
-						scoreBreakdown: result.score_breakdown,
-						summary: result.summary,
-						skillsMatched: result.skills_matched,
-					})),
-				).returning() : [],
-			]);
-
-			session = updatedSessions[0] ?? null;
-			insertedResults = inserted;
-		});
-
-		if (!session)
-			return;
-
-		const files = await getSessionFiles(params.sessionId);
-		const fileMap = new Map(files.map(file => [file.id, file]));
-		const summaries = insertedResults.map(result => buildResultSummaryFromInsert(result, fileMap.get(result.fileId)));
+			throw new Error("Retry update did not return a session")
 
 		patchSessionState({
 			session,
-			files,
-			results: summaries,
-		});
+			files: input.files.map(file => ({
+				id: file.fileId,
+				originalName: file.originalName,
+				mimeType: file.mimeType,
+				size: Number(file.size),
+			})),
+			results: [],
+		})
 
-		for (const result of insertedResults) {
-			const detail = buildResultDetailFromInsert(result, fileMap.get(result.fileId));
-			repositoryCache.set(sessionRepositoryCacheKeys.result(params.userId, params.sessionId, result.id), { result: detail });
-			repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(params.sessionId, result.id), detail);
+		return {
+			targetSessionId: session.id,
+			status: "retrying" as const,
 		}
 	},
 
-	async applyPipelineError(params: {
-		userId: string;
-		sessionId: string;
-		runId: string;
-		error: string;
-		partialResults: SessionResultUpsertInput[];
+	async applyPipelineCompletion(params: {
+		userId: string
+		sessionId: string
+		runId: string
+		results: SessionResultUpsertInput[]
 	}) {
-		let session: ProfilingSession | null = null;
-		let insertedResults: CandidateResultRow[] = [];
+		let session: ProfilingSession | null = null
+		let insertedResults: CandidateResultRow[] = []
 
 		await db.transaction(async (tx) => {
 			const [_, updatedSessions, inserted] = await Promise.all([
-				tx.delete(schema.candidateResult)
-				.where(
+				tx.delete(schema.candidateResult).where(
 					and(
 						eq(schema.candidateResult.sessionId, params.sessionId),
 						eq(schema.candidateResult.runId, params.runId),
 					),
 				),
 				tx.update(schema.profilingSession)
-					.set({
-						status: "failed",
-						errorMessage: params.error,
-						lastCompletedAt: null,
-					})
+					.set({ status: "completed", errorMessage: null, lastCompletedAt: new Date() })
 					.where(
 						and(
 							eq(schema.profilingSession.id, params.sessionId),
@@ -918,45 +544,172 @@ export const sessionRepository = {
 						),
 					)
 					.returning(),
-				params.partialResults.length > 0 ? tx.insert(schema.candidateResult).values(
-					params.partialResults.map(result => ({
-						sessionId: params.sessionId,
-						runId: params.runId,
-						fileId: result.file_id,
-						candidateName: result.candidate_name,
-						candidateEmail: result.candidate_email,
-						candidatePhone: result.candidate_phone,
-						rawText: result.raw_text,
-						parsedProfile: result.parsed_profile,
-						overallScore: String(result.overall_score),
-						scoreBreakdown: result.score_breakdown,
-						summary: result.summary,
-						skillsMatched: result.skills_matched,
-					})),
-				).returning() : [],
-			]);
+				params.results.length > 0
+					? tx.insert(schema.candidateResult).values(
+						params.results.map(result => ({
+							sessionId: params.sessionId,
+							runId: params.runId,
+							fileId: result.file_id,
+							candidateName: result.candidate_name,
+							candidateEmail: result.candidate_email,
+							candidatePhone: result.candidate_phone,
+							rawText: result.raw_text,
+							parsedProfile: result.parsed_profile,
+							overallScore: String(result.overall_score),
+							scoreBreakdown: result.score_breakdown,
+							summary: result.summary,
+							skillsMatched: result.skills_matched,
+						})),
+					).returning()
+					: [],
+			])
 
-			session = updatedSessions[0] ?? null;
-			insertedResults = inserted;
-		});
+			session = updatedSessions[0] ?? null
+			insertedResults = inserted
+		})
 
 		if (!session)
-			return;
+			return
 
-		const files = await getSessionFiles(params.sessionId);
-		const fileMap = new Map(files.map(file => [file.id, file]));
-		const summaries = insertedResults.map(result => buildResultSummaryFromInsert(result, fileMap.get(result.fileId)));
+		const files = await getSessionFiles(params.sessionId)
+		const fileMap = new Map(files.map(file => [file.id, file]))
+		const summaries = insertedResults.map(result => ({
+			id: result.id,
+			runId: result.runId,
+			fileId: result.fileId,
+			candidateName: result.candidateName,
+			candidateEmail: result.candidateEmail,
+			candidatePhone: result.candidatePhone,
+			parsedProfile: result.parsedProfile,
+			overallScore: result.overallScore,
+			summary: result.summary,
+			skillsMatched: result.skillsMatched,
+			createdAt: result.createdAt,
+			originalName: fileMap.get(result.fileId)?.originalName ?? "Unknown file",
+		}))
 
-		patchSessionState({
-			session,
-			files,
-			results: summaries,
-		});
+		patchSessionState({ session, files, results: summaries })
 
 		for (const result of insertedResults) {
-			const detail = buildResultDetailFromInsert(result, fileMap.get(result.fileId));
-			repositoryCache.set(sessionRepositoryCacheKeys.result(params.userId, params.sessionId, result.id), { result: detail });
-			repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(params.sessionId, result.id), detail);
+			const file = fileMap.get(result.fileId)
+			repositoryCache.set(sessionRepositoryCacheKeys.result(params.userId, params.sessionId, result.id), {
+				result: {
+					id: result.id,
+					runId: result.runId,
+					sessionId: result.sessionId,
+					fileId: result.fileId,
+					candidateName: result.candidateName,
+					candidateEmail: result.candidateEmail,
+					candidatePhone: result.candidatePhone,
+					rawText: result.rawText,
+					parsedProfile: result.parsedProfile,
+					overallScore: result.overallScore,
+					scoreBreakdown: result.scoreBreakdown,
+					summary: result.summary,
+					skillsMatched: result.skillsMatched,
+					createdAt: result.createdAt,
+					originalName: file?.originalName ?? "Unknown file",
+					mimeType: file?.mimeType ?? "application/octet-stream",
+				},
+			})
 		}
 	},
-};
+
+	async applyPipelineError(params: {
+		userId: string
+		sessionId: string
+		runId: string
+		error: string
+		partialResults: SessionResultUpsertInput[]
+	}) {
+		let session: ProfilingSession | null = null
+		let insertedResults: CandidateResultRow[] = []
+
+		await db.transaction(async (tx) => {
+			const [_, updatedSessions, inserted] = await Promise.all([
+				tx.delete(schema.candidateResult).where(
+					and(
+						eq(schema.candidateResult.sessionId, params.sessionId),
+						eq(schema.candidateResult.runId, params.runId),
+					),
+				),
+				tx.update(schema.profilingSession)
+					.set({ status: "failed", errorMessage: params.error, lastCompletedAt: null })
+					.where(
+						and(
+							eq(schema.profilingSession.id, params.sessionId),
+							eq(schema.profilingSession.activeRunId, params.runId),
+						),
+					)
+					.returning(),
+				params.partialResults.length > 0
+					? tx.insert(schema.candidateResult).values(
+						params.partialResults.map(result => ({
+							sessionId: params.sessionId,
+							runId: params.runId,
+							fileId: result.file_id,
+							candidateName: result.candidate_name,
+							candidateEmail: result.candidate_email,
+							candidatePhone: result.candidate_phone,
+							rawText: result.raw_text,
+							parsedProfile: result.parsed_profile,
+							overallScore: String(result.overall_score),
+							scoreBreakdown: result.score_breakdown,
+							summary: result.summary,
+							skillsMatched: result.skills_matched,
+						})),
+					).returning()
+					: [],
+			])
+
+			session = updatedSessions[0] ?? null
+			insertedResults = inserted
+		})
+
+		if (!session)
+			return
+
+		const files = await getSessionFiles(params.sessionId)
+		const fileMap = new Map(files.map(file => [file.id, file]))
+		const summaries = insertedResults.map(result => ({
+			id: result.id,
+			runId: result.runId,
+			fileId: result.fileId,
+			candidateName: result.candidateName,
+			candidateEmail: result.candidateEmail,
+			candidatePhone: result.candidatePhone,
+			parsedProfile: result.parsedProfile,
+			overallScore: result.overallScore,
+			summary: result.summary,
+			skillsMatched: result.skillsMatched,
+			createdAt: result.createdAt,
+			originalName: fileMap.get(result.fileId)?.originalName ?? "Unknown file",
+		}))
+
+		patchSessionState({ session, files, results: summaries })
+
+		for (const result of insertedResults) {
+			const file = fileMap.get(result.fileId)
+			repositoryCache.set(sessionRepositoryCacheKeys.result(params.userId, params.sessionId, result.id), {
+				result: {
+					id: result.id,
+					runId: result.runId,
+					sessionId: result.sessionId,
+					fileId: result.fileId,
+					candidateName: result.candidateName,
+					candidateEmail: result.candidateEmail,
+					candidatePhone: result.candidatePhone,
+					rawText: result.rawText,
+					parsedProfile: result.parsedProfile,
+					overallScore: result.overallScore,
+					scoreBreakdown: result.scoreBreakdown,
+					summary: result.summary,
+					skillsMatched: result.skillsMatched,
+					createdAt: result.createdAt,
+					originalName: file?.originalName ?? "Unknown file",
+					mimeType: file?.mimeType ?? "application/octet-stream",
+				},
+			})
+		}
+	},
+}
