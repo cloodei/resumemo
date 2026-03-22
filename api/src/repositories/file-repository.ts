@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import * as schema from "@resumemo/core/schemas";
 
 import { db } from "~/lib/db";
-import { repositoryCache } from "~/lib/repository-cache";
+import { createCacheKey, repositoryCache } from "~/lib/repository-cache";
 
 const listFilesByUserStatement = db
 	.select()
@@ -40,6 +40,12 @@ export type FileRepositoryError = {
 	message: string;
 };
 
+type FileListCacheValue = {
+	files: Awaited<ReturnType<typeof listFilesByUserStatement.execute>>;
+};
+
+type OwnedFileCacheValue = Awaited<ReturnType<typeof getOwnedFileStatement.execute>>[number];
+
 export function isFileRepositoryError(value: unknown): value is FileRepositoryError {
 	if (!value || typeof value !== "object")
 		return false;
@@ -48,8 +54,8 @@ export function isFileRepositoryError(value: unknown): value is FileRepositoryEr
 }
 
 export const fileRepositoryCacheKeys = {
-	list: (userId: string) => `file:list:${userId}` as const,
-	entity: (userId: string, fileId: number) => `file:entity:${userId}:${fileId}` as const,
+	list: (userId: string) => createCacheKey<FileListCacheValue>(`file:list:${userId}`),
+	entity: (userId: string, fileId: number) => createCacheKey<OwnedFileCacheValue>(`file:entity:${userId}:${fileId}`),
 };
 
 export const fileRepository = {
@@ -68,9 +74,7 @@ export const fileRepository = {
 	},
 
 	async getOwned(userId: string, fileId: number) {
-		const cached = repositoryCache.get<Awaited<ReturnType<typeof getOwnedFileStatement.execute>>[number]>(
-			fileRepositoryCacheKeys.entity(userId, fileId),
-		);
+		const cached = repositoryCache.get(fileRepositoryCacheKeys.entity(userId, fileId));
 		if (cached)
 			return cached;
 
@@ -94,9 +98,7 @@ export const fileRepository = {
 		await deleteFileStatement.execute({ fileId });
 
 		repositoryCache.delete(fileRepositoryCacheKeys.entity(userId, fileId));
-		repositoryCache.update<{
-			files: Awaited<ReturnType<typeof listFilesByUserStatement.execute>>;
-		}>(fileRepositoryCacheKeys.list(userId), current => ({
+		repositoryCache.update(fileRepositoryCacheKeys.list(userId), current => ({
 			files: current.files.filter((entry: typeof file) => entry.id !== fileId),
 		}));
 

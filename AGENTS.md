@@ -38,7 +38,7 @@ resumemo/
 
 ## Commands
 
-You **must not** run build, lint, or test commands unless the user explicitly asks.
+You **must not** run build, lint, or test commands unless the user explicitly asks. Refrain from running direct tests/lints or build during code generation or development. They will be ran manually except explicitly being said to run, or allowed to.
 
 ### Root
 

@@ -4,6 +4,7 @@ import * as schema from "@resumemo/core/schemas"
 
 import { db } from "~/lib/db"
 
+
 export const listSessionsByUserStatement = db
   .select()
   .from(schema.profilingSession)

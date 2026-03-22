@@ -3,8 +3,15 @@ import { and, eq } from "drizzle-orm"
 import * as schema from "@resumemo/core/schemas"
 import * as sessionQueries from "~/sql/session"
 import { db } from "~/lib/db"
-import { type SessionSort } from "~/utils/types"
-import { repositoryCache, sessionRepositoryCacheKeys } from "~/lib/repository-cache"
+import { repositoryCache, sessionRepositoryCacheKeys, type CacheKey } from "~/lib/repository-cache"
+import type {
+	SessionSort,
+	SessionFileView,
+	SessionListItem,
+	ProfilingSession,
+	SessionResultSummary,
+	RetryFile,
+} from "~/utils/types"
 
 type CandidateResultRow = typeof schema.candidateResult.$inferSelect
 
@@ -13,18 +20,7 @@ export type SessionRepositoryError = {
 	message: string
 }
 
-type SessionRepositoryResult<T> =
-	| { ok: true; data: T }
-	| { ok: false; error: SessionRepositoryError }
-
-export type SessionListItem = Awaited<ReturnType<typeof sessionQueries.listSessionsByUserStatement.execute>>[number]
-export type ProfilingSession = Awaited<ReturnType<typeof sessionQueries.getOwnedSessionStatement.execute>>[number]
-export type SessionResultSummary = Awaited<ReturnType<typeof sessionQueries.getSessionResultsDescStatement.execute>>[number]
-export type SessionResultDetail = Awaited<ReturnType<typeof sessionQueries.getSessionResultDetailStatement.execute>>[number]
-// export type RetrySession = Awaited<ReturnType<typeof sessionQueries.getRetrySessionStatement.execute>>[number]
-export type RetryFile = Awaited<ReturnType<typeof sessionQueries.getRetryFilesStatement.execute>>[number]
-type SessionFileRow = Awaited<ReturnType<typeof sessionQueries.getSessionFilesStatement.execute>>[number]
-export type SessionFileView = Omit<SessionFileRow, "size"> & { size: number }
+type SessionRepositoryResult<T> = { ok: true; data: T } | { ok: false; error: SessionRepositoryError }
 
 export type SessionCreateInputFile = {
 	storageKey: string
@@ -50,16 +46,6 @@ export type CreateSessionInput = {
 	files: SessionCreateInputFile[]
 }
 
-// export type RetrySourceFile = {
-// 	fileId: number
-// 	storageKey: string
-// 	originalName: string
-// 	mimeType: string
-// 	size: bigint
-// }
-
-// export type SessionRetryMode = "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
-
 export type RetryMutationInput = {
 	mode: "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
 	userId: string
@@ -84,6 +70,7 @@ export type SessionResultUpsertInput = {
 	skills_matched: string[]
 }
 
+
 function success<T>(data: T): SessionRepositoryResult<T> {
 	return { ok: true, data }
 }
@@ -97,10 +84,10 @@ export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>)
 }
 
 async function getCachedProjection<T>(
-	key: string,
+	key: CacheKey<T>,
 	loader: () => Promise<SessionRepositoryResult<T>>,
 ) {
-	const cached = repositoryCache.get<T>(key)
+	const cached = repositoryCache.get(key)
 	if (cached !== undefined)
 		return success(cached)
 
@@ -109,13 +96,6 @@ async function getCachedProjection<T>(
 		repositoryCache.set(key, result.data)
 
 	return result
-}
-
-function filterActiveRunResults<T extends { runId?: string | null }>(results: T[], activeRunId: string | null) {
-	if (!activeRunId)
-		return results
-
-	return results.filter(result => result.runId === activeRunId)
 }
 
 function patchSessionListEntry(sessions: SessionListItem[], nextSession: ProfilingSession, prependIfMissing?: boolean) {
@@ -160,44 +140,49 @@ function setSessionResultsCaches(
 	})
 
 	for (const result of results) {
-		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
 		repositoryCache.delete(sessionRepositoryCacheKeys.result(userId, sessionId, result.id))
 	}
 }
 
-function clearSessionResultCaches(userId: string, sessionId: string) {
-	repositoryCache.deleteMany([
-		sessionRepositoryCacheKeys.results(userId, sessionId, "asc"),
-		sessionRepositoryCacheKeys.results(userId, sessionId, "desc"),
-	])
-	repositoryCache.deleteWhere(key => key.startsWith(`session:results-data:${sessionId}:`))
-	repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
-	repositoryCache.deleteWhere(key => key.startsWith(`result:entity:${sessionId}:`))
-}
+// function clearSessionResultCaches(userId: string, sessionId: string) {
+// 	repositoryCache.deleteMany([
+// 		sessionRepositoryCacheKeys.results(userId, sessionId, "asc"),
+// 		sessionRepositoryCacheKeys.results(userId, sessionId, "desc"),
+// 	])
+// 	repositoryCache.deleteWhere(key => key.startsWith(`session:results-data:${sessionId}:`))
+// 	repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
+// }
 
 function primeSessionCaches(payload: {
 	session: ProfilingSession
 	files: SessionFileView[]
-	results: SessionResultSummary[] | null
+	results?: SessionResultSummary[] | null
 }) {
 	repositoryCache.set(sessionRepositoryCacheKeys.entity(payload.session.id), payload.session)
 	repositoryCache.set(sessionRepositoryCacheKeys.files(payload.session.id), payload.files)
-	repositoryCache.update<{ sessions: SessionListItem[] }>(
+	repositoryCache.update(
 		sessionRepositoryCacheKeys.list(payload.session.userId),
 		current => ({ sessions: patchSessionListEntry(current.sessions, payload.session, true) }),
 	)
+
 	repositoryCache.set(sessionRepositoryCacheKeys.detail(payload.session.userId, payload.session.id), payload)
-	setSessionResultsCaches(payload.session.userId, payload.session.id, payload.session.activeRunId, payload.session.status, payload.results ?? [])
+	setSessionResultsCaches(
+		payload.session.userId,
+		payload.session.id,
+		payload.session.activeRunId,
+		payload.session.status,
+		payload.results ?? []
+	)
 }
 
 function patchSessionState(payload: {
 	session: ProfilingSession
 	files: SessionFileView[]
-	results: SessionResultSummary[] | null
+	results?: SessionResultSummary[] | null
 }) {
 	repositoryCache.set(sessionRepositoryCacheKeys.entity(payload.session.id), payload.session)
 	repositoryCache.set(sessionRepositoryCacheKeys.files(payload.session.id), payload.files)
-	repositoryCache.update<{ sessions: SessionListItem[] }>(
+	repositoryCache.update(
 		sessionRepositoryCacheKeys.list(payload.session.userId),
 		current => ({ sessions: patchSessionListEntry(current.sessions, payload.session) }),
 	)
@@ -205,12 +190,19 @@ function patchSessionState(payload: {
 		sessionRepositoryCacheKeys.detail(payload.session.userId, payload.session.id),
 		() => payload,
 	)
-	clearSessionResultCaches(payload.session.userId, payload.session.id)
-	setSessionResultsCaches(payload.session.userId, payload.session.id, payload.session.activeRunId, payload.session.status, payload.results ?? [])
+
+	// clearSessionResultCaches(payload.session.userId, payload.session.id)
+	setSessionResultsCaches(
+		payload.session.userId,
+		payload.session.id,
+		payload.session.activeRunId,
+		payload.session.status,
+		payload.results ?? []
+	)
 }
 
 async function getOwnedSession(userId: string, sessionId: string) {
-	const cached = repositoryCache.get<ProfilingSession>(sessionRepositoryCacheKeys.entity(sessionId))
+	const cached = repositoryCache.get(sessionRepositoryCacheKeys.entity(sessionId))
 	if (cached && cached.userId === userId)
 		return cached
 
@@ -223,7 +215,7 @@ async function getOwnedSession(userId: string, sessionId: string) {
 }
 
 async function getSessionFiles(sessionId: string) {
-	const cached = repositoryCache.get<SessionFileView[]>(sessionRepositoryCacheKeys.files(sessionId))
+	const cached = repositoryCache.get(sessionRepositoryCacheKeys.files(sessionId))
 	if (cached)
 		return cached
 
@@ -240,7 +232,7 @@ async function getSessionFiles(sessionId: string) {
 }
 
 async function getSessionResultsFromSource(sessionId: string, sort: SessionSort, activeRunId: string | null) {
-	const cached = repositoryCache.get<SessionResultSummary[]>(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId))
+	const cached = repositoryCache.get(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId))
 	if (cached)
 		return cached
 
@@ -248,11 +240,10 @@ async function getSessionResultsFromSource(sessionId: string, sort: SessionSort,
 		? await sessionQueries.getSessionResultsAscStatement.execute({ sessionId })
 		: await sessionQueries.getSessionResultsDescStatement.execute({ sessionId })
 
-	const results = filterActiveRunResults(rows, activeRunId)
+	const results = activeRunId
+		? rows.filter(result => result.runId === activeRunId)
+		: rows
 	repositoryCache.set(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId), results)
-
-	for (const result of results)
-		repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
 
 	return results
 }
@@ -324,11 +315,12 @@ export const sessionRepository = {
 				return failure("session-not-found", "Session not found")
 
 			const rows = await sessionQueries.getSessionResultDetailStatement.execute({ sessionId, resultId })
-			const [result] = filterActiveRunResults(rows, session.activeRunId ?? null)
+			const [result] = session.activeRunId
+				? rows.filter(result => result.runId === session.activeRunId)
+				: rows
 			if (!result)
 				return failure("result-not-found", "Result not found")
 
-			repositoryCache.set(sessionRepositoryCacheKeys.resultEntity(sessionId, result.id), result)
 			return success({ result })
 		})
 	},
@@ -419,7 +411,7 @@ export const sessionRepository = {
 		return { session: sessionSnapshot, files: createdFiles, totalConfirmed: createdFiles.length }
 	},
 
-	async markSessionFailed(userId: string, sessionId: string, message: string) {
+	async markSessionFailed(sessionId: string, message: string) {
 		const [session] = await sessionQueries.markSessionFailedStatement.execute({
 			sessionId,
 			status: "failed",
@@ -435,7 +427,7 @@ export const sessionRepository = {
 			files: await getSessionFiles(sessionId),
 			results: [],
 		})
-		repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
+		// repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
 	},
 
 	async applyRetryMutation(input: RetryMutationInput) {
