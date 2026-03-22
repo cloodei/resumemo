@@ -5,13 +5,9 @@
  * Authenticated by shared secret (PIPELINE_CALLBACK_SECRET), not user auth.
  */
 
-import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-
-import * as schema from "@resumemo/core/schemas";
-
-import { db } from "~/lib/db";
 import { sessionRepository } from "~/repositories/session-repository";
+import { isSessionRepositoryFailure } from "~/types";
 
 const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
 const PIPELINE_SECRET_HEADER_NAME = (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase();
@@ -53,9 +49,6 @@ const errorBody = t.Object({
 	error: t.String(),
 	partial_results: t.Array(resultSchema),
 });
-// type ErrorBody = typeof errorBody.static;
-
-const callbackBody = t.Union([completionBody, errorBody]);
 
 export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeline" })
 	.post(
@@ -65,24 +58,17 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 			if (!validateSecret(secretHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
 
-			const [session] = await db
-				.select({
-					id: schema.profilingSession.id,
-					userId: schema.profilingSession.userId,
-					status: schema.profilingSession.status,
-					activeRunId: schema.profilingSession.activeRunId,
-				})
-				.from(schema.profilingSession)
-				.where(eq(schema.profilingSession.id, body.session_id));
+			const data = await sessionRepository.selectSessionById(body.session_id);
+			if (isSessionRepositoryFailure(data))
+				return status(404, { status: "error", message: data.error.message });
 
-			if (!session)
-				return status(404, { status: "error", message: "Session not found" });
+			const session = data.data;
 			if (!session.activeRunId || session.activeRunId !== body.run_id)
 				return { status: "ok", skipped: true };
 
 			switch (body.type) {
 				case "completion":
-					await sessionRepository.applyPipelineCompletion({
+					await sessionRepository.replaceRunResultsAndSetCompleted({
 						userId: session.userId,
 						sessionId: body.session_id,
 						runId: body.run_id,
@@ -90,7 +76,7 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 					});
 					break;
 				case "error":
-					await sessionRepository.applyPipelineError({
+					await sessionRepository.replaceRunResultsAndSetFailed({
 						userId: session.userId,
 						sessionId: body.session_id,
 						runId: body.run_id,
@@ -102,5 +88,5 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 
 			return { status: "ok" };
 		},
-		{ body: callbackBody },
+		{ body: t.Union([completionBody, errorBody]) },
 	);

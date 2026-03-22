@@ -5,14 +5,20 @@ import * as schema from "@resumemo/core/schemas"
 import { db } from "~/lib/db"
 
 
-export const listSessionsByUserStatement = db
+export const selectSessionsByUserIdStatement = db
   .select()
   .from(schema.profilingSession)
   .where(eq(schema.profilingSession.userId, sql.placeholder("userId")))
   .orderBy(desc(schema.profilingSession.createdAt))
-  .prepare("session_list_by_user")
+  .prepare("session_select_by_user_id")
 
-export const getOwnedSessionStatement = db
+export const selectSessionByIdStatement = db
+  .select()
+  .from(schema.profilingSession)
+  .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
+  .prepare("session_select_by_id")
+
+export const selectOwnedSessionStatement = db
   .select()
   .from(schema.profilingSession)
   .where(
@@ -21,9 +27,9 @@ export const getOwnedSessionStatement = db
       eq(schema.profilingSession.userId, sql.placeholder("userId")),
     ),
   )
-  .prepare("session_get_owned_base")
+  .prepare("session_select_owned")
 
-export const getSessionFilesStatement = db
+export const selectSessionFilesStatement = db
   .select({
     id: schema.resumeFile.id,
     originalName: schema.resumeFile.originalName,
@@ -33,9 +39,9 @@ export const getSessionFilesStatement = db
   .from(schema.profilingSessionFile)
   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-  .prepare("session_get_files_by_session_id")
+  .prepare("session_select_files")
 
-export const getSessionResultsDescStatement = db
+export const selectSessionResultsByScoreDescStatement = db
   .select({
     id: schema.candidateResult.id,
     runId: schema.candidateResult.runId,
@@ -54,9 +60,9 @@ export const getSessionResultsDescStatement = db
   .innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
   .where(eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")))
   .orderBy(desc(schema.candidateResult.overallScore))
-  .prepare("session_get_results_desc")
+  .prepare("session_select_results_by_score_desc")
 
-export const getSessionResultsAscStatement = db
+export const selectSessionResultsByScoreAscStatement = db
   .select({
     id: schema.candidateResult.id,
     runId: schema.candidateResult.runId,
@@ -75,9 +81,9 @@ export const getSessionResultsAscStatement = db
   .innerJoin(schema.resumeFile, eq(schema.candidateResult.fileId, schema.resumeFile.id))
   .where(eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")))
   .orderBy(schema.candidateResult.overallScore)
-  .prepare("session_get_results_asc")
+  .prepare("session_select_results_by_score_asc")
 
-export const getSessionResultDetailStatement = db
+export const selectSessionResultByIdStatement = db
   .select({
     id: schema.candidateResult.id,
     runId: schema.candidateResult.runId,
@@ -104,9 +110,9 @@ export const getSessionResultDetailStatement = db
       eq(schema.candidateResult.sessionId, sql.placeholder("sessionId")),
     ),
   )
-  .prepare("session_get_result_detail")
+  .prepare("session_select_result_by_id")
 
-export const getRetrySessionStatement = db
+export const selectOwnedSessionRetryRowStatement = db
   .select({
     id: schema.profilingSession.id,
     userId: schema.profilingSession.userId,
@@ -122,9 +128,9 @@ export const getRetrySessionStatement = db
       eq(schema.profilingSession.userId, sql.placeholder("userId")),
     ),
   )
-  .prepare("session_get_retry_preview")
+  .prepare("session_select_owned_retry_row")
 
-export const getRetryFilesStatement = db
+export const selectSessionRetryFilesStatement = db
   .select({
     fileId: schema.resumeFile.id,
     storageKey: schema.resumeFile.storageKey,
@@ -135,9 +141,9 @@ export const getRetryFilesStatement = db
   .from(schema.profilingSessionFile)
   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-  .prepare("session_get_retry_files")
+  .prepare("session_select_retry_files")
 
-export const markSessionFailedStatement = db
+export const updateSessionFailureStatement = db
   .update(schema.profilingSession)
   .set({
     status: schema.profilingSession.status,
@@ -146,9 +152,9 @@ export const markSessionFailedStatement = db
   })
   .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
   .returning()
-  .prepare("session_mark_failed");
+  .prepare("session_update_failure")
 
-export const updateSessionRetryingStatement = db
+export const updateSessionRetryStateStatement = db
   .update(schema.profilingSession)
   .set({
     name: schema.profilingSession.name,
@@ -162,4 +168,4 @@ export const updateSessionRetryingStatement = db
   })
   .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
   .returning()
-  .prepare("session_update_retrying");
+  .prepare("session_update_retry_state")
