@@ -5,7 +5,7 @@ import * as sessionQueries from "~/sql/session"
 import { db } from "~/lib/db"
 import { repositoryCache, sessionRepositoryCacheKeys, type CacheKey } from "~/lib/repository-cache"
 import {
-	type RetryFile,
+	// type RetryFile,
 	type SessionSort,
 	type SessionFileView,
 	type SessionListItem,
@@ -50,7 +50,7 @@ export type RetryMutationInput = {
 	name: string
 	jobTitle: string | null
 	jobDescription: string
-	files: RetryFile[]
+	files: SessionFileView[]
 }
 
 export type SessionResultUpsertInput = {
@@ -195,8 +195,9 @@ async function selectSessionFiles(sessionId: string) {
 
 	const rows = await sessionQueries.selectSessionFilesStatement.execute({ sessionId })
 	const files = rows.map(file => ({
-		id: file.id,
+		fileId: file.fileId,
 		originalName: file.originalName,
+		storageKey: file.storageKey,
 		mimeType: file.mimeType,
 		size: Number(file.size),
 	}))
@@ -223,7 +224,7 @@ async function selectSessionResults(sessionId: string, sort: SessionSort, active
 }
 
 export const sessionRepository = {
-	async selectSessionById(sessionId: string) {
+	async getSessionById(sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.entity(sessionId), async () => {
 			const rows = await sessionQueries.selectSessionByIdStatement.execute({ sessionId })
 			const [session] = rows
@@ -234,7 +235,7 @@ export const sessionRepository = {
 		})
 	},
 
-	async selectRetryContext(userId: string, sessionId: string) {
+	async listFilesFromSessionByUserId(userId: string, sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.entityDetail(sessionId), async () => {
 			const session = await selectOwnedSession(userId, sessionId)
 			if (!session)
@@ -243,6 +244,15 @@ export const sessionRepository = {
 			const files = await selectSessionFiles(sessionId)
 			if (files.length === 0)
 				return failure("files-not-found", "Files not found")
+
+			// const rows = await sessionQueries.selectOwnedSessionRetryRowStatement.execute({ userId, sessionId })
+			// const [session] = rows
+			// if (!session)
+			// 	return failure("session-not-found", "Session not found")
+
+			// const files = await sessionQueries.selectSessionRetryFilesStatement.execute({ sessionId })
+			// if (files.length === 0)
+			// 	return failure("files-not-found", "Files not found")
 
 			return success({ session, files })
 		})
@@ -261,7 +271,7 @@ export const sessionRepository = {
 		)
 	},
 
-	async selectSessionDetailByUserId(userId: string, sessionId: string) {
+	async getSessionDetailByUserId(userId: string, sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.detail(userId, sessionId), async () => {
 			const session = await selectOwnedSession(userId, sessionId)
 			if (!session)
@@ -281,7 +291,7 @@ export const sessionRepository = {
 		})
 	},
 
-	async selectSessionResultsByUserId(userId: string, sessionId: string, sort: SessionSort) {
+	async getSessionResultsByUserId(userId: string, sessionId: string, sort: SessionSort) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.results(userId, sessionId, sort), async () => {
 			const session = await selectOwnedSession(userId, sessionId)
 			if (!session)
@@ -297,7 +307,7 @@ export const sessionRepository = {
 		})
 	},
 
-	async selectSessionResultByUserId(userId: string, sessionId: string, resultId: string) {
+	async getSessionResultByUserId(userId: string, sessionId: string, resultId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.result(userId, sessionId, resultId), async () => {
 			const session = await selectOwnedSession(userId, sessionId)
 			if (!session)
@@ -314,14 +324,14 @@ export const sessionRepository = {
 		})
 	},
 
-	async selectSessionExportByUserId(userId: string, sessionId: string) {
+	async getSessionExportByUserId(userId: string, sessionId: string) {
 		const session = await selectOwnedSession(userId, sessionId)
 		if (!session)
 			return failure("session-not-found", "Session not found")
 		if (session.status !== "completed")
 			return failure("session-not-completed", "Session is not completed yet")
 
-		const resultsResponse = await this.selectSessionResultsByUserId(userId, sessionId, "desc")
+		const resultsResponse = await this.getSessionResultsByUserId(userId, sessionId, "desc")
 		if (isSessionRepositoryFailure(resultsResponse))
 			return resultsResponse
 
@@ -336,7 +346,7 @@ export const sessionRepository = {
 		})
 	},
 
-	async insertSession(input: CreateSessionInput) {
+	async createSession(input: CreateSessionInput) {
 		let sessionSnapshot: SessionListItem | undefined
 		let createdFiles: SessionCreatedFileRecord[] = []
 
@@ -389,7 +399,8 @@ export const sessionRepository = {
 		primeSessionCaches({
 			session: sessionSnapshot,
 			files: createdFiles.map(file => ({
-				id: file.fileId,
+				fileId: file.fileId,
+				storageKey: file.storageKey,
 				originalName: file.originalName,
 				mimeType: file.mimeType,
 				size: Number(file.size),
@@ -453,7 +464,8 @@ export const sessionRepository = {
 			primeSessionCaches({
 				session: sessionSnapshot,
 				files: input.files.map(file => ({
-					id: file.fileId,
+					fileId: file.fileId,
+					storageKey: file.storageKey,
 					originalName: file.originalName,
 					mimeType: file.mimeType,
 					size: Number(file.size),
@@ -485,7 +497,8 @@ export const sessionRepository = {
 		patchSessionState({
 			session,
 			files: input.files.map(file => ({
-				id: file.fileId,
+				fileId: file.fileId,
+				storageKey: file.storageKey,
 				originalName: file.originalName,
 				mimeType: file.mimeType,
 				size: Number(file.size),
@@ -526,22 +539,23 @@ export const sessionRepository = {
 					)
 					.returning(),
 				params.results.length > 0
-					? tx.insert(schema.candidateResult).values(
-						params.results.map(result => ({
-							sessionId: params.sessionId,
-							runId: params.runId,
-							fileId: result.file_id,
-							candidateName: result.candidate_name,
-							candidateEmail: result.candidate_email,
-							candidatePhone: result.candidate_phone,
-							rawText: result.raw_text,
-							parsedProfile: result.parsed_profile,
-							overallScore: String(result.overall_score),
-							scoreBreakdown: result.score_breakdown,
-							summary: result.summary,
-							skillsMatched: result.skills_matched,
-						})),
-					).returning()
+					? tx.insert(schema.candidateResult)
+							.values(
+								params.results.map(result => ({
+									sessionId: params.sessionId,
+									runId: params.runId,
+									fileId: result.file_id,
+									candidateName: result.candidate_name,
+									candidateEmail: result.candidate_email,
+									candidatePhone: result.candidate_phone,
+									rawText: result.raw_text,
+									parsedProfile: result.parsed_profile,
+									overallScore: String(result.overall_score),
+									scoreBreakdown: result.score_breakdown,
+									summary: result.summary,
+									skillsMatched: result.skills_matched,
+								})))
+							.returning()
 					: [],
 			])
 
@@ -553,7 +567,7 @@ export const sessionRepository = {
 			return
 
 		const files = await selectSessionFiles(params.sessionId)
-		const fileMap = new Map(files.map(file => [file.id, file]))
+		const fileMap = new Map(files.map(file => [file.fileId, file]))
 		const summaries = insertedResults.map(result => ({
 			id: result.id,
 			runId: result.runId,
@@ -651,7 +665,7 @@ export const sessionRepository = {
 			return
 
 		const files = await selectSessionFiles(params.sessionId)
-		const fileMap = new Map(files.map(file => [file.id, file]))
+		const fileMap = new Map(files.map(file => [file.fileId, file]))
 		const summaries = insertedResults.map(result => ({
 			id: result.id,
 			runId: result.runId,

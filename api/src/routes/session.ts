@@ -197,10 +197,10 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		"/:id/retry",
 		async ({ user, params, body, status }) => {
 			const preview = await sessionRepository.selectRetryContext(user.id, params.id);
-			if (!preview)
-				return status(404, { status: "error", message: "Session not found" });
+			if (isSessionRepositoryFailure(preview))
+				return status(404, { status: "error", message: preview.error.message });
 
-			const { session: existingSession, files: currentFiles } = preview;
+			const { session: existingSession, files: currentFiles } = preview.data;
 			if (existingSession.status === "processing" || existingSession.status === "retrying")
 				return status(409, { status: "error", message: "This session is already running" });
 

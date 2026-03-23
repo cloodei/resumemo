@@ -29,17 +29,17 @@ export const selectOwnedSessionStatement = db
   )
   .prepare("session_select_owned")
 
-export const selectSessionFilesStatement = db
-  .select({
-    id: schema.resumeFile.id,
-    originalName: schema.resumeFile.originalName,
-    mimeType: schema.resumeFile.mimeType,
-    size: schema.resumeFile.size,
-  })
-  .from(schema.profilingSessionFile)
-  .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-  .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-  .prepare("session_select_files")
+// export const selectSessionFilesStatement = db
+//   .select({
+//     id: schema.resumeFile.id,
+//     originalName: schema.resumeFile.originalName,
+//     mimeType: schema.resumeFile.mimeType,
+//     size: schema.resumeFile.size,
+//   })
+//   .from(schema.profilingSessionFile)
+//   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
+//   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
+//   .prepare("session_select_files")
 
 export const selectSessionResultsByScoreDescStatement = db
   .select({
@@ -130,7 +130,7 @@ export const selectOwnedSessionRetryRowStatement = db
   )
   .prepare("session_select_owned_retry_row")
 
-export const selectSessionRetryFilesStatement = db
+export const selectSessionFilesStatement = db
   .select({
     fileId: schema.resumeFile.id,
     storageKey: schema.resumeFile.storageKey,
@@ -141,7 +141,7 @@ export const selectSessionRetryFilesStatement = db
   .from(schema.profilingSessionFile)
   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-  .prepare("session_select_retry_files")
+  .prepare("session_select_files")
 
 export const updateSessionFailureStatement = db
   .update(schema.profilingSession)
