@@ -58,7 +58,7 @@ export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeli
 			if (!validateSecret(secretHeader))
 				return status(401, { status: "error", message: "Unauthorized" });
 
-			const data = await sessionRepository.selectSessionById(body.session_id);
+			const data = await sessionRepository.getSessionById(body.session_id);
 			if (isSessionRepositoryFailure(data))
 				return status(404, { status: "error", message: data.error.message });
 

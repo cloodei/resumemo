@@ -126,7 +126,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 			let sessionPersisted = false;
 			try {
 				const runId = randomUUIDv7();
-				const created = await sessionRepository.insertSession({
+				const created = await sessionRepository.createSession({
 					userId: user.id,
 					name,
 					jobDescription,
@@ -196,7 +196,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.post(
 		"/:id/retry",
 		async ({ user, params, body, status }) => {
-			const preview = await sessionRepository.selectRetryContext(user.id, params.id);
+			const preview = await sessionRepository.listFilesFromSessionByUserId(user.id, params.id);
 			if (isSessionRepositoryFailure(preview))
 				return status(404, { status: "error", message: preview.error.message });
 
@@ -459,7 +459,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
-			const response = await sessionRepository.selectSessionDetailByUserId(user.id, params.id);
+			const response = await sessionRepository.getSessionDetailByUserId(user.id, params.id);
 
 			if (isSessionRepositoryFailure(response))
 				return status(404, { status: "error", message: response.error.message });
@@ -472,7 +472,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		"/:id/results",
 		async ({ user, params, status, query }) => {
 			const sort = query.sort === "asc" ? "asc" : "desc";
-			const response = await sessionRepository.selectSessionResultsByUserId(user.id, params.id, sort);
+			const response = await sessionRepository.listSessionResultsByUserId(user.id, params.id, sort);
 
 			if (isSessionRepositoryFailure(response))
 				return status(404, { status: "error", message: response.error.message });
@@ -489,7 +489,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id/results/:resultId",
 		async ({ user, params, status }) => {
-			const response = await sessionRepository.selectSessionResultByUserId(user.id, params.id, params.resultId);
+			const response = await sessionRepository.getSessionResultByUserId(user.id, params.id, params.resultId);
 
 			if (isSessionRepositoryFailure(response))
 				return status(404, { status: "error", message: response.error.message });
@@ -501,7 +501,7 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	.get(
 		"/:id/export",
 		async ({ user, params, status, query, set }) => {
-			const exportData = await sessionRepository.selectSessionExportByUserId(user.id, params.id);
+			const exportData = await sessionRepository.getSessionExportByUserId(user.id, params.id);
 			if (isSessionRepositoryFailure(exportData)) {
 				if (exportData.error.code === "session-not-completed")
 					return status(409, { status: "error", message: exportData.error.message });

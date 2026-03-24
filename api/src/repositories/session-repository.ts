@@ -291,7 +291,7 @@ export const sessionRepository = {
 		})
 	},
 
-	async getSessionResultsByUserId(userId: string, sessionId: string, sort: SessionSort) {
+	async listSessionResultsByUserId(userId: string, sessionId: string, sort: SessionSort) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.results(userId, sessionId, sort), async () => {
 			const session = await selectOwnedSession(userId, sessionId)
 			if (!session)
@@ -331,7 +331,7 @@ export const sessionRepository = {
 		if (session.status !== "completed")
 			return failure("session-not-completed", "Session is not completed yet")
 
-		const resultsResponse = await this.getSessionResultsByUserId(userId, sessionId, "desc")
+		const resultsResponse = await this.listSessionResultsByUserId(userId, sessionId, "desc")
 		if (isSessionRepositoryFailure(resultsResponse))
 			return resultsResponse
 

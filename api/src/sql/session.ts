@@ -112,23 +112,23 @@ export const selectSessionResultByIdStatement = db
   )
   .prepare("session_select_result_by_id")
 
-export const selectOwnedSessionRetryRowStatement = db
-  .select({
-    id: schema.profilingSession.id,
-    userId: schema.profilingSession.userId,
-    name: schema.profilingSession.name,
-    jobTitle: schema.profilingSession.jobTitle,
-    jobDescription: schema.profilingSession.jobDescription,
-    status: schema.profilingSession.status,
-  })
-  .from(schema.profilingSession)
-  .where(
-    and(
-      eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-      eq(schema.profilingSession.userId, sql.placeholder("userId")),
-    ),
-  )
-  .prepare("session_select_owned_retry_row")
+// export const selectOwnedSessionRetryRowStatement = db
+//   .select({
+//     id: schema.profilingSession.id,
+//     userId: schema.profilingSession.userId,
+//     name: schema.profilingSession.name,
+//     jobTitle: schema.profilingSession.jobTitle,
+//     jobDescription: schema.profilingSession.jobDescription,
+//     status: schema.profilingSession.status,
+//   })
+//   .from(schema.profilingSession)
+//   .where(
+//     and(
+//       eq(schema.profilingSession.id, sql.placeholder("sessionId")),
+//       eq(schema.profilingSession.userId, sql.placeholder("userId")),
+//     ),
+//   )
+//   .prepare("session_select_owned_retry_row")
 
 export const selectSessionFilesStatement = db
   .select({
