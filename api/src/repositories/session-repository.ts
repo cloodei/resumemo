@@ -175,20 +175,20 @@ function patchSessionState(payload: {
 	)
 }
 
-async function selectOwnedSession(userId: string, sessionId: string) {
+async function getSessionOfUserId(userId: string, sessionId: string) {
 	const cached = repositoryCache.get(sessionRepositoryCacheKeys.entity(sessionId))
-	if (cached && cached.userId === userId)
-		return cached
+	if (cached)
+		return (cached.userId === userId) ? cached : null
 
-	const rows = await sessionQueries.selectOwnedSessionStatement.execute({ userId, sessionId })
-	const session = rows[0] ?? null
-	if (session)
-		repositoryCache.set(sessionRepositoryCacheKeys.entity(sessionId), session)
+	const [session] = await sessionQueries.selectSessionByIdStatement.execute({ sessionId })
+	if (!session)
+		return null
 
-	return session
+	repositoryCache.set(sessionRepositoryCacheKeys.entity(sessionId), session)
+	return (session.userId === userId) ? session : null
 }
 
-async function selectSessionFiles(sessionId: string) {
+async function listSessionFiles(sessionId: string) {
 	const cached = repositoryCache.get(sessionRepositoryCacheKeys.files(sessionId))
 	if (cached)
 		return cached
@@ -206,7 +206,7 @@ async function selectSessionFiles(sessionId: string) {
 	return files
 }
 
-async function selectSessionResults(sessionId: string, sort: SessionSort, activeRunId: string | null) {
+async function listSessionResults(sessionId: string, sort: SessionSort, activeRunId: string | null) {
 	const cached = repositoryCache.get(sessionRepositoryCacheKeys.resultsData(sessionId, sort, activeRunId))
 	if (cached)
 		return cached
@@ -237,11 +237,11 @@ export const sessionRepository = {
 
 	async listFilesFromSessionByUserId(userId: string, sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.entityDetail(sessionId), async () => {
-			const session = await selectOwnedSession(userId, sessionId)
+			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
 				return failure("session-not-found", "Session not found")
 
-			const files = await selectSessionFiles(sessionId)
+			const files = await listSessionFiles(sessionId)
 			if (files.length === 0)
 				return failure("files-not-found", "Files not found")
 
@@ -259,25 +259,22 @@ export const sessionRepository = {
 	},
 
 	async listSessionsByUserId(userId: string) {
-		return await repositoryCache.getOrLoad(
-			sessionRepositoryCacheKeys.list(userId),
-			async () => {
-				const sessions = await sessionQueries.selectSessionsByUserIdStatement.execute({ userId })
-				for (const session of sessions)
-					repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session)
+		return await getCachedProjection(sessionRepositoryCacheKeys.list(userId), async () => {
+			const sessions = await sessionQueries.selectSessionsByUserIdStatement.execute({ userId })
+			for (const session of sessions)
+				repositoryCache.set(sessionRepositoryCacheKeys.entity(session.id), session)
 
-				return { sessions }
-			},
-		)
+			return success({ sessions })
+		})
 	},
 
 	async getSessionDetailByUserId(userId: string, sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.detail(userId, sessionId), async () => {
-			const session = await selectOwnedSession(userId, sessionId)
+			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
 				return failure("session-not-found", "Session not found")
 
-			const files = await selectSessionFiles(sessionId)
+			const files = await listSessionFiles(sessionId)
 			if (files.length === 0)
 				return failure("files-not-found", "Files not found")
 
@@ -285,7 +282,7 @@ export const sessionRepository = {
 				session,
 				files,
 				results: session.status === "completed"
-					? await selectSessionResults(sessionId, "desc", session.activeRunId ?? null)
+					? await listSessionResults(sessionId, "desc", session.activeRunId ?? null)
 					: null,
 			})
 		})
@@ -293,11 +290,11 @@ export const sessionRepository = {
 
 	async listSessionResultsByUserId(userId: string, sessionId: string, sort: SessionSort) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.results(userId, sessionId, sort), async () => {
-			const session = await selectOwnedSession(userId, sessionId)
+			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
 				return failure("session-not-found", "Session not found")
 
-			const results = await selectSessionResults(sessionId, sort, session.activeRunId ?? null)
+			const results = await listSessionResults(sessionId, sort, session.activeRunId ?? null)
 			return success({
 				sessionId,
 				sessionStatus: session.status,
@@ -309,7 +306,7 @@ export const sessionRepository = {
 
 	async getSessionResultByUserId(userId: string, sessionId: string, resultId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.result(userId, sessionId, resultId), async () => {
-			const session = await selectOwnedSession(userId, sessionId)
+			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
 				return failure("session-not-found", "Session not found")
 
@@ -325,7 +322,7 @@ export const sessionRepository = {
 	},
 
 	async getSessionExportByUserId(userId: string, sessionId: string) {
-		const session = await selectOwnedSession(userId, sessionId)
+		const session = await getSessionOfUserId(userId, sessionId)
 		if (!session)
 			return failure("session-not-found", "Session not found")
 		if (session.status !== "completed")
@@ -424,7 +421,7 @@ export const sessionRepository = {
 
 		patchSessionState({
 			session,
-			files: await selectSessionFiles(sessionId),
+			files: await listSessionFiles(sessionId),
 			results: [],
 		})
 		// repositoryCache.deleteWhere(key => key.startsWith(`session:result:${userId}:${sessionId}:`))
@@ -566,7 +563,7 @@ export const sessionRepository = {
 		if (!session)
 			return
 
-		const files = await selectSessionFiles(params.sessionId)
+		const files = await listSessionFiles(params.sessionId)
 		const fileMap = new Map(files.map(file => [file.fileId, file]))
 		const summaries = insertedResults.map(result => ({
 			id: result.id,
@@ -664,7 +661,7 @@ export const sessionRepository = {
 		if (!session)
 			return
 
-		const files = await selectSessionFiles(params.sessionId)
+		const files = await listSessionFiles(params.sessionId)
 		const fileMap = new Map(files.map(file => [file.fileId, file]))
 		const summaries = insertedResults.map(result => ({
 			id: result.id,

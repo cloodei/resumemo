@@ -18,16 +18,16 @@ export const selectSessionByIdStatement = db
   .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
   .prepare("session_select_by_id")
 
-export const selectOwnedSessionStatement = db
-  .select()
-  .from(schema.profilingSession)
-  .where(
-    and(
-      eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-      eq(schema.profilingSession.userId, sql.placeholder("userId")),
-    ),
-  )
-  .prepare("session_select_owned")
+// export const selectOwnedSessionStatement = db
+//   .select()
+//   .from(schema.profilingSession)
+//   .where(
+//     and(
+//       eq(schema.profilingSession.id, sql.placeholder("sessionId")),
+//       eq(schema.profilingSession.userId, sql.placeholder("userId")),
+//     ),
+//   )
+//   .prepare("session_select_owned")
 
 // export const selectSessionFilesStatement = db
 //   .select({
