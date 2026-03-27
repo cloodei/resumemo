@@ -8,7 +8,7 @@ import type {
 } from "~/types";
 
 const REPOSITORY_CACHE_TTL_MS = 15 * 60 * 1000;
-const REPOSITORY_CACHE_MAX_ENTRIES = 500_000;
+const REPOSITORY_CACHE_MAX_ENTRIES = 1_000_000;
 
 export type CacheKey<T> = string & {
 	readonly __cacheValue?: T;
@@ -120,47 +120,19 @@ export const sessionRepositoryCacheKeys = {
 		`session:entity:${sessionId}`
 	),
 
-	entityDetail: (sessionId: string) => createCacheKey<{
-		session: SessionListItem;
-		files: SessionFileView[];
-	}>(
-		`session:entity-detail:${sessionId}`
-	),
-
 	files: (sessionId: string) => createCacheKey<SessionFileView[]>(
 		`session:files:${sessionId}`
 	),
 
-	list: (userId: string) => createCacheKey<{
-		sessions: SessionListItem[];
-	}>(
+	list: (userId: string) => createCacheKey<SessionListItem[]>(
 		`session:list:${userId}`
-	),
-
-	detail: (userId: string, sessionId: string) => createCacheKey<{
-		session: SessionListItem;
-		files: SessionFileView[];
-		results: SessionResultSummary[] | null;
-	}>(
-		`session:detail:${userId}:${sessionId}`
-	),
-
-	results: (userId: string, sessionId: string, sort: SessionSort) => createCacheKey<{
-		sessionId: string;
-		sessionStatus: SessionListItem["status"];
-		totalResults: number;
-		results: SessionResultSummary[];
-	}>(
-		`session:results:${userId}:${sessionId}:${sort}`
 	),
 
 	resultsData: (sessionId: string, sort: SessionSort, activeRunId: string | null) => createCacheKey<SessionResultSummary[]>(
 		`session:results-data:${sessionId}:${sort}:${activeRunId ?? "none"}`
 	),
 
-	result: (userId: string, sessionId: string, resultId: string) => createCacheKey<{
-		result: SessionResultDetail
-	}>(
-		`session:result:${userId}:${sessionId}:${resultId}`
+	result: (sessionId: string, resultId: string, activeRunId: string | null) => createCacheKey<SessionResultDetail>(
+		`session:result:${sessionId}:${resultId}:${activeRunId ?? "none"}`
 	),
 }

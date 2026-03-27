@@ -5,18 +5,18 @@
  * Authenticated by shared secret (PIPELINE_CALLBACK_SECRET), not user auth.
  */
 
-import { Elysia, t } from "elysia";
-import { sessionRepository } from "~/repositories/session-repository";
-import { isSessionRepositoryFailure } from "~/types";
+import { Elysia, t } from "elysia"
 
-const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? "";
-const PIPELINE_SECRET_HEADER_NAME = (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase();
+import { sessionRepository } from "~/repositories/session-repository"
+
+const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? ""
+const PIPELINE_SECRET_HEADER_NAME = (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase()
 
 function validateSecret(secretHeader?: string | null) {
 	if (!PIPELINE_CALLBACK_SECRET || !secretHeader)
-		return false;
+		return false
 
-	return secretHeader === PIPELINE_CALLBACK_SECRET;
+	return secretHeader === PIPELINE_CALLBACK_SECRET
 }
 
 const resultSchema = t.Object({
@@ -30,7 +30,7 @@ const resultSchema = t.Object({
 	score_breakdown: t.Record(t.String(), t.Any()),
 	summary: t.String(),
 	skills_matched: t.Array(t.String()),
-});
+})
 
 const completionBody = t.Object({
 	type: t.Literal("completion"),
@@ -38,8 +38,8 @@ const completionBody = t.Object({
 	run_id: t.String(),
 	status: t.Literal("completed"),
 	results: t.Array(resultSchema),
-});
-// type CompletionBody = typeof completionBody.static;
+})
+// type CompletionBody = typeof completionBody.static
 
 const errorBody = t.Object({
 	type: t.Literal("error"),
@@ -48,45 +48,42 @@ const errorBody = t.Object({
 	status: t.Literal("failed"),
 	error: t.String(),
 	partial_results: t.Array(resultSchema),
-});
+})
 
 export const pipelineCallbackRoutes = new Elysia({ prefix: "/api/internal/pipeline" })
 	.post(
 		"/callback",
 		async ({ body, headers, status }) => {
-			const secretHeader = headers[PIPELINE_SECRET_HEADER_NAME];
+			const secretHeader = headers[PIPELINE_SECRET_HEADER_NAME]
 			if (!validateSecret(secretHeader))
-				return status(401, { status: "error", message: "Unauthorized" });
+				return status(401, { status: "error", message: "Unauthorized" })
 
-			const data = await sessionRepository.getSessionById(body.session_id);
-			if (isSessionRepositoryFailure(data))
-				return status(404, { status: "error", message: data.error.message });
+			const session = await sessionRepository.getSessionById(body.session_id)
+			if (!session)
+				return status(404, { status: "error", message: "Session not found" })
 
-			const session = data.data;
 			if (!session.activeRunId || session.activeRunId !== body.run_id)
-				return { status: "ok", skipped: true };
+				return { status: "ok", skipped: true }
 
 			switch (body.type) {
 				case "completion":
 					await sessionRepository.replaceRunResultsAndSetCompleted({
-						userId: session.userId,
 						sessionId: body.session_id,
 						runId: body.run_id,
 						results: body.results,
-					});
-					break;
+					})
+					break
 				case "error":
 					await sessionRepository.replaceRunResultsAndSetFailed({
-						userId: session.userId,
 						sessionId: body.session_id,
 						runId: body.run_id,
 						error: body.error,
 						partialResults: body.partial_results,
-					});
-					break;
+					})
+					break
 			}
 
-			return { status: "ok" };
+			return { status: "ok" }
 		},
 		{ body: t.Union([completionBody, errorBody]) },
-	);
+	)
