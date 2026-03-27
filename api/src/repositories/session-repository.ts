@@ -229,7 +229,7 @@ export const sessionRepository = {
 			const rows = await sessionQueries.selectSessionByIdStatement.execute({ sessionId })
 			const [session] = rows
 			if (!session)
-				return failure("session-not-found", "Session not found")
+				return failure("Session not found")
 
 			return success(session)
 		})
@@ -239,11 +239,11 @@ export const sessionRepository = {
 		return await getCachedProjection(sessionRepositoryCacheKeys.entityDetail(sessionId), async () => {
 			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
-				return failure("session-not-found", "Session not found")
+				return failure("Session not found")
 
 			const files = await listSessionFiles(sessionId)
 			if (files.length === 0)
-				return failure("files-not-found", "Files not found")
+				return failure("Files not found")
 
 			// const rows = await sessionQueries.selectOwnedSessionRetryRowStatement.execute({ userId, sessionId })
 			// const [session] = rows
@@ -272,11 +272,11 @@ export const sessionRepository = {
 		return await getCachedProjection(sessionRepositoryCacheKeys.detail(userId, sessionId), async () => {
 			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
-				return failure("session-not-found", "Session not found")
+				return failure("Session not found")
 
 			const files = await listSessionFiles(sessionId)
 			if (files.length === 0)
-				return failure("files-not-found", "Files not found")
+				return failure("Files not found")
 
 			return success({
 				session,
@@ -292,7 +292,7 @@ export const sessionRepository = {
 		return await getCachedProjection(sessionRepositoryCacheKeys.results(userId, sessionId, sort), async () => {
 			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
-				return failure("session-not-found", "Session not found")
+				return failure("Session not found")
 
 			const results = await listSessionResults(sessionId, sort, session.activeRunId ?? null)
 			return success({
@@ -308,14 +308,14 @@ export const sessionRepository = {
 		return await getCachedProjection(sessionRepositoryCacheKeys.result(userId, sessionId, resultId), async () => {
 			const session = await getSessionOfUserId(userId, sessionId)
 			if (!session)
-				return failure("session-not-found", "Session not found")
+				return failure("Session not found")
 
 			const rows = await sessionQueries.selectSessionResultByIdStatement.execute({ sessionId, resultId })
 			const [result] = session.activeRunId
 				? rows.filter(result => result.runId === session.activeRunId)
 				: rows
 			if (!result)
-				return failure("result-not-found", "Result not found")
+				return failure("Result not found")
 
 			return success({ result })
 		})
@@ -324,9 +324,9 @@ export const sessionRepository = {
 	async getSessionExportByUserId(userId: string, sessionId: string) {
 		const session = await getSessionOfUserId(userId, sessionId)
 		if (!session)
-			return failure("session-not-found", "Session not found")
+			return failure("Session not found")
 		if (session.status !== "completed")
-			return failure("session-not-completed", "Session is not completed yet")
+			return failure("Session is not completed yet")
 
 		const resultsResponse = await this.listSessionResultsByUserId(userId, sessionId, "desc")
 		if (isSessionRepositoryFailure(resultsResponse))

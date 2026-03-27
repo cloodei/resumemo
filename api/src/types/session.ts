@@ -9,20 +9,18 @@ export type SessionResultDetail = Awaited<ReturnType<typeof sessionQueries.selec
 export type SessionFileRow = Awaited<ReturnType<typeof sessionQueries.selectSessionFilesStatement.execute>>[number]
 export type SessionFileView = Omit<SessionFileRow, "size"> & { size: number }
 
-export type SessionRepositoryError = {
-	code: "session-not-found" | "files-not-found" | "result-not-found" | "session-not-completed"
-	message: string
-}
-export type SessionRepositoryResult<T> = RepositoryResult<T, SessionRepositoryError>
+export type SessionRepositoryResult<T> = RepositoryResult<T, { message: string }>
 
 export function success<T>(data: T): SessionRepositoryResult<T> {
 	return { ok: true, data }
 }
 
-export function failure(code: SessionRepositoryError["code"], message: string): SessionRepositoryResult<never> {
-	return { ok: false, error: { code, message } }
+export function failure(message: string): SessionRepositoryResult<never> {
+	return { ok: false, error: { message } }
 }
 
-export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>): value is { ok: false; error: SessionRepositoryError } {
+export function isSessionRepositoryFailure<T>(value: SessionRepositoryResult<T>): value is {
+	ok: false; error: { message: string }
+} {
 	return !value.ok
 }
