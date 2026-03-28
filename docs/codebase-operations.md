@@ -207,6 +207,12 @@ Useful operational endpoints and routes today:
 - profiling session routes under `/api/v2/sessions`
 - internal worker callback at `/api/internal/pipeline/callback`
 
+Current backend layering note:
+
+- `api/src/routes/` is transport-only and stays thin
+- `api/src/usecases/` owns orchestration and HTTP-facing error mapping
+- `api/src/repositories/` owns raw data access, cache updates, and persistence side effects
+
 Repo note: `api/src/routes/files.ts` and `api/src/routes/system.ts` exist, but they are not mounted by `api/src/index.ts` today.
 
 ## Onboarding checklist

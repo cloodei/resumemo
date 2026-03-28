@@ -11,6 +11,11 @@ Use this index to find the current source of truth before relying on older plans
 - `docs/codebase-operations.md` - repo operations, environment, and deployment notes
 - `docs/pipeline-spec.md` - current pipeline contract and implementation snapshot
 
+Current backend implementation note:
+
+- `api/src/routes/` stays thin and delegates HTTP behavior to usecases in `api/src/usecases/`.
+- `api/src/repositories/` is the raw data-access layer and should not return HTTP-oriented wrapper states.
+
 ## Operational Docs
 
 - `deploy/ec2/README.md` - EC2 deployment runbook for the current server flow

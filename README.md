@@ -26,6 +26,7 @@ Current runtime shape:
 
 - `web` serves the recruiter interface for sign-in, dashboard, profiling session creation, session list, and result review.
 - `api` handles auth, upload presigning, session creation, retry flows, results, exports, and the internal pipeline callback.
+- In `api`, route modules are thin transport adapters, usecases own HTTP-facing orchestration and error mapping, and repositories return raw data or command success only.
 - `core` holds shared TypeScript contracts used by `web` and `api`.
 - `services/pipeline` consumes queue jobs, reads files from storage, runs extraction/parsing/scoring/summarization, and calls back into the API.
 
@@ -88,6 +89,13 @@ bun run start      # preview web + start compiled api
 - `docs/system-guidelines.md` - product behavior and workflow notes
 - `docs/codebase-operations.md` - operations guide, env touchpoints, and deployment references
 - `docs/pipeline-spec.md` - current pipeline contract and implementation snapshot
+
+## API Backend Shape
+
+- Session recruiter routes under `api/src/routes/session.ts` delegate to usecases in `api/src/usecases/session/`.
+- The internal worker callback route in `api/src/routes/pipeline.ts` delegates to `api/src/usecases/pipeline/`.
+- Repositories in `api/src/repositories/` are data-access focused; reads return raw data or `null`, while command-style writes return useful data, `true`, `false`, or successful void behavior.
+- Shared request schemas for route validation can live alongside the relevant usecase modules so routes and usecases stay aligned.
 
 ## Unstable Areas
 

@@ -18,6 +18,7 @@ resumemo/
 |- api/                       Elysia API
 |  |- src/lib/               auth, db, queue, storage helpers
 |  |- src/repositories/      session and file data access
+|  |- src/usecases/          route orchestration and HTTP-aware result mapping
 |  `- src/routes/            HTTP route modules
 |- core/                      shared schemas, types, constants
 |  `- src/
@@ -138,8 +139,9 @@ Notes:
   - health check at `/health`
   - profiling session presign, create, retry, list, detail, results, result detail, and export routes under `/api/v2/sessions`
   - internal worker callback at `/api/internal/pipeline/callback`
-- Session orchestration and persistence logic live in `api/src/repositories/session-repository.ts` and related helpers.
-- Keep route handlers thin; push database and workflow logic into repository and lib layers.
+- Keep route handlers thin; push HTTP-aware orchestration into `api/src/usecases/` and keep repositories focused on raw data access and persistence.
+- Session flows currently live in `api/src/usecases/session/`, and the internal worker callback flow lives in `api/src/usecases/pipeline/`.
+- Repositories should return raw data, `null`, `false`, or successful void behavior rather than wrapped success/error states.
 
 ### Pipeline
 
@@ -185,6 +187,7 @@ Notes:
 | Client stores | `web/src/stores/` |
 | Shared TS contracts | `core/src/` |
 | API routes | `api/src/routes/` |
+| API usecases | `api/src/usecases/` |
 | API repositories | `api/src/repositories/` |
 | Pipeline stages | `services/pipeline/stages/` |
 | Deployment assets | `deploy/` |

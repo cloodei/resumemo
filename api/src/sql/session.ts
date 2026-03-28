@@ -18,29 +18,6 @@ export const selectSessionByIdStatement = db
   .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
   .prepare("session_select_by_id")
 
-// export const selectOwnedSessionStatement = db
-//   .select()
-//   .from(schema.profilingSession)
-//   .where(
-//     and(
-//       eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-//       eq(schema.profilingSession.userId, sql.placeholder("userId")),
-//     ),
-//   )
-//   .prepare("session_select_owned")
-
-// export const selectSessionFilesStatement = db
-//   .select({
-//     id: schema.resumeFile.id,
-//     originalName: schema.resumeFile.originalName,
-//     mimeType: schema.resumeFile.mimeType,
-//     size: schema.resumeFile.size,
-//   })
-//   .from(schema.profilingSessionFile)
-//   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
-//   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
-//   .prepare("session_select_files")
-
 export const selectSessionResultsByScoreDescStatement = db
   .select({
     id: schema.candidateResult.id,
@@ -111,24 +88,6 @@ export const selectSessionResultByIdStatement = db
     ),
   )
   .prepare("session_select_result_by_id")
-
-// export const selectOwnedSessionRetryRowStatement = db
-//   .select({
-//     id: schema.profilingSession.id,
-//     userId: schema.profilingSession.userId,
-//     name: schema.profilingSession.name,
-//     jobTitle: schema.profilingSession.jobTitle,
-//     jobDescription: schema.profilingSession.jobDescription,
-//     status: schema.profilingSession.status,
-//   })
-//   .from(schema.profilingSession)
-//   .where(
-//     and(
-//       eq(schema.profilingSession.id, sql.placeholder("sessionId")),
-//       eq(schema.profilingSession.userId, sql.placeholder("userId")),
-//     ),
-//   )
-//   .prepare("session_select_owned_retry_row")
 
 export const selectSessionFilesStatement = db
   .select({

@@ -152,7 +152,7 @@ There is no separate progress state in the callback contract today.
 
 ### Create or retry
 
-The API routes in `api/src/routes/sessions.ts`:
+The session route and usecase flow in `api/src/routes/session.ts` and `api/src/usecases/session/`:
 
 - create a new session or mutate/clone an existing one
 - generate a new `run_id`
@@ -175,13 +175,19 @@ Per-file exceptions are collected. If at least one file succeeds, the worker cur
 
 ### API finalization
 
-The callback route in `api/src/routes/pipeline.ts` and repository logic in `api/src/repositories/session-repository.ts`:
+The callback route in `api/src/routes/pipeline.ts`, the pipeline usecase in `api/src/usecases/pipeline/`, and repository logic in `api/src/repositories/session-repository.ts`:
 
 - verify the shared-secret header
 - ignore stale callbacks whose `run_id` does not match the active run
 - upsert current-run results by delete-then-insert for that run
 - update session status and error fields
 - refresh cached session and result views
+
+Current backend layering for this flow:
+
+- routes only adapt transport concerns and hand off to usecases
+- usecases decide the HTTP-facing success/error result
+- repositories perform raw persistence and cache updates without returning HTTP-shaped wrapper states
 
 ## Current Worker Layout
 
@@ -291,7 +297,9 @@ These runtime choices are operationally important today but still replaceable.
 
 - `api/src/lib/queue.ts`
 - `api/src/routes/pipeline.ts`
-- `api/src/routes/sessions.ts`
+- `api/src/routes/session.ts`
+- `api/src/usecases/pipeline/`
+- `api/src/usecases/session/`
 - `api/src/repositories/session-repository.ts`
 - `core/src/schemas/index.ts`
 - `services/pipeline/worker.py`

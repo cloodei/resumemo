@@ -46,7 +46,9 @@ resumemo/
   - Better Auth handler mounted through `authMiddleware`
   - profiling session routes under `/api/v2/sessions`
   - internal worker callback at `/api/internal/pipeline/callback`
-- Session orchestration and data shaping live mainly in `api/src/repositories/session-repository.ts` and supporting `lib/` helpers.
+- Route handlers in `api/src/routes/` are thin adapters.
+- HTTP-aware orchestration and error mapping live in `api/src/usecases/`, currently centered on `api/src/usecases/session/` and `api/src/usecases/pipeline/`.
+- Repository reads in `api/src/repositories/` return raw data or `null`; command-style writes return useful data, `true`, `false`, or successful void behavior.
 - Storage, upload verification, and queue publishing stay in API-side helpers instead of the web app.
 
 Important note: `api/src/routes/files.ts` and `api/src/routes/system.ts` exist in the repo, but they are not mounted by `api/src/index.ts` today. They should not be documented as active runtime surface unless they are wired in.
