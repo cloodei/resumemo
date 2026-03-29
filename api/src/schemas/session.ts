@@ -49,8 +49,19 @@ export const sessionExportQuerySchema = t.Object({
 	format: t.Optional(t.Union([t.Literal("json"), t.Literal("csv")])),
 })
 
+export const sessionFileAccessParamsSchema = t.Object({
+	id: t.String({ minLength: 1 }),
+	fileId: t.Number({ minimum: 1 }),
+})
+
+export const sessionFileAccessQuerySchema = t.Object({
+	disposition: t.Optional(t.Union([t.Literal("inline"), t.Literal("attachment")])),
+})
+
 export type PresignSessionUploadsBody = typeof presignSessionUploadsBodySchema.static
 export type CreateSessionBody = typeof createSessionBodySchema.static
 export type RetrySessionBody = typeof retrySessionBodySchema.static
 export type SessionResultsQuery = typeof sessionResultsQuerySchema.static
 export type SessionExportQuery = typeof sessionExportQuerySchema.static
+export type SessionFileAccessParams = typeof sessionFileAccessParamsSchema.static
+export type SessionFileAccessQuery = typeof sessionFileAccessQuerySchema.static

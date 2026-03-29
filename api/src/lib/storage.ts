@@ -1,6 +1,6 @@
 import { randomUUIDv7 } from "bun";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { validateFileMetadata } from "./upload-guard";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
@@ -44,6 +44,28 @@ function generatePresignedUploadUrl(
 		Key: storageKey,
 		ContentType: contentType,
 		...(contentLength ? { ContentLength: contentLength } : {}),
+	});
+
+	return getSignedUrl(r2Client, command, { expiresIn: 60 * 15 });
+}
+
+function buildContentDisposition(disposition: "inline" | "attachment", fileName: string) {
+	const safeName = fileName.replace(/[\r\n"]/g, "_");
+	const encodedName = encodeURIComponent(fileName);
+	return `${disposition}; filename="${safeName}"; filename*=UTF-8''${encodedName}`;
+}
+
+function generatePresignedReadUrl(args: {
+	storageKey: string;
+	fileName: string;
+	mimeType: string;
+	disposition: "inline" | "attachment";
+}) {
+	const command = new GetObjectCommand({
+		Bucket: R2_BUCKET_NAME,
+		Key: args.storageKey,
+		ResponseContentDisposition: buildContentDisposition(args.disposition, args.fileName),
+		ResponseContentType: args.mimeType,
 	});
 
 	return getSignedUrl(r2Client, command, { expiresIn: 60 * 15 });
@@ -128,6 +150,7 @@ export {
 	R2_BUCKET_NAME,
 	generateStorageKey,
 	generatePresignedUploadUrl,
+	generatePresignedReadUrl,
 	deleteFile,
 	headFile,
 	cleanupUploadedKeys,

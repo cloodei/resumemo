@@ -130,6 +130,28 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 	)
 
 	.get(
+		"/:id/files/:fileId/access",
+		async ({ user, params, query, status }) => {
+			const result = await sessionUsecases.getSessionFileAccessUsecase({
+				userId: user.id,
+				sessionId: params.id,
+				fileId: params.fileId,
+				disposition: query.disposition,
+			})
+
+			if (!result.ok)
+				return status(result.error.httpStatus, result.error.body)
+
+			return result.data
+		},
+		{
+			auth: true,
+			params: sessionSchema.sessionFileAccessParamsSchema,
+			query: sessionSchema.sessionFileAccessQuerySchema,
+		},
+	)
+
+	.get(
 		"/:id/export",
 		async ({ user, params, query, status, set }) => {
 			const result = await sessionUsecases.exportSessionUsecase({

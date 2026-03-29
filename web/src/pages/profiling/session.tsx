@@ -219,9 +219,10 @@ function ProfilingSessionContent() {
 				/>
 			)}
 
-			{!isCompleted && files.length > 0 && (
+			{files.length > 0 && (
 				<Profiling.UploadedDocumentsSection
-					files={files.map(file => ({ id: file.id, originalName: file.originalName, size: Number(file.size) }))}
+					files={files.map(file => ({ fileId: file.fileId, originalName: file.originalName, size: Number(file.size) }))}
+					sessionId={id}
 					formatFileSize={formatFileSize}
 				/>
 			)}

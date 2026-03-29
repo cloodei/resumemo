@@ -1,5 +1,6 @@
 export * from "./create-session.usecase"
 export * from "./export-session.usecase"
+export * from "./get-session-file-access.usecase"
 export * from "./get-session-detail.usecase"
 export * from "./get-session-result.usecase"
 export * from "./list-session-results.usecase"

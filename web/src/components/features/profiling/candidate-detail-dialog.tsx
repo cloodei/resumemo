@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { Mail, Phone, UserRound } from "lucide-react"
+import { Download, ExternalLink, Mail, Phone, UserRound } from "lucide-react"
+import { toast } from "sonner"
 
 import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
@@ -14,6 +15,9 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { candidateDetailQueryOptions } from "@/lib/profiling-queries"
+import { Button } from "@/components/ui/button"
+import { downloadSessionFile, openSessionFile } from "@/lib/session-file-access"
+import { getErrorMessage } from "@/lib/errors"
 
 import { SummaryTile } from "./summary-tile"
 import {
@@ -60,8 +64,38 @@ function CandidateDetailContent({ sessionId, resultId }: { sessionId: string; re
 			</div>
 
 			<div className="rounded-xl bg-muted/40 p-4">
-				<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Summary</p>
-				<p className="mt-2 leading-6 text-foreground">{selectedResult.summary}</p>
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div>
+						<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Summary</p>
+						<p className="mt-2 leading-6 text-foreground">{selectedResult.summary}</p>
+					</div>
+					<div className="flex shrink-0 flex-wrap gap-2">
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => {
+								void openSessionFile({ sessionId, fileId: selectedResult.fileId }).catch(error => {
+									toast.error(getErrorMessage(error, "Could not open original file"))
+								})
+							}}
+						>
+							<ExternalLink className="size-4" />
+							View original
+						</Button>
+						<Button
+							size="sm"
+							variant="secondary"
+							onClick={() => {
+								void downloadSessionFile({ sessionId, fileId: selectedResult.fileId }).catch(error => {
+									toast.error(getErrorMessage(error, "Could not download original file"))
+								})
+							}}
+						>
+							<Download className="size-4" />
+							Download
+						</Button>
+					</div>
+				</div>
 			</div>
 
 			<div className="grid gap-4 lg:grid-cols-2">

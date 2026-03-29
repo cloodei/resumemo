@@ -18,7 +18,7 @@ export type ProfilingSession = {
 }
 
 export type SessionFile = {
-	id: number
+	fileId: number
 	originalName: string
 	mimeType: string
 	size: number
@@ -48,6 +48,7 @@ export type CandidateResult = {
 	rank?: number
 	id: string
 	runId?: string
+	fileId: number
 	candidateName: string | null
 	candidateEmail: string | null
 	candidatePhone: string | null
@@ -85,8 +86,16 @@ async function fetchProfilingSession(id: string): Promise<ProfilingSessionRespon
 
 	return {
 		session: data.session as ProfilingSession,
-		files: (data.files || []) as SessionFile[],
-		results: (data.results || null) as CandidateResult[] | null,
+		files: ((data.files || []) as Array<SessionFile & { id?: number }>).map(file => ({
+			...file,
+			fileId: Number(file.fileId ?? file.id),
+			size: Number(file.size),
+		})),
+		results: ((data.results || null) as CandidateResult[] | null)?.map(result => ({
+			...result,
+			fileId: Number(result.fileId),
+			overallScore: Number(result.overallScore),
+		})) ?? null,
 	}
 }
 
@@ -97,6 +106,7 @@ async function fetchCandidateResultDetail(args: { sessionId: string; resultId: s
 
 	return {
 		...data.result,
+		fileId: Number(data.result.fileId),
 		overallScore: Number(data.result.overallScore),
 	} as CandidateResultDetail
 }

@@ -1,9 +1,12 @@
-import { FileText, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react"
+import { FileDown, FileText, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react"
+import { toast } from "sonner"
 
 import { SummaryTile } from "@/components/features/profiling/summary-tile"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { downloadSessionFile, openSessionFile } from "@/lib/session-file-access"
 import type { ProfilingSession } from "@/lib/profiling-queries"
+import { getErrorMessage } from "@/lib/errors"
 
 import type { RetryMode } from "./session-utils"
 
@@ -78,11 +81,12 @@ export function FailedSessionSection({ session, onOpenRetry }: FailedSessionSect
 }
 
 type UploadedDocumentsSectionProps = {
-	files: Array<{ id: number; originalName: string; size: number }>
+	sessionId: string
+	files: Array<{ fileId: number; originalName: string; size: number }>
 	formatFileSize: (size: number) => string
 }
 
-export function UploadedDocumentsSection({ files, formatFileSize }: UploadedDocumentsSectionProps) {
+export function UploadedDocumentsSection({ sessionId, files, formatFileSize }: UploadedDocumentsSectionProps) {
 	return (
 		<section>
 			<Card className="overflow-hidden border-border/60 shadow-m dark:border-border/40">
@@ -93,13 +97,38 @@ export function UploadedDocumentsSection({ files, formatFileSize }: UploadedDocu
 				<CardContent className="pt-6">
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{files.map((file) => (
-							<div key={file.id} className="rounded-lg bg-muted/30 p-4 shadow-m transition-all hover:-translate-y-0.5 dark:bg-muted/20">
+							<div key={file.fileId} className="rounded-lg bg-muted/30 p-4 shadow-m transition-all hover:-translate-y-0.5 dark:bg-muted/20">
 								<div className="flex items-center gap-3.5">
 									<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10"><FileText className="size-5 text-primary/80" /></div>
 									<div className="min-w-0">
 										<p className="truncate text-sm font-medium text-foreground" title={file.originalName}>{file.originalName}</p>
 										<p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(Number(file.size))}</p>
 									</div>
+								</div>
+								<div className="mt-4 flex flex-wrap gap-2">
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											void openSessionFile({ sessionId, fileId: file.fileId }).catch(error => {
+												toast.error(getErrorMessage(error, "Could not open file"))
+											})
+										}}
+									>
+										View file
+									</Button>
+									<Button
+										size="sm"
+										variant="secondary"
+										onClick={() => {
+											void downloadSessionFile({ sessionId, fileId: file.fileId }).catch(error => {
+												toast.error(getErrorMessage(error, "Could not download file"))
+											})
+										}}
+									>
+										<FileDown className="size-4" />
+										Download
+									</Button>
 								</div>
 							</div>
 						))}
