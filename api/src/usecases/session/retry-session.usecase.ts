@@ -9,23 +9,23 @@ import { usecaseFailure, usecaseSuccess } from "../result"
 const RETRY_SESSION_FAILED_MESSAGE = "We couldn't restart processing. Please try again."
 const RETRY_CLONE_FAILED_MESSAGE = "We couldn't start the new copied session. Please try again."
 
-type RetrySessionSuccess = {
-	status: "retrying" | "processing"
-	sessionId: string
-	runId: string
-	totalConfirmed: number
-	action: RetrySessionBody["mode"]
-	targetSessionId: string
-}
+// type RetrySessionSuccess = {
+// 	status: "retrying" | "processing"
+// 	sessionId: string
+// 	runId: string
+// 	totalConfirmed: number
+// 	action: RetrySessionBody["mode"]
+// 	targetSessionId: string
+// }
 
-type RetrySessionError = {
-	status: "error"
-	message: string
-	details?: string
-	retryable?: boolean
-	targetSessionId?: string | null
-	failures?: unknown
-}
+// type RetrySessionError = {
+// 	status: "error"
+// 	message: string
+// 	details?: string
+// 	retryable?: boolean
+// 	targetSessionId?: string | null
+// 	failures?: unknown
+// }
 
 export async function retrySessionUsecase(input: {
 	userId: string

@@ -79,36 +79,40 @@ export type ProfilingSessionResponse = {
 	results: CandidateResult[] | null
 }
 
-async function fetchProfilingSession(id: string): Promise<ProfilingSessionResponse> {
+async function fetchProfilingSession(id: string) {
 	const { data, error } = await api.api.v2.sessions({ id }).get()
 	if (error || !data)
 		throw new Error(getEdenErrorMessage(error) ?? "Could not load profiling session")
 
+	const files = (data.files ?? []).map(file => ({
+		...file,
+		fileId: Number(file.fileId),
+		size: Number(file.size),
+	}))
+
+	const results = data.results?.map(result => ({
+		...result,
+		fileId: Number(result.fileId),
+		overallScore: Number(result.overallScore),
+	})) ?? null
+
 	return {
-		session: data.session as ProfilingSession,
-		files: ((data.files || []) as Array<SessionFile & { id?: number }>).map(file => ({
-			...file,
-			fileId: Number(file.fileId ?? file.id),
-			size: Number(file.size),
-		})),
-		results: ((data.results || null) as CandidateResult[] | null)?.map(result => ({
-			...result,
-			fileId: Number(result.fileId),
-			overallScore: Number(result.overallScore),
-		})) ?? null,
+		session: data.session,
+		files,
+		results,
 	}
 }
 
 async function fetchCandidateResultDetail(args: { sessionId: string; resultId: string }) {
 	const { data, error } = await api.api.v2.sessions({ id: args.sessionId }).results({ resultId: args.resultId }).get()
-	if (error || !data?.result)
+	if (error || !data)
 		throw new Error(getEdenErrorMessage(error) ?? "Could not load candidate details")
 
 	return {
 		...data.result,
 		fileId: Number(data.result.fileId),
 		overallScore: Number(data.result.overallScore),
-	} as CandidateResultDetail
+	}
 }
 
 async function fetchProfilingSessions() {
@@ -116,7 +120,7 @@ async function fetchProfilingSessions() {
 	if (error || !data)
 		throw new Error(getEdenErrorMessage(error) ?? "Could not load sessions")
 
-	return data.sessions as ProfilingSession[]
+	return data.sessions
 }
 
 export function profilingSessionQueryOptions(id: string) {

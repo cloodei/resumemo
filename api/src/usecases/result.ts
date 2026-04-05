@@ -1,30 +1,31 @@
-export type UsecaseSuccess<T> = {
+export type UsecaseSuccess<T, TH extends Record<string, string>> = {
 	ok: true
 	data: T
-	headers?: Record<string, string>
+	headers?: TH
 }
 
-export type UsecaseFailure<TBody extends { status: "error"; message: string }> = {
+export type UsecaseFailure<
+	TBody extends { status: "error"; message: string },
+	TStatus extends number,
+> = {
 	ok: false
 	error: {
-		httpStatus: number
+		httpStatus: TStatus
 		body: TBody
 	}
 }
 
-// export type UsecaseResult<
-// 	TData,
-// 	TBody extends { status: "error"; message: string } = { status: "error"; message: string },
-// > = UsecaseSuccess<TData> | UsecaseFailure<TBody>
-
-export function usecaseSuccess<TData>(data: TData, headers?: Record<string, string>): UsecaseSuccess<TData> {
+export function usecaseSuccess<TData, TH extends Record<string, string>>(data: TData, headers?: TH): UsecaseSuccess<TData, TH> {
 	return { ok: true, data, headers }
 }
 
-export function usecaseFailure<TBody extends { status: "error"; message: string }>(
-	httpStatus: number,
+export function usecaseFailure<
+	TStatus extends number,
+	TBody extends { status: "error"; message: string },
+>(
+	httpStatus: TStatus,
 	body: TBody,
-): UsecaseFailure<TBody> {
+): UsecaseFailure<TBody, TStatus> {
 	return {
 		ok: false,
 		error: {
