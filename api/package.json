@@ -7,7 +7,8 @@
     "start": "./main",
     "build": "bun build --compile --minify --outfile main index.ts",
     "push": "bunx --bun drizzle-kit push",
-    "generate": "bunx --bun @better-auth/cli generate"
+    "generate": "bunx --bun @better-auth/cli generate",
+    "drizzle:generate": "bunx --bun drizzle-kit generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.990.0",
