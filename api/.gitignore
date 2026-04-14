@@ -10,8 +10,6 @@
 *.exe
 
 .DS_Store
-*.pem
-*.key
 
 **/*.trace
 **/*.zip

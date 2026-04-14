@@ -2,9 +2,10 @@ import { Elysia } from "elysia";
 
 import { db } from "../lib/db";
 import * as schema from "@resumemo/core/schemas";
+import { apiEnv } from "~/config/env";
 
 export const systemRoutes = new Elysia()
-	.get("/", () => process.env.JWT_SECRET)
+	.get("/", () => apiEnv.jwt.secret)
 	.get("/api/test", async () => {
 		const [users, sessions, accounts, verifications] = await Promise.all([
 			db.select().from(schema.user),

@@ -1,11 +1,12 @@
 import { sessionRepository } from "~/repositories/session-repository"
 import type { PipelineCallbackBody } from "~/schemas/pipeline"
+import { apiEnv } from "~/config/env"
 import { usecaseFailure, usecaseSuccess } from "../result"
 
-const PIPELINE_CALLBACK_SECRET = process.env.PIPELINE_CALLBACK_SECRET ?? ""
+const PIPELINE_CALLBACK_SECRET = apiEnv.pipeline.callbackSecret
 
-function getPipelineSecretHeaderName() {
-	return (process.env.PIPELINE_SECRET_HEADER_NAME ?? "x-pipeline-secret").toLowerCase()
+export function getPipelineSecretHeader() {
+	return apiEnv.pipeline.secretHeaderName
 }
 
 function hasValidSecret(secretHeader?: string | null) {
@@ -13,10 +14,6 @@ function hasValidSecret(secretHeader?: string | null) {
 		return false
 
 	return secretHeader === PIPELINE_CALLBACK_SECRET
-}
-
-export function getPipelineSecretHeader() {
-	return getPipelineSecretHeaderName()
 }
 
 export async function pipelineCallbackUsecase(input: {
@@ -27,7 +24,7 @@ export async function pipelineCallbackUsecase(input: {
 		return usecaseFailure(401, {
 			status: "error",
 			message: "Unauthorized",
-		})
+		} as const)
 	}
 
 	const session = await sessionRepository.getSessionById(input.body.session_id)
@@ -35,7 +32,7 @@ export async function pipelineCallbackUsecase(input: {
 		return usecaseFailure(404, {
 			status: "error",
 			message: "Session not found",
-		})
+		} as const)
 	}
 
 	if (!session.activeRunId || session.activeRunId !== input.body.run_id)

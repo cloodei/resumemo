@@ -7,9 +7,10 @@
 
 import { randomUUIDv7 } from "bun";
 import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib";
+import { QUEUE_NAME, PIPELINE_TASK_NAME, QUEUE_ORIGIN } from "~/config/constants";
+import { apiEnv } from "~/config/env";
 
-const QUEUE_NAME = "profiling.jobs";
-const url = process.env.CELERY_BROKER_URL ?? "amqp://resumemo:resumemo@localhost:5672//";
+const url = apiEnv.queue.brokerUrl;
 
 export let channel: Channel | null = null;
 export let connection: Connection | null = null;
@@ -96,7 +97,7 @@ async function publishCeleryTask({ taskName, args }: {
 				timelimit: [null, null],
 				argsrepr: null,
 				kwargsrepr: null,
-				origin: "elysia@api",
+				origin: QUEUE_ORIGIN,
 			},
 		},
 	);
@@ -115,7 +116,7 @@ async function publishCeleryTask({ taskName, args }: {
  */
 export async function publishPipelineJob(payload: PipelineJobPayload) {
 	return publishCeleryTask({
-		taskName: "pipeline.process_session",
+		taskName: PIPELINE_TASK_NAME,
 		args: [payload],
 	});
 }

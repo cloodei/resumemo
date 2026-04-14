@@ -33,3 +33,4 @@ Thumbs.db
 /docs/plans
 
 *.pem
+*.key
