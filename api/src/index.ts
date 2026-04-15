@@ -1,11 +1,10 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 
-
-import { authMiddleware } from "./lib/auth";
-import { CORS_BASE_ALLOWED_HEADERS, CORS_METHODS } from "./config/constants";
 import { apiEnv } from "./config/env";
+import { authMiddleware } from "./lib/auth";
 import { pipelineCallbackRoutes, sessionRoutes } from "./routes";
+import { CORS_BASE_ALLOWED_HEADERS, CORS_METHODS } from "./config/constants";
 
 const app = new Elysia({ precompile: true })
 	.get("/health", () => ({ status: "ok" }))

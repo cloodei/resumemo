@@ -1,1 +1,1 @@
-export { apiEnv } from "./env"
+export * from "./env"

@@ -1,8 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm"
 
-import * as schema from "@resumemo/core/schemas"
-
 import { db } from "~/lib/db"
+import * as schema from "@resumemo/core/schemas"
 
 
 export const selectSessionsByUserIdStatement = db
