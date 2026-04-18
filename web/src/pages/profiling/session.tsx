@@ -3,14 +3,14 @@ import { useNavigate, useParams } from "react-router-dom"
 import { Suspense, useMemo, useState } from "react"
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 
-import * as Profiling from "@/components/features/profiling"
+import * as Profiling from "@/features/profiling"
 import { api } from "@/lib/api"
 import { BASE_URL } from "@/lib/constants"
 import { formatFileSize } from "@/lib/utils"
 import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionSkeleton } from "@/components/feedback/route-skeletons"
-import { profilingSessionQueryOptions } from "@/lib/profiling-queries"
+import { profilingSessionQueryOptions } from "@/features/profiling/profiling-queries"
 import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 
 function ProfilingSessionContent() {

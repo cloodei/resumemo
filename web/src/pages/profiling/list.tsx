@@ -11,7 +11,7 @@ import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionsSkeleton } from "@/components/feedback/route-skeletons"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { profilingSessionsQueryOptions, type ProfilingSession } from "@/lib/profiling-queries"
+import { profilingSessionsQueryOptions, type ProfilingSession } from "@/features/profiling/profiling-queries"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 

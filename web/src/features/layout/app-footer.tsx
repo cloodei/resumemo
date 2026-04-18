@@ -14,7 +14,7 @@ import {
   Building2,
 } from "lucide-react";
 
-import { Logo } from "../brand/logo";
+import { Logo } from "@/components/brand/logo";
 
 const footerLinks = {
   product: [

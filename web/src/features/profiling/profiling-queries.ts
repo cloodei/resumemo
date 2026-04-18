@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query"
 
-import { api } from "./api"
-import { getEdenErrorMessage } from "./errors"
+import { api } from "@/lib/api"
+import { getEdenErrorMessage } from "@/lib/errors"
 
 export type SessionStatus = "processing" | "retrying" | "completed" | "failed"
 

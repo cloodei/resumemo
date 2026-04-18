@@ -2,7 +2,7 @@ import { ArrowLeft, Download, Loader2, RefreshCw, RotateCcw } from "lucide-react
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { ProfilingSession } from "@/lib/profiling-queries"
+import type { ProfilingSession } from "@/features/profiling/profiling-queries"
 
 import type { RetryMode } from "./session-utils"
 import { statusBadgeVariant, statusLabel } from "./session-utils"

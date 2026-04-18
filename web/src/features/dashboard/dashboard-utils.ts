@@ -1,4 +1,4 @@
-import type { ProfilingSession } from "@/lib/profiling-queries"
+import type { ProfilingSession } from "@/features/profiling/profiling-queries"
 
 export function detectAuthProvider(user?: { image?: string | null; email?: string | null }) {
 	if (!user)

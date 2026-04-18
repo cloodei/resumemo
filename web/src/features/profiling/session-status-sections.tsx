@@ -1,14 +1,13 @@
-import { FileDown, FileText, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
+import { FileDown, FileText, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react"
 
-import { SummaryTile } from "@/components/features/profiling/summary-tile"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { downloadSessionFile, openSessionFile } from "@/lib/session-file-access"
-import type { ProfilingSession } from "@/lib/profiling-queries"
-import { getErrorMessage } from "@/lib/errors"
-
+import { SummaryTile } from "@/features/profiling/summary-tile"
 import type { RetryMode } from "./session-utils"
+import { getErrorMessage } from "@/lib/errors"
+import type { ProfilingSession } from "@/features/profiling/profiling-queries"
+import { downloadSessionFile, openSessionFile } from "@/features/profiling/session-file-access"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 type RunningSessionSectionProps = {
 	session: ProfilingSession
@@ -73,7 +72,7 @@ export function FailedSessionSection({ session, onOpenRetry }: FailedSessionSect
 			{session.errorMessage && (
 				<div className="mt-6 max-w-2xl rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-left text-sm text-muted-foreground">
 					<p className="font-medium text-foreground">What happened</p>
-					<p className="mt-1 break-words">{session.errorMessage}</p>
+					<p className="mt-1 wrap-break-word">{session.errorMessage}</p>
 				</div>
 			)}
 		</section>

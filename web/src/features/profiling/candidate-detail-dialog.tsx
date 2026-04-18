@@ -14,9 +14,9 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { candidateDetailQueryOptions } from "@/lib/profiling-queries"
+import { candidateDetailQueryOptions } from "@/features/profiling/profiling-queries"
 import { Button } from "@/components/ui/button"
-import { downloadSessionFile, openSessionFile } from "@/lib/session-file-access"
+import { downloadSessionFile, openSessionFile } from "@/features/profiling/session-file-access"
 import { getErrorMessage } from "@/lib/errors"
 
 import { SummaryTile } from "./summary-tile"

@@ -2,9 +2,9 @@ import { ArrowUpRight, BadgeInfo, Mail } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ActionCard } from "@/components/features/profiling/action-card"
-import { SummaryTile } from "@/components/features/profiling/summary-tile"
-import type { CandidateResult, ProfilingSession } from "@/lib/profiling-queries"
+import { ActionCard } from "@/features/profiling/action-card"
+import { SummaryTile } from "@/features/profiling/summary-tile"
+import type { CandidateResult, ProfilingSession } from "@/features/profiling/profiling-queries"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {

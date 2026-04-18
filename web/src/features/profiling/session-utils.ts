@@ -1,4 +1,4 @@
-import type { CandidateResult, CandidateResultDetail, ParsedProfile, SessionStatus } from "@/lib/profiling-queries"
+import type { CandidateResult, CandidateResultDetail, ParsedProfile, SessionStatus } from "@/features/profiling/profiling-queries"
 
 export type RetryMode = "rerun_current" | "clone_current" | "clone_with_updates" | "replace_with_updates"
 

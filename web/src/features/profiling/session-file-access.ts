@@ -1,5 +1,5 @@
-import { BASE_URL } from "./constants"
-import { getErrorMessage } from "./errors"
+import { BASE_URL } from "../../lib/constants"
+import { getErrorMessage } from "../../lib/errors"
 
 type FileDisposition = "inline" | "attachment"
 

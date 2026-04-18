@@ -20,7 +20,7 @@ import {
 	NewSessionRoleForm,
 	NewSessionUploadPanel,
 	newSessionSteps,
-} from "@/components/features/profiling"
+} from "@/features/profiling"
 import {
 	type FileStatus,
 	type SessionFormData,

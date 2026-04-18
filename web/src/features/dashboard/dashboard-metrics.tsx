@@ -1,7 +1,7 @@
 import { motion } from "motion/react"
 import { BriefcaseBusiness, Clock, FileAxis3D, LaptopMinimalCheck } from "lucide-react"
 
-import type { DashboardMetric } from "@/components/features/dashboard/dashboard-utils"
+import type { DashboardMetric } from "@/features/dashboard/dashboard-utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 const metricIcons = [LaptopMinimalCheck, BriefcaseBusiness, Clock, FileAxis3D] as const

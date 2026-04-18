@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 
-import type { DashboardRecentSession } from "@/components/features/dashboard/dashboard-utils"
+import type { DashboardRecentSession } from "@/features/dashboard/dashboard-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
