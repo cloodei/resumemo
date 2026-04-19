@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-
-import { retryModeCopy, type RetryFormValues, type RetryMode } from "./session-utils"
+import { retryModeCopy, type RetryFormValues, type RetryMode } from "./utils"
 
 type RetrySessionDialogProps = {
 	open: boolean
@@ -51,7 +50,7 @@ export function RetrySessionDialog({
 				</DialogHeader>
 
 				<div className="grid gap-3 md:grid-cols-2">
-					{(Object.entries(retryModeCopy) as Array<[RetryMode, typeof retryModeCopy[RetryMode]]>).map(([mode, copy]) => (
+					{(Object.entries(retryModeCopy) as [RetryMode, typeof retryModeCopy[RetryMode]][]).map(([mode, copy]) => (
 						<button
 							key={mode}
 							type="button"

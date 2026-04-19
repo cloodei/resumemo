@@ -1,28 +1,26 @@
-import { BASE_URL } from "../../lib/constants"
-import { getErrorMessage } from "../../lib/errors"
+import { BASE_URL } from "@/lib/constants"
+import { getErrorMessage } from "@/lib/errors"
 
-type FileDisposition = "inline" | "attachment"
-
-type SessionFileAccessResponse = {
-	url: string
-	disposition: FileDisposition
-	fileId: number
-	originalName: string
-	mimeType: string
-	expiresInSeconds: number
+function isSessionFileAccessPayload(value: unknown): value is { url: string; originalName: string } {
+	return typeof value === "object"
+		&& value !== null
+		&& "url" in value
+		&& typeof value.url === "string"
+		&& "originalName" in value
+		&& typeof value.originalName === "string"
 }
 
 async function getSessionFileAccessUrl(args: {
 	sessionId: string
 	fileId: number
-	disposition: FileDisposition
+	disposition: "inline" | "attachment"
 }) {
 	const response = await fetch(
 		`${BASE_URL}/api/v2/sessions/${args.sessionId}/files/${args.fileId}/access?disposition=${args.disposition}`,
 		{ credentials: "include" },
 	)
 
-	let body: SessionFileAccessResponse | { message?: string } | null = null
+	let body: unknown = null
 	try {
 		body = await response.json()
 	}
@@ -30,7 +28,7 @@ async function getSessionFileAccessUrl(args: {
 		body = null
 	}
 
-	if (!response.ok || !body || typeof body !== "object" || !("url" in body) || typeof body.url !== "string")
+	if (!response.ok || !isSessionFileAccessPayload(body))
 		throw new Error(getErrorMessage(body, `Could not access file (${response.status})`))
 
 	return body

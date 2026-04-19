@@ -14,13 +14,11 @@ import {
 } from "@/lib/constants"
 import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
-import {
-	NewSessionFileQueue,
-	NewSessionHero,
-	NewSessionRoleForm,
-	NewSessionUploadPanel,
-	newSessionSteps,
-} from "@/features/profiling"
+import { NewSessionFileQueue } from "@/features/profiling/new-session-file-queue"
+import { NewSessionHero } from "@/features/profiling/new-session-hero"
+import { NewSessionRoleForm } from "@/features/profiling/new-session-role-form"
+import { NewSessionUploadPanel } from "@/features/profiling/new-session-upload-panel"
+import { newSessionSteps } from "@/features/profiling/new-session-utils"
 import {
 	type FileStatus,
 	type SessionFormData,

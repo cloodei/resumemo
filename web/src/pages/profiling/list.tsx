@@ -11,9 +11,11 @@ import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionsSkeleton } from "@/components/feedback/route-skeletons"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { profilingSessionsQueryOptions, type ProfilingSession } from "@/features/profiling/profiling-queries"
+import { fetchProfilingSessions } from "@/features/profiling/api/profiling-sessions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+type ProfilingSession = Awaited<ReturnType<typeof fetchProfilingSessions>>[number]
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
 
@@ -68,7 +70,14 @@ function statusVariant(status: ProfilingSession["status"]) {
 }
 
 function ProfilingSessionsContent() {
-	const { data: sessions } = useSuspenseQuery(profilingSessionsQueryOptions())
+	const { data: sessions } = useSuspenseQuery({
+		queryKey: ["profiling-sessions"],
+		queryFn: fetchProfilingSessions,
+		refetchInterval: (query) => {
+			const sessions = query.state.data ?? []
+			return sessions.some(item => item.status === "processing" || item.status === "retrying") ? 8000 : false
+		},
+	})
 	const [searchParams, setSearchParams] = useSearchParams()
 	const activeTab = searchParams.get("status") ?? "all"
 	const searchQuery = searchParams.get("q") ?? ""

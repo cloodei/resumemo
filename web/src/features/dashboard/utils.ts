@@ -1,4 +1,6 @@
-import type { ProfilingSession } from "@/features/profiling/profiling-queries"
+import { fetchProfilingSessions } from "@/features/profiling/api/profiling-sessions"
+
+type ProfilingSession = Awaited<ReturnType<typeof fetchProfilingSessions>>[number]
 
 export function detectAuthProvider(user?: { image?: string | null; email?: string | null }) {
 	if (!user)
@@ -55,10 +57,10 @@ function formatSessionDate(date: string | Date) {
 export function buildDashboardMetrics(sessions: ProfilingSession[]): DashboardMetric[] {
 	const totalSessions = sessions.length
 	let activeSessions: ProfilingSession[] = [],
-	 queuedSessions: ProfilingSession[] = [],
-	 retryingSessions: ProfilingSession[] = [],
-	 completedSessions: ProfilingSession[] = [],
-	 failedSessions: ProfilingSession[] = [];
+		queuedSessions: ProfilingSession[] = [],
+		retryingSessions: ProfilingSession[] = [],
+		completedSessions: ProfilingSession[] = [],
+		failedSessions: ProfilingSession[] = [];
 	let totalFiles = 0
 
 	for (let i = 0; i < sessions.length; i++) {

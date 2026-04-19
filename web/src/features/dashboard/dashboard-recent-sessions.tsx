@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom"
 
-import type { DashboardRecentSession } from "@/features/dashboard/dashboard-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import type { DashboardRecentSession } from "@/features/dashboard/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 

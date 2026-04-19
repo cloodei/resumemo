@@ -4,18 +4,20 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ActionCard } from "@/features/profiling/action-card"
 import { SummaryTile } from "@/features/profiling/summary-tile"
-import type { CandidateResult, ProfilingSession } from "@/features/profiling/profiling-queries"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
 	type RetryMode,
+	type CandidateResult,
+	type ProfilingSessionDetailData,
 	getDisplayCandidateName,
 	getExperienceLabel,
 	getManualReviewLabel,
 	getPrimarySkills,
 	needsManualReview,
-} from "./session-utils"
+} from "./utils"
 
+type ProfilingSession = ProfilingSessionDetailData["session"]
 type CompletedSessionViewProps = {
 	session: ProfilingSession
 	results: CandidateResult[]
@@ -118,9 +120,9 @@ export function CompletedSessionView({
 										<TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No results generated for this session.</TableCell>
 									</TableRow>
 								) : (
-									results.map((candidate) => (
+									results.map((candidate, index) => (
 										<TableRow key={candidate.id} className="group cursor-pointer align-top transition-all hover:bg-muted/55" onClick={() => onSelectCandidate(candidate.id)}>
-											<TableCell><Badge variant="secondary" className="text-xs shadow-sm">#{candidate.rank}</Badge></TableCell>
+											<TableCell><Badge variant="secondary" className="text-xs shadow-sm">#{index + 1}</Badge></TableCell>
 											<TableCell className="space-y-1">
 												<p className="font-semibold text-foreground transition-colors group-hover:text-primary">{getDisplayCandidateName(candidate)}</p>
 												<p className="text-xs text-muted-foreground">Match score {candidate.overallScore}/100{getExperienceLabel(candidate) ? ` • ${getExperienceLabel(candidate)}` : ""}</p>
@@ -155,10 +157,10 @@ export function CompletedSessionView({
 							<CardDescription className="mt-1 text-sm">Quick access to the strongest profiles from this completed run.</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-3 pt-6 text-sm text-muted-foreground">
-							{results.slice(0, 3).map((candidate) => (
+							{results.slice(0, 3).map((candidate, index) => (
 								<div key={candidate.id} className="cursor-pointer rounded-lg bg-muted/30 p-4 shadow-x transition-all hover:-translate-y-0.5 dark:bg-muted/20" onClick={() => onSelectCandidate(candidate.id)}>
 									<p className="text-sm font-semibold text-foreground">{getDisplayCandidateName(candidate)}</p>
-									<p className="mt-1 text-xs">Match score {candidate.overallScore}/100 • Rank #{candidate.rank}</p>
+									<p className="mt-1 text-xs">Match score {candidate.overallScore}/100 • Rank #{index + 1}</p>
 									<p className="mt-3 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{candidate.summary}</p>
 									<Button size="sm" variant="ghost" className="mt-4 gap-2">View details<ArrowUpRight className="size-4" /></Button>
 								</div>

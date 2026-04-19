@@ -12,14 +12,21 @@ import {
 	buildDashboardRecentSessions,
 	detectAuthProvider,
 	getProviderBadge,
-} from "@/features/dashboard/dashboard-utils"
+} from "@/features/dashboard/utils"
 import { DashboardWorkflowNotes } from "@/features/dashboard/dashboard-workflow-notes"
+import { fetchProfilingSessions } from "@/features/profiling/api/profiling-sessions"
 import { useSession } from "@/lib/auth"
-import { profilingSessionsQueryOptions } from "@/features/profiling/profiling-queries"
 
 function DashboardContent() {
 	const { data: session, isPending } = useSession()
-	const { data: sessions } = useSuspenseQuery(profilingSessionsQueryOptions())
+	const { data: sessions } = useSuspenseQuery({
+		queryKey: ["profiling-sessions"],
+		queryFn: fetchProfilingSessions,
+		refetchInterval: (query) => {
+			const sessions = query.state.data ?? []
+			return sessions.some(item => item.status === "processing" || item.status === "retrying") ? 8000 : false
+		},
+	})
 	const user = session?.user
 	const authProvider = detectAuthProvider(user)
 	const providerBadge = getProviderBadge(authProvider)

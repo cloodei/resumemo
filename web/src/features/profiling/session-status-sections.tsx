@@ -3,12 +3,12 @@ import { FileDown, FileText, RefreshCw, RotateCcw, TriangleAlert } from "lucide-
 
 import { Button } from "@/components/ui/button"
 import { SummaryTile } from "@/features/profiling/summary-tile"
-import type { RetryMode } from "./session-utils"
 import { getErrorMessage } from "@/lib/errors"
-import type { ProfilingSession } from "@/features/profiling/profiling-queries"
-import { downloadSessionFile, openSessionFile } from "@/features/profiling/session-file-access"
+import { downloadSessionFile, openSessionFile } from "@/features/profiling/api/session-file-access"
+import type { RetryMode, ProfilingSessionDetailData } from "./utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+type ProfilingSession = ProfilingSessionDetailData["session"]
 type RunningSessionSectionProps = {
 	session: ProfilingSession
 	onRefresh: () => void
