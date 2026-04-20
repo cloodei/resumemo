@@ -8,6 +8,13 @@
       "when": 1776180429383,
       "tag": "0000_lucky_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776600000000,
+      "tag": "0001_profiling_v3_foundation",
+      "breakpoints": true
     }
   ]
 }

@@ -7,8 +7,10 @@
 
 import { randomUUIDv7 } from "bun";
 import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib";
-import { QUEUE_NAME, PIPELINE_TASK_NAME, QUEUE_ORIGIN } from "~/config/constants";
+
 import { apiEnv } from "~/config/env";
+import type { ProfilingV3PipelineJobPayload } from "@resumemo/core/schemas";
+import { QUEUE_NAME, QUEUE_NAME_V3, PIPELINE_TASK_NAME, PIPELINE_TASK_NAME_V3, QUEUE_ORIGIN } from "~/config/constants";
 
 const url = apiEnv.queue.brokerUrl;
 
@@ -55,12 +57,14 @@ export type PipelineJobPayload = {
 	}[];
 };
 
-async function publishCeleryTask({ taskName, args }: {
+async function publishCeleryTask({ queueName, taskName, args }: {
+	queueName: string;
 	taskName: string;
 	args: unknown[];
 }) {
 	const ch = await getChannel();
 	const taskId = randomUUIDv7();
+	await ch.assertQueue(queueName, { durable: true });
 
 	const body = JSON.stringify([
 		args,
@@ -74,7 +78,7 @@ async function publishCeleryTask({ taskName, args }: {
 	]);
 
 	const sent = ch.sendToQueue(
-		QUEUE_NAME,
+		queueName,
 		Buffer.from(body),
 		{
 			persistent: true,
@@ -116,7 +120,16 @@ async function publishCeleryTask({ taskName, args }: {
  */
 export async function publishPipelineJob(payload: PipelineJobPayload) {
 	return publishCeleryTask({
+		queueName: QUEUE_NAME,
 		taskName: PIPELINE_TASK_NAME,
+		args: [payload],
+	});
+}
+
+export async function publishPipelineJobV3(payload: ProfilingV3PipelineJobPayload) {
+	return publishCeleryTask({
+		queueName: QUEUE_NAME_V3,
+		taskName: PIPELINE_TASK_NAME_V3,
 		args: [payload],
 	});
 }
