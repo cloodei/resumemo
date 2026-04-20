@@ -1,9 +1,9 @@
 import { Elysia } from "elysia"
 
+import * as profilingV3Schema from "~/schemas/session-v3"
+import * as profilingV3Usecases from "~/usecases/profiling-v3"
 import { authMiddleware } from "~/lib/auth"
 import { presignSessionUploadsUsecase } from "~/usecases/session"
-import * as profilingV3Usecases from "~/usecases/profiling-v3"
-import * as profilingV3Schema from "~/schemas/session-v3"
 
 export const sessionV3Routes = new Elysia({ prefix: "/api/v3/sessions" })
 	.use(authMiddleware)
@@ -25,6 +25,7 @@ export const sessionV3Routes = new Elysia({ prefix: "/api/v3/sessions" })
 			body: profilingV3Schema.presignSessionUploadsV3BodySchema,
 		},
 	)
+	
 	.post(
 		"/create",
 		async ({ user, body, status }) => {
@@ -43,17 +44,16 @@ export const sessionV3Routes = new Elysia({ prefix: "/api/v3/sessions" })
 			body: profilingV3Schema.createSessionV3BodySchema,
 		},
 	)
+
 	.get(
 		"/",
-		async ({ user, status }) => {
+		async ({ user }) => {
 			const result = await profilingV3Usecases.listSessionsV3Usecase({ userId: user.id })
-			if (!result.ok)
-				return status(result.error.httpStatus, result.error.body)
-
 			return result.data
 		},
 		{ auth: true },
 	)
+
 	.get(
 		"/:id",
 		async ({ user, params, status }) => {
@@ -69,6 +69,7 @@ export const sessionV3Routes = new Elysia({ prefix: "/api/v3/sessions" })
 		},
 		{ auth: true },
 	)
+
 	.get(
 		"/:id/results",
 		async ({ user, params, query, status }) => {
@@ -88,6 +89,7 @@ export const sessionV3Routes = new Elysia({ prefix: "/api/v3/sessions" })
 			query: profilingV3Schema.sessionResultsV3QuerySchema,
 		},
 	)
+	
 	.get(
 		"/:id/results/:resultId",
 		async ({ user, params, status }) => {

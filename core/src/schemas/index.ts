@@ -181,7 +181,7 @@ export const candidateResult = pgTable("candidate_result", {
 
 export const profilingV3JobDescriptionSourceEnum = ["inline", "template"] as const;
 
-export const profilingJobDescriptionV3 = pgTable("profiling_job_description_v3", {
+export const profilingJobDescriptionV3 = pgTable("profiling_job_description", {
 	id: uuid("id")
 		.$defaultFn(randomUUIDv7)
 		.primaryKey(),
@@ -283,8 +283,7 @@ export const candidateResultV3 = pgTable("candidate_result_v3", {
 		.defaultNow()
 		.notNull(),
 }, (table) => [
-	index().on(table.sessionId, table.runId),
-	uniqueIndex("candidate_result_v3_run_file_unique").on(table.runId, table.fileId),
+	index().on(table.sessionId, table.runId)
 ]);
 
 export * from "./profiling-v3-artifacts";

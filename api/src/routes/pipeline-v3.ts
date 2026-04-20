@@ -1,6 +1,7 @@
 import { Elysia } from "elysia"
 
-import { getPipelineV3SecretHeader, pipelineCallbackV3Usecase } from "~/usecases/profiling-v3"
+import { apiEnv } from "~/config/env"
+import { pipelineCallbackV3Usecase } from "~/usecases/profiling-v3"
 import { pipelineV3CallbackBodySchema } from "~/schemas/pipeline-v3"
 
 export const pipelineCallbackV3Routes = new Elysia({ prefix: "/api/internal/pipeline/v3" })
@@ -9,7 +10,7 @@ export const pipelineCallbackV3Routes = new Elysia({ prefix: "/api/internal/pipe
 		async ({ body, headers, status }) => {
 			const result = await pipelineCallbackV3Usecase({
 				body,
-				secretHeader: headers[getPipelineV3SecretHeader()],
+				secretHeader: headers[apiEnv.pipeline.secretHeaderName],
 			})
 
 			if (!result.ok)

@@ -5,10 +5,12 @@ import { usecaseFailure, usecaseSuccess } from "../result"
 
 const PIPELINE_CALLBACK_SECRET = apiEnv.pipeline.callbackSecret
 
-export function getPipelineV3SecretHeader() {
-	return apiEnv.pipeline.secretHeaderName
-}
-
+/**
+ * Validates the shared secret header sent by the pipeline worker callback.
+ *
+ * @param secretHeader - Secret value provided by the callback request.
+ * @returns True only when both values exist and match exactly.
+ */
 function hasValidSecret(secretHeader?: string | null) {
 	if (!PIPELINE_CALLBACK_SECRET || !secretHeader)
 		return false
@@ -16,6 +18,22 @@ function hasValidSecret(secretHeader?: string | null) {
 	return secretHeader === PIPELINE_CALLBACK_SECRET
 }
 
+/**
+ * Handles async v3 pipeline callbacks for completion or failure events.
+ *
+ * Behavior summary:
+ * - Rejects requests with invalid callback secret.
+ * - Ignores callbacks when the target session is missing.
+ * - Ignores stale callbacks whose run id is no longer active.
+ * - On completion, replaces run results and marks the session completed.
+ * - On failure, stores partial results (if present) and marks the session failed.
+ *
+ * Returns a generic ok response for accepted callbacks, including skipped stale
+ * callbacks to keep worker retries idempotent.
+ *
+ * @param input - Callback body plus secret header from the request.
+ * @returns Standardized usecase result with unauthorized, not found, skipped, or ok status.
+ */
 export async function pipelineCallbackV3Usecase(input: {
 	body: PipelineV3CallbackBody
 	secretHeader?: string | null

@@ -145,7 +145,7 @@ export const profilingV3Repository = {
 
 	async createSession(input: CreateSessionV3Input) {
 		let createdSessionId: string | null = null
-		let sessionSnapshot: ProfilingV3SessionListItem | undefined
+		let session: ProfilingV3SessionListItem | undefined
 		let createdFiles: ProfilingV3CreatedFileRecord[] = []
 
 		try {
@@ -196,16 +196,13 @@ export const profilingV3Repository = {
 			return false
 		}
 
-		if (createdSessionId) {
-			const [session] = await profilingV3Queries.selectProfilingSessionV3ByIdStatement.execute({ sessionId: createdSessionId })
-			sessionSnapshot = session
-		}
-
-		if (!sessionSnapshot)
+		if (createdSessionId)
+			session = (await profilingV3Queries.selectProfilingSessionV3ByIdStatement.execute({ sessionId: createdSessionId }))[0]
+		if (!session)
 			return false
 
 		return {
-			session: sessionSnapshot,
+			session,
 			files: createdFiles,
 		}
 	},
@@ -280,24 +277,24 @@ export const profilingV3Repository = {
 
 				insertedResults = params.results.length > 0
 					? await tx.insert(schema.candidateResultV3)
-						.values(params.results.map(result => ({
-							sessionId: params.sessionId,
-							runId: params.runId,
-							fileId: result.file_id,
-							candidateName: result.candidate_name,
-							candidateEmail: result.candidate_email,
-							candidatePhone: result.candidate_phone,
-							rawText: result.raw_text,
-							resumeArtifact: result.resume_artifact,
-							candidateDna: result.candidate_dna,
-							scoreArtifact: result.score_artifact,
-							overallScore: String(result.overall_score),
-							baseScore: String(result.base_score),
-							bonusScore: String(result.bonus_score),
-							summary: result.summary,
-							skillsMatched: result.skills_matched,
-						})))
-						.returning()
+							.values(params.results.map(result => ({
+								sessionId: params.sessionId,
+								runId: params.runId,
+								fileId: result.file_id,
+								candidateName: result.candidate_name,
+								candidateEmail: result.candidate_email,
+								candidatePhone: result.candidate_phone,
+								rawText: result.raw_text,
+								resumeArtifact: result.resume_artifact,
+								candidateDna: result.candidate_dna,
+								scoreArtifact: result.score_artifact,
+								overallScore: String(result.overall_score),
+								baseScore: String(result.base_score),
+								bonusScore: String(result.bonus_score),
+								summary: result.summary,
+								skillsMatched: result.skills_matched,
+							})))
+							.returning()
 					: []
 			})
 		}

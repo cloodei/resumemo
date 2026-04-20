@@ -1,16 +1,29 @@
 import { randomUUIDv7 } from "bun"
 
-import {
-	cleanupUploadedKeys,
-	verifyUploads,
-} from "~/lib/storage"
 import { publishPipelineJobV3 } from "~/lib/queue"
 import { profilingV3Repository } from "~/repositories/profiling-v3-repository"
 import type { CreateSessionV3Body } from "~/schemas/session-v3"
 import { usecaseFailure, usecaseSuccess } from "../result"
+import { cleanupUploadedKeys, verifyUploads } from "~/lib/storage"
 
 const CREATE_SESSION_FAILED_MESSAGE = "We couldn't start processing. Please try again."
 
+/**
+ * Creates a v3 profiling session for the authenticated user and starts pipeline processing.
+ *
+ * Validation and flow summary:
+ * - Requires at least one uploaded file.
+ * - Requires either a saved job description template or inline job description text.
+ * - Verifies that all storage keys belong to the current user and that uploads exist.
+ * - Reuses a selected template or creates a new inline template.
+ * - Persists the session, then publishes a pipeline job with a new run id.
+ *
+ * Returns a usecase failure for validation/authorization/persistence/queue errors,
+ * and a processing payload with session and run metadata on success.
+ *
+ * @param input - Authenticated user id plus validated create-session request body.
+ * @returns Standardized usecase result with failure status details or processing metadata.
+ */
 export async function createSessionV3Usecase(input: {
 	userId: string
 	body: CreateSessionV3Body
@@ -76,7 +89,6 @@ export async function createSessionV3Usecase(input: {
 	}
 
 	const runId = randomUUIDv7()
-
 	const created = await profilingV3Repository.createSession({
 		userId: input.userId,
 		name,
