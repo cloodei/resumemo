@@ -1,1 +1,38 @@
-{}
+{
+  "workbench.colorCustomizations": {
+    "[Nord Native]": {
+      "sideBar.background": "#222324",
+    },
+    "[poimandres-noitalics]": {
+      "sideBar.background": "#15171d",
+    },
+    "[poimandres]": {
+      "sideBar.background": "#15171d",
+    },
+  },
+  "editor.semanticHighlighting.enabled": true,
+  "editor.semanticTokenColorCustomizations": {
+    "enabled": true,
+    "rules": {
+      "function": {
+        "foreground": "#f5fac8",
+      },
+      "method": {
+        "foreground": "#f5fac8",
+      },
+      "magicFunction": {
+        "foreground": "#f5fac8",
+      },
+    },
+  },
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": ["support.type", "entity.name.type"],
+        "settings": {
+          "foreground": "#5185af",
+        },
+      },
+    ],
+  },
+}
