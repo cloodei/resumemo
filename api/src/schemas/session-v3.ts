@@ -1,42 +1,14 @@
 import { t } from "elysia"
 
-import { MAX_FILES_PER_SESSION } from "@resumemo/core/constants/file-uploads"
+import {
+	screeningCreateSessionBodySchema,
+	screeningPresignBodySchema,
+	screeningResultsQuerySchema,
+} from "~/modules/screening/contracts"
 
-const sessionFileSchema = t.Object({
-	storageKey: t.String({ minLength: 1 }),
-	fileName: t.String({ minLength: 1, maxLength: 512 }),
-	mimeType: t.String({ minLength: 1, maxLength: 128 }),
-	size: t.Number({ minimum: 1 }),
-})
-
-export const presignSessionUploadsV3BodySchema = t.Object({
-	files: t.Array(
-		t.Object({
-			clientId: t.Number(),
-			fileName: t.String({ minLength: 1, maxLength: 512 }),
-			mimeType: t.String({ minLength: 1, maxLength: 128 }),
-			size: t.Number({ minimum: 1 }),
-		}),
-		{ minItems: 1, maxItems: MAX_FILES_PER_SESSION },
-	),
-})
-
-export const createSessionV3BodySchema = t.Object({
-	name: t.String({ minLength: 1, maxLength: 255 }),
-	jobDescriptionTemplateId: t.Optional(t.String({ minLength: 1 })),
-	jobDescriptionName: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
-	jobDescriptionText: t.Optional(t.String({ minLength: 1, maxLength: 5000 })),
-	jobTitle: t.Optional(t.String({ maxLength: 255 })),
-	files: t.Array(sessionFileSchema, {
-		minItems: 1,
-		maxItems: MAX_FILES_PER_SESSION,
-	}),
-})
-
-export const sessionResultsV3QuerySchema = t.Object({
-	sort: t.Optional(t.Union([t.Literal("asc"), t.Literal("desc")])),
-})
-
+export const presignSessionUploadsV3BodySchema = screeningPresignBodySchema
+export const createSessionV3BodySchema = screeningCreateSessionBodySchema
+export const sessionResultsV3QuerySchema = screeningResultsQuerySchema
 export const jobDescriptionTemplateV3ParamsSchema = t.Object({
 	id: t.String({ minLength: 1 }),
 })

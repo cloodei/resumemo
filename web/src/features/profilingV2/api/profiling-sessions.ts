@@ -1,10 +1,10 @@
 import { api } from "@/lib/api"
 import { getEdenErrorMessage } from "@/lib/errors"
 
-export async function fetchProfilingV3Sessions() {
+export async function fetchScreeningSessions() {
 	const { data, error } = await api.api.v3.sessions.get()
 	if (error || !data)
-		throw new Error(getEdenErrorMessage(error) ?? "Could not load v3 profiling sessions")
+		throw new Error(getEdenErrorMessage(error) ?? "Could not load screening sessions")
 
 	return data.sessions.map(session => ({
 		...session,
@@ -12,4 +12,4 @@ export async function fetchProfilingV3Sessions() {
 	}))
 }
 
-export type ProfilingV3SessionList = Awaited<ReturnType<typeof fetchProfilingV3Sessions>>
+export type ScreeningSessionList = Awaited<ReturnType<typeof fetchScreeningSessions>>

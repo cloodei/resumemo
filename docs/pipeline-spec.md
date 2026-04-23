@@ -7,6 +7,11 @@ It describes two things separately:
 - the stable boundary the API and worker rely on today
 - the current Python/Celery implementation snapshot, which is important in production now but expected to be replaceable later
 
+There are now two pipeline surfaces:
+
+- legacy profiling at `/api/v2` backed by `profiling.jobs`
+- screening at `/api/v3` backed by `screening.jobs`
+
 If live code conflicts with this file, fix this file in the same change.
 
 ## What Is Stable vs Replaceable
@@ -23,6 +28,17 @@ These are the parts other parts of the system depend on today:
 - callback run awareness: callbacks only apply when payload `run_id` matches the session's active run
 - session status model: `processing`, `retrying`, `completed`, `failed`
 - result persistence: candidate results are stored against the active run, and stale callbacks are ignored
+
+### Screening boundary
+
+The `/api/v3` screening path uses a richer contract:
+
+- queue: `screening.jobs`
+- task name: `screening.process_session`
+- callback endpoint: `POST /api/internal/pipeline/v3/callback`
+- job description payload: `job_description = { id, name, raw_text, job_title, source }`
+- completion payload includes `job_description_artifact`, `resume_artifact`, `candidate_profile`, and `score_artifact`
+- persistence target is the dedicated `screening` Postgres schema: `screening.job_description`, `screening.session`, `screening.session_file`, and `screening.candidate`
 
 ### Replaceable internals
 
@@ -71,6 +87,31 @@ Field notes:
 
 The queue transport is currently Celery wire format created in `api/src/lib/queue.ts`, but the contract that matters to the worker is the payload above.
 
+### Screening queue payload
+
+The screening worker receives:
+
+```json
+{
+  "session_id": "<session-uuid>",
+  "run_id": "<run-uuid>",
+  "job_description": {
+    "id": "<job-description-uuid>",
+    "name": "Backend Engineer",
+    "raw_text": "...",
+    "job_title": "Backend Engineer",
+    "source": "inline"
+  },
+  "files": [
+    {
+      "file_id": 42,
+      "storage_key": "uploads/user-1/resume.pdf",
+      "original_name": "resume.pdf"
+    }
+  ]
+}
+```
+
 ### Callback auth
 
 The worker calls `POST /api/internal/pipeline/callback`.
@@ -103,6 +144,39 @@ Authentication is not bearer auth. The worker sends the configured secret in the
 ```
 
 On success, the API deletes any existing `candidate_result` rows for the same `session_id` + `run_id`, inserts the new results, and marks the session `completed`.
+
+### Screening completion callback
+
+The screening worker posts to `POST /api/internal/pipeline/v3/callback` with:
+
+```json
+{
+  "type": "completion",
+  "session_id": "<session-uuid>",
+  "run_id": "<run-uuid>",
+  "status": "completed",
+  "job_description_artifact": {},
+  "results": [
+    {
+      "file_id": 42,
+      "candidate_name": "Jane Doe",
+      "candidate_email": "jane@example.com",
+      "candidate_phone": "+1-555-0100",
+      "raw_text": "...",
+      "resume_artifact": {},
+      "candidate_profile": {},
+      "score_artifact": {},
+      "overall_score": 96.2,
+      "base_score": 88.0,
+      "bonus_score": 8.2,
+      "summary": "...",
+      "skills_matched": ["python", "docker"]
+    }
+  ]
+}
+```
+
+The API persists this under the `screening` schema and updates the referenced JD row with the latest JD artifact.
 
 ### Error callback
 

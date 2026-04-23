@@ -1,7 +1,7 @@
 import { api } from "@/lib/api"
 import { getEdenErrorMessage } from "@/lib/errors"
 
-export async function presignProfilingV3Uploads(files: Array<{
+export async function presignScreeningUploads(files: Array<{
 	clientId: number
 	fileName: string
 	mimeType: string
@@ -9,9 +9,9 @@ export async function presignProfilingV3Uploads(files: Array<{
 }>) {
 	const { data, error } = await api.api.v3.sessions.presign.post({ files })
 	if (error || !data)
-		throw new Error(getEdenErrorMessage(error) ?? "Could not prepare v3 uploads")
+		throw new Error(getEdenErrorMessage(error) ?? "Could not prepare screening uploads")
 
 	return data
 }
 
-export type ProfilingV3PresignResponse = Awaited<ReturnType<typeof presignProfilingV3Uploads>>
+export type ScreeningPresignResponse = Awaited<ReturnType<typeof presignScreeningUploads>>

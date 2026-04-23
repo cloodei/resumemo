@@ -1,245 +1,214 @@
-"""Stage 3: Hybrid lexical + semantic scoring for resume relevance."""
+"""Stage 3: layered composite scoring based on JD and candidate artifacts."""
 
 from __future__ import annotations
 
-import logging
-import re
-from typing import Any
-
-from sentence_transformers import SentenceTransformer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
-from config import (
-    SCORING_WEIGHT_EXPERIENCE_FIT,
-    SCORING_WEIGHT_SEMANTIC_SIMILARITY,
-    SCORING_WEIGHT_SKILL_MATCH,
-    SCORING_WEIGHT_TEXT_SIMILARITY,
-    SEMANTIC_MAX_CHARS,
-    SEMANTIC_MODEL_NAME,
-    TFIDF_MAX_FEATURES,
-    TFIDF_NGRAM_RANGE,
-)
-from models import CandidateProfile, ScoringResult, SubScore
-from stages.parse import _get_nlp, _get_skills_taxonomy
-
-logger = logging.getLogger(__name__)
-_semantic_model: SentenceTransformer | None = SentenceTransformer(SEMANTIC_MODEL_NAME)
-_semantic_backend = "sentence-transformers"
-
-EXPERIENCE_YEARS_PATTERN = re.compile(
-    r"(\d+)\+?\s*(?:years?|yrs?)(?:\s+of\s+experience)?",
-    re.IGNORECASE,
-)
+import math
 
 
-def score_resume(
-    raw_text: str,
-    profile: CandidateProfile,
-    job_description: str,
-) -> ScoringResult:
-    """Score a resume against a job description with a hybrid approach."""
-    lexical_sim = _score_text_similarity(raw_text, job_description)
-    semantic_sim = _score_semantic_similarity(raw_text, job_description)
-    skill_match, matched, missing, extra = _score_skill_match(profile.skills, job_description)
-    exp_fit, required_years = _score_experience_fit(profile.total_experience_years, job_description)
+BUCKET_WEIGHTS = {
+	"mustHave": 1.0,
+	"niceToHave": 0.7,
+	"expansion": 0.3,
+}
 
-    weights = {
-        "text_similarity": SCORING_WEIGHT_TEXT_SIMILARITY,
-        "semantic_similarity": SCORING_WEIGHT_SEMANTIC_SIMILARITY,
-        "skill_match": SCORING_WEIGHT_SKILL_MATCH,
-        "experience_fit": SCORING_WEIGHT_EXPERIENCE_FIT,
-    }
-
-    if skill_match == 50.0 and not matched and not missing:
-        _redistribute_weight(weights, "skill_match", ["text_similarity", "semantic_similarity"])
-
-    if exp_fit == 50.0 and required_years is None:
-        _redistribute_weight(weights, "experience_fit", ["semantic_similarity", "text_similarity", "skill_match"])
-
-    total_weight = sum(weights.values())
-    if total_weight > 0:
-        weights = {key: value / total_weight for key, value in weights.items()}
-
-    overall = (
-        lexical_sim * weights["text_similarity"]
-        + semantic_sim * weights["semantic_similarity"]
-        + skill_match * weights["skill_match"]
-        + exp_fit * weights["experience_fit"]
-    )
-    overall = round(min(100.0, max(0.0, overall)), 1)
-
-    breakdown = {
-        "text_similarity": SubScore(
-            score=round(lexical_sim, 1),
-            weight=round(weights["text_similarity"], 2),
-            description="Lexical TF-IDF similarity between the resume and job description",
-        ),
-        "semantic_similarity": SubScore(
-            score=round(semantic_sim, 1),
-            weight=round(weights["semantic_similarity"], 2),
-            description="Semantic similarity using sentence-transformer embeddings",
-            details={
-                "max_chars": SEMANTIC_MAX_CHARS,
-                "backend": _semantic_backend,
-                "model": SEMANTIC_MODEL_NAME if _semantic_backend == "sentence-transformers" else "spacy-fallback",
-            },
-        ),
-        "skill_match": SubScore(
-            score=round(skill_match, 1),
-            weight=round(weights["skill_match"], 2),
-            description="Ratio of required skills found in the resume",
-            details={
-                "matched": matched,
-                "missing": missing,
-                "extra": extra,
-            },
-        ),
-        "experience_fit": SubScore(
-            score=round(exp_fit, 1),
-            weight=round(weights["experience_fit"], 2),
-            description="Experience duration relative to the stated requirement",
-            details={
-                "required_years": required_years,
-                "candidate_years": profile.total_experience_years,
-            },
-        ),
-    }
-
-    return ScoringResult(overall_score=overall, breakdown=breakdown)
+DEGREE_RANK = {
+	"associate": 1,
+	"bachelor": 2,
+	"master": 3,
+	"phd": 4,
+	"doctorate": 4,
+}
 
 
-def _redistribute_weight(weights: dict[str, float], from_key: str, recipients: list[str]) -> None:
-    amount = weights[from_key]
-    weights[from_key] = 0.0
-    if amount <= 0 or not recipients:
-        return
-
-    share = amount / len(recipients)
-    for key in recipients:
-        weights[key] += share
-
-
-def _score_text_similarity(resume_text: str, job_description: str) -> float:
-    """Compute lexical TF-IDF cosine similarity between resume and JD."""
-    if not resume_text.strip() or not job_description.strip():
-        return 0.0
-
-    try:
-        vectorizer = TfidfVectorizer(
-            max_features=TFIDF_MAX_FEATURES,
-            stop_words="english",
-            ngram_range=TFIDF_NGRAM_RANGE,
-        )
-        tfidf_matrix = vectorizer.fit_transform([job_description, resume_text])
-        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-        return float(similarity * 100)
-    except Exception:
-        return 0.0
+def _degree_rank(value: str | None) -> int:
+	if not value:
+		return 0
+	lowered = value.lower()
+	for key, rank in DEGREE_RANK.items():
+		if key in lowered:
+			return rank
+	return 0
 
 
-def _score_semantic_similarity(resume_text: str, job_description: str) -> float:
-    """Compute semantic similarity using sentence-transformers with spaCy fallback."""
-    if not resume_text.strip() or not job_description.strip():
-        return 0.0
-
-    try:
-        model = _get_semantic_model()
-        embeddings = model.encode(
-            [job_description[:SEMANTIC_MAX_CHARS], resume_text[:SEMANTIC_MAX_CHARS]],
-            normalize_embeddings=True,
-        )
-        similarity = float(embeddings[0] @ embeddings[1])
-        return max(0.0, min(100.0, float(similarity * 100)))
-    except Exception as primary_error:
-        return _score_semantic_similarity_spacy(resume_text, job_description, primary_error)
+def _lookup_candidate_skills(candidate_profile: dict) -> dict[str, dict]:
+	items: dict[str, dict] = {}
+	for skill in candidate_profile["hardSkills"]["directMention"]:
+		key = skill.get("taxonomyId") or skill.get("canonicalName", "").lower()
+		if key:
+			items[key] = skill
+	return items
 
 
-def _get_semantic_model():
-    global _semantic_model
-    global _semantic_backend
+def _score_skill_bucket(required_skills: list[dict], candidate_lookup: dict[str, dict], bucket_weight: float, ideal_years: float) -> tuple[float, float, list[str], list[str]]:
+	achieved = 0.0
+	possible = 0.0
+	matched: list[str] = []
+	missing: list[str] = []
 
-    if _semantic_model is None:
-        _semantic_model = SentenceTransformer(SEMANTIC_MODEL_NAME)
-        _semantic_backend = "sentence-transformers"
+	for required in required_skills:
+		key = required.get("taxonomyId") or required.get("canonicalName", "").lower()
+		base_point = bucket_weight * (1 + math.log(ideal_years + 1))
+		possible += base_point
+		candidate_skill = candidate_lookup.get(key)
+		if not candidate_skill:
+			missing.append(required["skill"])
+			continue
 
-    return _semantic_model
+		years = float(candidate_skill.get("years") or 0.0)
+		achieved += bucket_weight * (1 + math.log(years + 1))
+		matched.append(required["skill"])
 
-
-def _score_semantic_similarity_spacy(
-    resume_text: str,
-    job_description: str,
-    primary_error: Exception | None = None,
-):
-    global _semantic_backend
-
-    try:
-        nlp = _get_nlp()
-        jd_doc = nlp(job_description[:SEMANTIC_MAX_CHARS])
-        resume_doc = nlp(resume_text[:SEMANTIC_MAX_CHARS])
-        similarity = jd_doc.similarity(resume_doc)
-        _semantic_backend = "spacy-fallback"
-        return max(0.0, min(100.0, float(similarity * 100)))
-    except Exception as fallback_error:
-        logger.error(
-            "Semantic scoring failed after fallback",
-            extra={
-                "primary_error": str(primary_error) if primary_error else None,
-                "fallback_error": str(fallback_error),
-            },
-        )
-        return 0.0
+	return achieved, possible, matched, missing
 
 
-def _score_skill_match(
-    candidate_skills: list[str],
-    job_description: str,
-) -> tuple[float, list[str], list[str], list[str]]:
-    """Score skill overlap between candidate and job description."""
-    taxonomy = _get_skills_taxonomy()
-    jd_lower = job_description.lower()
+def score_candidate(candidate_profile: dict, job_description_artifact: dict) -> dict:
+	candidate_lookup = _lookup_candidate_skills(candidate_profile)
+	ideal_years = float(job_description_artifact["hardConstraints"]["minExperienceYears"] or 0.0)
 
-    required_skills: set[str] = set()
-    for skill in taxonomy:
-        pattern = r"\b" + re.escape(skill) + r"\b"
-        if re.search(pattern, jd_lower):
-            required_skills.add(skill)
+	must_achieved, must_possible, matched_must, missing_must = _score_skill_bucket(
+		job_description_artifact["hardSkills"]["mustHave"]["techSkills"],
+		candidate_lookup,
+		BUCKET_WEIGHTS["mustHave"],
+		ideal_years,
+	)
+	nice_achieved, nice_possible, matched_nice, missing_nice = _score_skill_bucket(
+		job_description_artifact["hardSkills"]["niceToHave"]["fromJobDescription"],
+		candidate_lookup,
+		BUCKET_WEIGHTS["niceToHave"],
+		ideal_years,
+	)
+	exp_achieved, exp_possible, matched_expansion, missing_expansion = _score_skill_bucket(
+		job_description_artifact["hardSkills"]["niceToHave"]["fromTaxonomyExpansion"],
+		candidate_lookup,
+		BUCKET_WEIGHTS["expansion"],
+		ideal_years,
+	)
 
-    if not required_skills:
-        return 50.0, [], [], list(candidate_skills)
+	hard_skill_achieved = must_achieved + nice_achieved + exp_achieved
+	hard_skill_possible = must_possible + nice_possible + exp_possible
+	hard_ratio = hard_skill_achieved / hard_skill_possible if hard_skill_possible > 0 else 1.0
+	hard_skills_score = min(hard_ratio, 1.0) * 80.0
+	spillover_bonus = max(hard_ratio - 1.0, 0.0) * 80.0
 
-    candidate_lower = {skill.lower() for skill in candidate_skills}
+	required_years = job_description_artifact["hardConstraints"]["minExperienceYears"]
+	candidate_years = candidate_profile["information"]["yearsOfExperience"]
+	experience_passed = required_years is None or ((candidate_years or 0.0) >= required_years)
 
-    matched = sorted(required_skills & candidate_lower, key=str.lower)
-    missing = sorted(required_skills - candidate_lower, key=str.lower)
-    extra = sorted(candidate_lower - required_skills, key=str.lower)
+	required_degree = job_description_artifact["hardConstraints"]["requiredDegree"]
+	candidate_degree = candidate_profile["education"]["degree"]
+	degree_passed = required_degree is None or _degree_rank(candidate_degree) >= _degree_rank(required_degree)
 
-    score = (len(matched) / len(required_skills)) * 100 if required_skills else 50.0
-    return min(100.0, score), matched, missing, extra
+	constraint_checks = [
+		("experience", experience_passed),
+		("degree", degree_passed),
+	]
+	active_constraint_count = sum(1 for name, _ in constraint_checks if job_description_artifact["hardConstraints"]["minExperienceYears"] is not None or name != "experience" or required_years is not None)
+	hard_constraints_score = (
+		(sum(1.0 for _, passed in constraint_checks if passed) / len(constraint_checks)) * 20.0
+	)
 
+	required_soft = {item["canonicalName"] for item in job_description_artifact["softSkills"]}
+	candidate_soft = {item["canonicalName"] for item in candidate_profile["softSkills"]}
+	matched_soft = sorted(required_soft & candidate_soft)
+	missing_soft = sorted(required_soft - candidate_soft)
+	soft_bonus = float(len(matched_soft))
 
-def _score_experience_fit(
-    candidate_years: float | None,
-    job_description: str,
-) -> tuple[float, int | None]:
-    """Score experience alignment with JD requirements."""
-    match = EXPERIENCE_YEARS_PATTERN.search(job_description)
-    if not match:
-        return 50.0, None
+	required_skill_keys = {
+		item.get("taxonomyId") or item.get("canonicalName", "").lower()
+		for item in (
+			job_description_artifact["hardSkills"]["mustHave"]["techSkills"]
+			+ job_description_artifact["hardSkills"]["niceToHave"]["fromJobDescription"]
+			+ job_description_artifact["hardSkills"]["niceToHave"]["fromTaxonomyExpansion"]
+		)
+	}
+	surplus_skills = sorted([
+		skill["skill"]
+		for key, skill in candidate_lookup.items()
+		if key not in required_skill_keys
+	])
+	surplus_bonus = sum(0.05 * (1 + math.log((candidate_lookup[key].get("years") or 0.0) + 1)) for key in candidate_lookup if key not in required_skill_keys)
 
-    required = int(match.group(1))
+	required_certifications = {
+		item.get("taxonomyId") or item.get("canonicalName", "").lower()
+		for item in job_description_artifact["hardSkills"]["mustHave"]["certifications"]
+	}
+	candidate_certifications = {
+		item.get("taxonomyId") or item.get("canonicalName", "").lower(): item["skill"]
+		for item in candidate_profile["hardSkills"]["certifications"]
+	}
+	matched_certs = sorted([
+		name
+		for key, name in candidate_certifications.items()
+		if key in required_certifications
+	])
+	extra_certs = sorted([
+		name
+		for key, name in candidate_certifications.items()
+		if key not in required_certifications
+	])
+	cert_bonus = float(len(extra_certs))
 
-    if candidate_years is None:
-        return 50.0, required
+	base_score = round(hard_skills_score + hard_constraints_score, 2)
+	bonus_score = round(spillover_bonus + surplus_bonus + soft_bonus + cert_bonus, 2)
+	total_score = round(base_score + bonus_score, 2)
 
-    diff = candidate_years - required
-    if diff >= 0:
-        score = 100.0
-    elif diff >= -1:
-        score = 80.0
-    elif diff >= -2:
-        score = 60.0
-    else:
-        score = 40.0
+	score_artifact = {
+		"scores": {
+			"hardSkillsScore": round(hard_skills_score, 2),
+			"hardConstraintsScore": round(hard_constraints_score, 2),
+			"baseScore": base_score,
+			"bonusScore": bonus_score,
+			"totalScore": total_score,
+		},
+		"breakdown": {
+			"hardSkills": {
+				"achieved": round(hard_skill_achieved, 4),
+				"possible": round(hard_skill_possible, 4),
+				"ratio": round(hard_ratio, 4),
+				"matchedMustHave": matched_must,
+				"matchedNiceToHave": matched_nice,
+				"matchedExpansion": matched_expansion,
+				"missingMustHave": missing_must,
+				"missingNiceToHave": missing_nice,
+				"missingExpansion": missing_expansion,
+			},
+			"hardConstraints": {
+				"experience": {
+					"required": str(required_years) if required_years is not None else None,
+					"candidate": str(candidate_years) if candidate_years is not None else None,
+					"passed": experience_passed,
+				},
+				"degree": {
+					"required": required_degree,
+					"candidate": candidate_degree,
+					"passed": degree_passed,
+				},
+			},
+			"surplusSkills": surplus_skills,
+			"softSkills": {
+				"matched": matched_soft,
+				"missing": missing_soft,
+				"score": soft_bonus,
+			},
+			"certifications": {
+				"matched": matched_certs,
+				"extra": extra_certs,
+				"score": cert_bonus,
+			},
+			"spillover": {
+				"hardSkillRatio": round(hard_ratio, 4),
+				"bonusScore": round(spillover_bonus, 2),
+			},
+		},
+		"matchedSkills": matched_must + matched_nice + matched_expansion,
+		"missingSkills": missing_must + missing_nice + missing_expansion,
+		"extraSkills": surplus_skills,
+	}
 
-    return score, required
+	return {
+		"score_artifact": score_artifact,
+		"overall_score": total_score,
+		"base_score": base_score,
+		"bonus_score": bonus_score,
+		"skills_matched": score_artifact["matchedSkills"],
+	}

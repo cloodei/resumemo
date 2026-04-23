@@ -48,6 +48,7 @@ bun run dev
 bun run web
 bun run api
 bun run pipeline
+bun run pipeline:screening
 bun run build
 bun run lint
 bun run start
@@ -138,7 +139,9 @@ Notes:
 - Current mounted API surface centers on:
   - health check at `/health`
   - profiling session presign, create, retry, list, detail, results, result detail, and export routes under `/api/v2/sessions`
+  - screening session and JD-template routes under `/api/v3`
   - internal worker callback at `/api/internal/pipeline/callback`
+  - screening worker callback at `/api/internal/pipeline/v3/callback`
 - Keep route handlers thin; push HTTP-aware orchestration into `api/src/usecases/` and keep repositories focused on raw data access and persistence.
 - Session flows currently live in `api/src/usecases/session/`, and the internal worker callback flow lives in `api/src/usecases/pipeline/`.
 - Repositories should return raw data, `null`, `false`, or successful void behavior rather than wrapped success/error states.
@@ -146,7 +149,9 @@ Notes:
 ### Pipeline
 
 - `services/pipeline/` is an active worker project today.
+- The screening pipeline that backs `/api/v3` currently lives in `services/pipeline-v3/` until the workspace is renamed cleanly.
 - The worker consumes `profiling.jobs`, reads resume files from object storage, runs staged extraction/parsing/scoring/summarization, and POSTs results back to the API.
+- The screening worker consumes `screening.jobs`, produces JD and candidate artifacts, and posts composite-scoring results back to `/api/internal/pipeline/v3/callback`.
 - Treat the external contract as important, but treat the Python/Celery implementation as replaceable.
 - When documenting or modifying pipeline behavior, say "current implementation" unless a contract is intentionally permanent.
 
