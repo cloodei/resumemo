@@ -14,7 +14,7 @@ worker_pool = os.getenv("CELERY_WORKER_POOL", "solo" if is_windows else "solo")
 worker_concurrency = int(os.getenv("CELERY_WORKER_CONCURRENCY", "1"))
 
 task_routes = {
-    "pipeline_v3.process_session": {"queue": "profiling.v3.jobs"},
+    "screening.process_session": {"queue": "screening.jobs"},
 }
 
 task_default_retry_delay = 60

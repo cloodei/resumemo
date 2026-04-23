@@ -5,45 +5,49 @@
  * Uses amqplib with a persistent connection and channel.
  */
 
-import { randomUUIDv7 } from "bun";
-import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib";
+import { randomUUIDv7 } from "bun"
+import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib"
 
-import { apiEnv } from "~/config/env";
-import type { ProfilingV3PipelineJobPayload } from "@resumemo/core/schemas";
-import { QUEUE_NAME, QUEUE_NAME_V3, PIPELINE_TASK_NAME, PIPELINE_TASK_NAME_V3, QUEUE_ORIGIN } from "~/config/constants";
+import { apiEnv } from "~/config/env"
+import type { ScreeningPipelinePayload } from "@resumemo/core/schemas"
+import {
+	PIPELINE_TASK_NAME,
+	QUEUE_NAME,
+	QUEUE_ORIGIN,
+	SCREENING_QUEUE_NAME,
+	SCREENING_TASK_NAME,
+} from "~/config/constants"
 
-const url = apiEnv.queue.brokerUrl;
+const url = apiEnv.queue.brokerUrl
 
-export let channel: Channel | null = null;
-export let connection: Connection | null = null;
-export let channelModel: ChannelModel | null = null;
+export let channel: Channel | null = null
+export let connection: Connection | null = null
+export let channelModel: ChannelModel | null = null
 
 function resetConnectionState() {
-	channelModel = null;
-	channel = null;
-	connection = null;
+	channelModel = null
+	channel = null
+	connection = null
 }
 
 async function getChannel() {
 	if (channel)
 		return channel;
 
-	channelModel = await amqplib.connect(url);
-	channel = await channelModel.createChannel();
-	connection = channelModel.connection;
-
-	await channel.assertQueue(QUEUE_NAME, { durable: true });
+	channelModel = await amqplib.connect(url)
+	channel = await channelModel.createChannel()
+	connection = channelModel.connection
 
 	connection.on("error", (err) => {
-		resetConnectionState();
-		console.error("[RabbitMQ] Broker connection error:", err.message);
-	});
+		resetConnectionState()
+		console.error("[RabbitMQ] Broker connection error:", err.message)
+	})
 
 	connection.on("close", () => {
-		resetConnectionState();
-	});
+		resetConnectionState()
+	})
 
-	return channel;
+	return channel
 }
 
 export type PipelineJobPayload = {
@@ -62,9 +66,9 @@ async function publishCeleryTask({ queueName, taskName, args }: {
 	taskName: string;
 	args: unknown[];
 }) {
-	const ch = await getChannel();
-	const taskId = randomUUIDv7();
-	await ch.assertQueue(queueName, { durable: true });
+	const ch = await getChannel()
+	const taskId = randomUUIDv7()
+	await ch.assertQueue(queueName, { durable: true })
 
 	const body = JSON.stringify([
 		args,
@@ -75,7 +79,7 @@ async function publishCeleryTask({ queueName, taskName, args }: {
 			chain: null,
 			chord: null,
 		},
-	]);
+	])
 
 	const sent = ch.sendToQueue(
 		queueName,
@@ -104,12 +108,12 @@ async function publishCeleryTask({ queueName, taskName, args }: {
 				origin: QUEUE_ORIGIN,
 			},
 		},
-	);
+	)
 
 	if (!sent)
-		throw new Error("Failed to publish task: channel buffer full");
+		throw new Error("Failed to publish task: channel buffer full")
 
-	return taskId;
+	return taskId
 }
 
 /**
@@ -123,16 +127,18 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 		queueName: QUEUE_NAME,
 		taskName: PIPELINE_TASK_NAME,
 		args: [payload],
-	});
+	})
 }
 
-export async function publishPipelineJobV3(payload: ProfilingV3PipelineJobPayload) {
+export async function publishScreeningJob(payload: ScreeningPipelinePayload) {
 	return publishCeleryTask({
-		queueName: QUEUE_NAME_V3,
-		taskName: PIPELINE_TASK_NAME_V3,
+		queueName: SCREENING_QUEUE_NAME,
+		taskName: SCREENING_TASK_NAME,
 		args: [payload],
-	});
+	})
 }
+
+export const publishPipelineJobV3 = publishScreeningJob
 
 /**
  * Gracefully close the RabbitMQ connection (call on server shutdown).
@@ -140,12 +146,12 @@ export async function publishPipelineJobV3(payload: ProfilingV3PipelineJobPayloa
 export async function closeRabbitMQ() {
 	try {
 		if (channel)
-			await channel.close();
+			await channel.close()
 		if (channelModel)
-			await channelModel.close();
+			await channelModel.close()
 	}
 	catch {
 		// Best-effort cleanup
 	}
-	resetConnectionState();
+	resetConnectionState()
 }

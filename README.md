@@ -6,6 +6,7 @@ Resumemo is a recruiter-facing resume screening app for running profiling sessio
 
 - Early-stage product: core profiling flows work, but behavior and docs will continue to move.
 - Current implementation uses a Bun monorepo for `web`, `api`, and `core`, plus a standalone Python/Celery pipeline in `services/pipeline/`.
+- The new screening pipeline for `/api/v3` currently lives in `services/pipeline-v3/` while the repo is being consolidated; its domain model is `screening`, not `v3`.
 - The pipeline is active in production today, but it is a replaceable subsystem rather than a permanent architecture commitment.
 
 ## Repository Overview
@@ -26,6 +27,7 @@ Current runtime shape:
 
 - `web` serves the recruiter interface for sign-in, dashboard, profiling session creation, session list, and result review.
 - `api` handles auth, upload presigning, session creation, retry flows, results, exports, and the internal pipeline callback.
+- `/api/v3` is the coordinated screening path built around a dedicated `screening` Postgres schema, JD templates, session artifacts, and composite scoring callbacks.
 - In `api`, route modules are thin transport adapters, usecases own HTTP-facing orchestration and error mapping, and repositories return raw data or command success only.
 - `core` holds shared TypeScript contracts used by `web` and `api`.
 - `services/pipeline` consumes queue jobs, reads files from storage, runs extraction/parsing/scoring/summarization, and calls back into the API.
@@ -59,6 +61,7 @@ bun run dev        # web + api
 bun run web        # web only
 bun run api        # api only
 bun run pipeline   # standalone Python worker
+bun run pipeline:screening
 bun run build      # build workspaces through Turbo
 bun run lint       # lint workspaces through Turbo
 bun run start      # preview web + start compiled api
@@ -79,7 +82,7 @@ bun run start      # preview web + start compiled api
 - Profiling result view at `/profiling/:id`
 - Session retry flows for rerun, clone, and replace variants
 - Session exports from the API in `csv` and `json` formats
-- Internal pipeline callback route for worker completion and failure reporting
+- Internal pipeline callback routes for the legacy worker and the screening worker
 
 ## Docs Map
 

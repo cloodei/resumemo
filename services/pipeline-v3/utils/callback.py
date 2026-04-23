@@ -14,7 +14,7 @@ from config import (
     PIPELINE_CALLBACK_URL,
     PIPELINE_SECRET_HEADER_NAME,
 )
-from models import JobPayload
+from models import PipelinePayload
 
 logger = logging.getLogger(__name__)
 headers = {
@@ -22,7 +22,7 @@ headers = {
     "Content-Type": "application/json",
 }
 
-def _post_callback(payload: JobPayload, body: dict):
+def _post_callback(payload: PipelinePayload, body: dict):
     """POST a callback to the Elysia API with retry logic."""
     last_error: Exception | None = None
 
@@ -53,7 +53,7 @@ def _post_callback(payload: JobPayload, body: dict):
 
 
 def send_completion(
-    payload: JobPayload,
+    payload: PipelinePayload,
     job_description_artifact: dict,
     results: list[dict],
 ):
@@ -70,7 +70,7 @@ def send_completion(
 
 
 def send_error(
-    payload: JobPayload,
+    payload: PipelinePayload,
     error: str,
     job_description_artifact: dict | None = None,
     partial_results: list[dict] | None = None,

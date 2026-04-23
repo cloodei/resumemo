@@ -15,6 +15,7 @@ Current backend implementation note:
 
 - `api/src/routes/` stays thin and delegates HTTP behavior to usecases in `api/src/usecases/`.
 - `api/src/repositories/` is the raw data-access layer and should not return HTTP-oriented wrapper states.
+- The `/api/v3` screening path is consolidated around `api/src/modules/screening/` and the `screening` database schema, even though the worker currently still sits under `services/pipeline-v3/`.
 
 ## Operational Docs
 
