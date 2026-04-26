@@ -25,7 +25,7 @@ resumemo/
 |     |- schemas/
 |     |- types/
 |     `- constants/
-|- services/pipeline/         standalone Python worker project
+|- services/pipeline/         official research-backed Python AI worker
 |  |- worker.py              Celery entrypoint
 |  |- stages/                extract, parse, score, summarize
 |  |- utils/                 callback and storage helpers
@@ -33,13 +33,14 @@ resumemo/
 |  `- celeryconfig.py        queue config
 |- deploy/                    deployment scripts, env examples, nginx config
 |- docs/                      current docs and working plans
+|- research/                  AI research references, taxonomy assets, and notebooks
 |- docker-compose.yml         local RabbitMQ + pipeline worker
 `- docker-compose.prod.yml    production compose stack
 ```
 
 ## Commands
 
-You **must not** run build, lint, or test commands unless the user explicitly asks. Refrain from running direct tests/lints or build during code generation or development. They will be ran manually except explicitly being said to run, or allowed to.
+You **must not** run build, test or run commands unless the user explicitly asks. They will be ran manually except explicitly being said to run, or allowed to.
 
 ### Root
 
@@ -48,7 +49,6 @@ bun run dev
 bun run web
 bun run api
 bun run pipeline
-bun run pipeline:screening
 bun run build
 bun run lint
 bun run start
@@ -86,7 +86,6 @@ bun run generate
 ```bash
 cd services/pipeline
 bun run sync
-bun run spacy
 bun run dev
 ```
 
@@ -139,21 +138,18 @@ Notes:
 - Current mounted API surface centers on:
   - health check at `/health`
   - profiling session presign, create, retry, list, detail, results, result detail, and export routes under `/api/v2/sessions`
-  - screening session and JD-template routes under `/api/v3`
   - internal worker callback at `/api/internal/pipeline/callback`
-  - screening worker callback at `/api/internal/pipeline/v3/callback`
 - Keep route handlers thin; push HTTP-aware orchestration into `api/src/usecases/` and keep repositories focused on raw data access and persistence.
 - Session flows currently live in `api/src/usecases/session/`, and the internal worker callback flow lives in `api/src/usecases/pipeline/`.
 - Repositories should return raw data, `null`, `false`, or successful void behavior rather than wrapped success/error states.
 
 ### Pipeline
 
-- `services/pipeline/` is an active worker project today.
-- The screening pipeline that backs `/api/v3` currently lives in `services/pipeline-v3/` until the workspace is renamed cleanly.
-- The worker consumes `profiling.jobs`, reads resume files from object storage, runs staged extraction/parsing/scoring/summarization, and POSTs results back to the API.
-- The screening worker consumes `screening.jobs`, produces JD and candidate artifacts, and posts composite-scoring results back to `/api/internal/pipeline/v3/callback`.
-- Treat the external contract as important, but treat the Python/Celery implementation as replaceable.
-- When documenting or modifying pipeline behavior, say "current implementation" unless a contract is intentionally permanent.
+- `services/pipeline/` is the official research-backed AI worker for the current `/api/v2` profiling flow.
+- The worker consumes `profiling.jobs`, reads resume files from object storage, builds JD, candidate DNA, and score artifacts, and POSTs results back to `/api/internal/pipeline/callback`.
+- The queue and callback contract is intentionally stable; Python, Celery, model choices, and taxonomy internals remain replaceable implementation details.
+- There is no mounted `/api/v3` screening path or `services/pipeline-v3/` service in this checkout.
+- Research material lives under `research/`; production runtime code belongs in `services/pipeline/`.
 
 ### Deployment surface
 
@@ -178,8 +174,9 @@ Notes:
 ## Pipeline Guidance
 
 - Keep the worker self-contained inside `services/pipeline/`.
-- Favor small stage-specific changes in `services/pipeline/stages/` and shared helpers in `services/pipeline/utils/`.
-- If the worker contract changes, update `docs/pipeline-spec.md`, `README.md`, and `AGENTS.md` in the same work.
+- Favor stage-specific changes in `services/pipeline/stages/` and shared helpers in `services/pipeline/utils/`.
+- Preserve the current v2 queue payload and callback fields unless the API contract is intentionally changed.
+- If the worker contract or artifact semantics change, update `docs/pipeline-spec.md`, `README.md`, `docs/README.md`, `research/README.md`, and `AGENTS.md` in the same work.
 
 ## File Placement
 
@@ -195,6 +192,7 @@ Notes:
 | API usecases | `api/src/usecases/` |
 | API repositories | `api/src/repositories/` |
 | Pipeline stages | `services/pipeline/stages/` |
+| AI research references | `research/` |
 | Deployment assets | `deploy/` |
 | Plans and long-form docs | `docs/` |
 
@@ -217,4 +215,5 @@ Notes:
 - `docs/system-guidelines.md` - current product workflow notes
 - `docs/codebase-operations.md` - operational guidance; verify commands against package scripts during the current docs refresh
 - `docs/pipeline-spec.md` - current pipeline contract
+- `research/README.md` - research reference map for the official AI pipeline
 - `deploy/ec2/README.md` - EC2 deployment runbook

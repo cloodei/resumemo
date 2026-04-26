@@ -13,7 +13,6 @@
     "web": "bun run --filter web dev",
     "api": "bun run --filter api dev",
     "pipeline": "cd services/pipeline && bun run dev",
-    "pipeline:screening": "cd services/pipeline-v3 && bun run dev",
     "queue": "bun run pipeline",
     "service": "bun run pipeline",
     "services": "bun run pipeline",
