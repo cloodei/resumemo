@@ -5,7 +5,7 @@ import { Elysia } from "elysia";
 import { apiEnv } from "./config/env";
 import { authMiddleware } from "./lib/auth";
 import { CORS_BASE_ALLOWED_HEADERS, CORS_METHODS } from "./config/constants";
-import { pipelineCallbackRoutes, screeningInternalRoutes, screeningRoutes, sessionRoutes } from "./routes";
+import { pipelineCallbackRoutes, sessionRoutes } from "./routes";
 
 const app = new Elysia({ precompile: true })
 	.get("/health", () => ({ status: "ok" }))
@@ -20,9 +20,7 @@ const app = new Elysia({ precompile: true })
 	.use(openapi())
 	.use(authMiddleware)
 	.use(sessionRoutes)
-	.use(screeningRoutes)
 	.use(pipelineCallbackRoutes)
-	.use(screeningInternalRoutes)
 	.listen({ hostname: "0.0.0.0", port: 8080 });
 
 export type API = typeof app;

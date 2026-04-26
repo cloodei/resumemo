@@ -9,13 +9,10 @@ import { randomUUIDv7 } from "bun"
 import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib"
 
 import { apiEnv } from "~/config/env"
-import type { ScreeningPipelinePayload } from "@resumemo/core/schemas"
 import {
 	PIPELINE_TASK_NAME,
 	QUEUE_NAME,
 	QUEUE_ORIGIN,
-	SCREENING_QUEUE_NAME,
-	SCREENING_TASK_NAME,
 } from "~/config/constants"
 
 const url = apiEnv.queue.brokerUrl
@@ -129,16 +126,6 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 		args: [payload],
 	})
 }
-
-export async function publishScreeningJob(payload: ScreeningPipelinePayload) {
-	return publishCeleryTask({
-		queueName: SCREENING_QUEUE_NAME,
-		taskName: SCREENING_TASK_NAME,
-		args: [payload],
-	})
-}
-
-export const publishPipelineJobV3 = publishScreeningJob
 
 /**
  * Gracefully close the RabbitMQ connection (call on server shutdown).

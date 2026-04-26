@@ -16,7 +16,9 @@ services:
       retries: 5
 
   pipeline-worker:
-    build: ./services/pipeline
+    build:
+      context: .
+      dockerfile: services/pipeline/Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -25,6 +27,7 @@ services:
       CELERY_BROKER_URL: amqp://resumemo:resumemo@rabbitmq:5672//
     volumes:
       - ./services/pipeline:/app
+      - ./research/data/taxonomy/taxonomy_processed:/app/data/taxonomy:ro
     command: >
       celery -A worker worker
       --loglevel=info

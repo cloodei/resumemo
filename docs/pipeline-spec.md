@@ -1,67 +1,34 @@
-# Pipeline Contract and Current Implementation
+# Pipeline Contract and Official AI Implementation
 
-This document is the current source of truth for the resume profiling pipeline.
+This document is the current source of truth for the Resumemo profiling pipeline.
 
 It describes two things separately:
 
-- the stable boundary the API and worker rely on today
-- the current Python/Celery implementation snapshot, which is important in production now but expected to be replaceable later
-
-There are now two pipeline surfaces:
-
-- legacy profiling at `/api/v2` backed by `profiling.jobs`
-- screening at `/api/v3` backed by `screening.jobs`
+- the stable v2 API/worker boundary
+- the official research-backed Python worker implementation in `services/pipeline/`
 
 If live code conflicts with this file, fix this file in the same change.
 
-## What Is Stable vs Replaceable
+## Stable Boundary
 
-### Stable boundary
+The active pipeline surface is the `/api/v2` profiling flow:
 
-These are the parts other parts of the system depend on today:
-
-- queue publisher payload fields: `session_id`, `run_id`, `job_description`, and `files[]`
+- queue: `profiling.jobs`
+- task name: `pipeline.process_session`
+- queue payload fields: `session_id`, `run_id`, `job_description`, and `files[]`
 - file manifest fields: `file_id`, `storage_key`, `original_name`
 - callback endpoint: `POST /api/internal/pipeline/callback`
-- callback auth shape: shared secret in the header named by `PIPELINE_SECRET_HEADER_NAME`, with value `PIPELINE_CALLBACK_SECRET`
+- callback auth: shared secret in the header named by `PIPELINE_SECRET_HEADER_NAME`, with value `PIPELINE_CALLBACK_SECRET`
 - callback types: `completion` and `error`
 - callback run awareness: callbacks only apply when payload `run_id` matches the session's active run
 - session status model: `processing`, `retrying`, `completed`, `failed`
-- result persistence: candidate results are stored against the active run, and stale callbacks are ignored
+- result persistence: candidate results are stored against the active run; stale callbacks are ignored
 
-### Screening boundary
+There is no mounted `/api/v3` screening pipeline in this checkout.
 
-The `/api/v3` screening path uses a richer contract:
+## Queue Payload
 
-- queue: `screening.jobs`
-- task name: `screening.process_session`
-- callback endpoint: `POST /api/internal/pipeline/v3/callback`
-- job description payload: `job_description = { id, name, raw_text, job_title, source }`
-- completion payload includes `job_description_artifact`, `resume_artifact`, `candidate_profile`, and `score_artifact`
-- persistence target is the dedicated `screening` Postgres schema: `screening.job_description`, `screening.session`, `screening.session_file`, and `screening.candidate`
-
-### Replaceable internals
-
-These are implementation details, not long-term commitments:
-
-- Python worker in `services/pipeline/`
-- Celery + RabbitMQ transport details
-- stage layout under `services/pipeline/stages/`
-- parsing heuristics, spaCy model choice, and skills taxonomy
-- scoring formulas, weights, fallback behavior, and model settings
-- Docker packaging and local compose wiring
-
-Any future replacement should preserve the stable boundary unless the API contract is intentionally changed.
-
-## Current System Role
-
-Today the API publishes profiling jobs to RabbitMQ and the worker consumes them, fetches resume files from object storage (currently Cloudflare R2), runs extract -> parse -> score -> summarize, then POSTs results back to the API. The worker does not write to Postgres directly; the API owns persistence and session state updates.
-
-## Contract Surface
-
-### Queue payload
-
-The API publishes a Celery-compatible task for `pipeline.process_session` on `profiling.jobs`. The application payload is:
+The API publishes a Celery-compatible task for `pipeline.process_session` on `profiling.jobs`:
 
 ```json
 {
@@ -78,47 +45,15 @@ The API publishes a Celery-compatible task for `pipeline.process_session` on `pr
 }
 ```
 
-Field notes:
+The queue transport is currently Celery wire format created in `api/src/lib/queue.ts`, but the payload above is the meaningful worker contract.
 
-- `session_id`: profiling session being processed
-- `run_id`: unique execution id for that session attempt or retry
-- `job_description`: current session job description text
-- `files`: file manifest for the worker to fetch from object storage
-
-The queue transport is currently Celery wire format created in `api/src/lib/queue.ts`, but the contract that matters to the worker is the payload above.
-
-### Screening queue payload
-
-The screening worker receives:
-
-```json
-{
-  "session_id": "<session-uuid>",
-  "run_id": "<run-uuid>",
-  "job_description": {
-    "id": "<job-description-uuid>",
-    "name": "Backend Engineer",
-    "raw_text": "...",
-    "job_title": "Backend Engineer",
-    "source": "inline"
-  },
-  "files": [
-    {
-      "file_id": 42,
-      "storage_key": "uploads/user-1/resume.pdf",
-      "original_name": "resume.pdf"
-    }
-  ]
-}
-```
-
-### Callback auth
+## Callback Auth
 
 The worker calls `POST /api/internal/pipeline/callback`.
 
 Authentication is not bearer auth. The worker sends the configured secret in the header named by `PIPELINE_SECRET_HEADER_NAME` (default `x-pipeline-secret`), and the API compares it to `PIPELINE_CALLBACK_SECRET`.
 
-### Completion callback
+## Completion Callback
 
 ```json
 {
@@ -134,51 +69,30 @@ Authentication is not bearer auth. The worker sends the configured secret in the
       "candidate_phone": "+1-555-0100",
       "raw_text": "...",
       "parsed_profile": {},
-      "overall_score": 87.3,
+      "overall_score": 96.2,
       "score_breakdown": {},
       "summary": "...",
-      "skills_matched": ["python", "docker"]
+      "skills_matched": ["Python", "Docker"]
     }
   ]
 }
 ```
 
-On success, the API deletes any existing `candidate_result` rows for the same `session_id` + `run_id`, inserts the new results, and marks the session `completed`.
+The callback shape is unchanged from v2. The official worker now maps research artifacts into the existing fields:
 
-### Screening completion callback
+- `parsed_profile`: candidate DNA profile
+- `score_breakdown.job_description_artifact`: structured JD artifact
+- `score_breakdown.resume_artifact`: resume processing metadata
+- `score_breakdown.score_artifact`: composite score artifact
+- `score_breakdown.base_score`: capped base score
+- `score_breakdown.bonus_score`: additional bonus score
+- `score_breakdown.total_score`: total ranking score
+- `overall_score`: same total ranking score used by existing result sorting
+- `summary`: deterministic recruiter-facing explanation
 
-The screening worker posts to `POST /api/internal/pipeline/v3/callback` with:
+On success, the API deletes existing `candidate_result` rows for the same `session_id` + `run_id`, inserts the new results, and marks the session `completed`.
 
-```json
-{
-  "type": "completion",
-  "session_id": "<session-uuid>",
-  "run_id": "<run-uuid>",
-  "status": "completed",
-  "job_description_artifact": {},
-  "results": [
-    {
-      "file_id": 42,
-      "candidate_name": "Jane Doe",
-      "candidate_email": "jane@example.com",
-      "candidate_phone": "+1-555-0100",
-      "raw_text": "...",
-      "resume_artifact": {},
-      "candidate_profile": {},
-      "score_artifact": {},
-      "overall_score": 96.2,
-      "base_score": 88.0,
-      "bonus_score": 8.2,
-      "summary": "...",
-      "skills_matched": ["python", "docker"]
-    }
-  ]
-}
-```
-
-The API persists this under the `screening` schema and updates the referenced JD row with the latest JD artifact.
-
-### Error callback
+## Error Callback
 
 ```json
 {
@@ -193,23 +107,73 @@ The API persists this under the `screening` schema and updates the referenced JD
 
 On error, the API marks the session `failed`, stores the error message, and currently persists any `partial_results` for that run before returning success.
 
+## Official Worker Stages
+
+The worker in `services/pipeline/worker.py` runs:
+
+1. Text extraction from PDF, DOCX, or TXT.
+2. JD enrichment through regex constraints, taxonomy-backed hard/soft skill detection, and top-K sibling expansion.
+3. CV preprocessing and candidate DNA extraction through text cleanup, section detection, taxonomy mapping, and interval-based experience evidence.
+4. Composite scoring with capped base score, uncapped bonus score, matched skills, missing skills, surplus skills, and component traces.
+5. Deterministic summary generation from the artifacts.
+6. Completion or error callback to the API.
+
+The research design comes from `research/project/` and processed taxonomy assets under `research/data/taxonomy/taxonomy_processed/`.
+
+## Artifact Summaries
+
+### JD artifact
+
+Contains:
+
+- `metadata`
+- `hard_constraints.min_experience_years`
+- `hard_constraints.required_degree`
+- `hard_skills.must_have.tech_skills`
+- `hard_skills.must_have.certifications`
+- `hard_skills.nice_to_have.from_jd_desirable`
+- `hard_skills.nice_to_have.from_taxonomy_expansion`
+- `soft_skills`
+- `taxonomy_traces`
+- `warnings`
+
+### Candidate DNA profile
+
+Contains:
+
+- candidate identity and contact signals
+- declared or inferred years of experience
+- direct hard skill evidence with taxonomy IDs, years, zones, and evidence lines
+- soft skills
+- education
+- raw extracted entities
+- taxonomy traces
+- parse warnings
+
+### Score artifact
+
+Contains:
+
+- `base_score`
+- `bonus_score`
+- `total_score`
+- hard-skill component details
+- constraint component details
+- bonus component details
+- matched, missing, and surplus skills
+- explanation lines
+
 ## Run-Aware Behavior
 
-Run awareness is a core part of the current contract.
-
-Context naming used in this document:
-
-- payload fields use snake_case, such as `run_id`
-- API/runtime properties in TypeScript usually use camelCase, such as `activeRunId` and `runId`
-- "active run" means the run currently stored on the session and allowed to mutate session state
+Run awareness is a core part of the contract.
 
 - each create or retry path generates a fresh `run_id`
 - the profiling session stores the active run in API code as `activeRunId`
-- `candidate_result` rows are stored with `runId` in the current schema
+- `candidate_result` rows are stored with `runId`
 - the callback route checks `activeRunId` before applying completion or error state
 - stale callbacks for older runs return `{ status: "ok", skipped: true }` and do not overwrite current results
 
-This is how reruns and retries avoid corrupting newer session state.
+This protects retries and reruns from stale worker responses.
 
 ## Session State Model
 
@@ -222,150 +186,49 @@ Current session states in `core/src/schemas/index.ts`:
 
 There is no separate progress state in the callback contract today.
 
-## Current Data Flow
-
-### Create or retry
-
-The session route and usecase flow in `api/src/routes/session.ts` and `api/src/usecases/session/`:
-
-- create a new session or mutate/clone an existing one
-- generate a new `run_id`
-- set the session to `processing` or `retrying`
-- publish the queue payload with the session and file manifest
-
-### Worker execution
-
-The current worker in `services/pipeline/worker.py`:
-
-- validates the queue payload with `JobPayload`
-- fetches each file from object storage using `storage_key`
-- extracts text by file extension
-- parses a structured profile from the extracted text
-- scores the resume against the job description
-- builds a text summary
-- sends either a `completion` callback or an `error` callback
-
-Per-file exceptions are collected. If at least one file succeeds, the worker currently sends `completion`; if every file fails, it sends `error`.
-
-### API finalization
-
-The callback route in `api/src/routes/pipeline.ts`, the pipeline usecase in `api/src/usecases/pipeline/`, and repository logic in `api/src/repositories/session-repository.ts`:
-
-- verify the shared-secret header
-- ignore stale callbacks whose `run_id` does not match the active run
-- upsert current-run results by delete-then-insert for that run
-- update session status and error fields
-- refresh cached session and result views
-
-Current backend layering for this flow:
-
-- routes only adapt transport concerns and hand off to usecases
-- usecases decide the HTTP-facing success/error result
-- repositories perform raw persistence and cache updates without returning HTTP-shaped wrapper states
-
-## Current Worker Layout
-
-The replaceable worker project lives in `services/pipeline/`:
-
-```text
-services/pipeline/
-|- worker.py
-|- models.py
-|- config.py
-|- celeryconfig.py
-|- stages/
-|  |- extract.py
-|  |- parse.py
-|  |- score.py
-|  `- summarize.py
-|- utils/
-|  |- callback.py
-|  `- storage.py
-`- data/
-   `- skills_taxonomy.json
-```
-
-Current responsibilities:
-
-- `worker.py`: Celery app and `pipeline.process_session`
-- `models.py`: queue, result, parse, and scoring models
-- `config.py`: callback, model, retry, and scoring env-backed settings
-- `celeryconfig.py`: broker URL, queue routing, ack/retry, pool, and limits
-- `stages/`: extract, parse, score, summarize pipeline stages
-- `utils/storage.py`: object storage fetch helper
-- `utils/callback.py`: callback POST with retries
-
-## Current Scoring Snapshot
-
-The current implementation uses a hybrid score made from:
-
-- lexical similarity via TF-IDF cosine similarity
-- semantic similarity via `sentence-transformers/all-MiniLM-L6-v2`
-- skill match based on the skills taxonomy
-- experience fit based on years-of-experience extraction from the job description
-
-Current default weights from `services/pipeline/config.py`:
-
-- `text_similarity`: `0.25`
-- `semantic_similarity`: `0.25`
-- `skill_match`: `0.30`
-- `experience_fit`: `0.20`
-
-If semantic scoring fails, the worker falls back to spaCy document similarity. These algorithms and weights are current implementation details, not a permanent scoring contract.
-
 ## Environment Touchpoints
 
-### API
+API-side pipeline env:
 
-Current API-side env usage tied to the pipeline:
+- `CELERY_BROKER_URL`
+- `PIPELINE_CALLBACK_SECRET`
+- `PIPELINE_SECRET_HEADER_NAME`
 
-- `CELERY_BROKER_URL`: RabbitMQ connection used by the publisher in `api/src/lib/queue.ts`
-- `PIPELINE_CALLBACK_SECRET`: shared secret expected on callbacks
-- `PIPELINE_SECRET_HEADER_NAME`: callback header name expected by the internal callback route
+Worker-side env:
 
-### Worker
-
-Current worker-side env usage:
-
-- `CELERY_BROKER_URL`: broker connection
-- `PIPELINE_CALLBACK_URL`: callback target URL
-- `PIPELINE_CALLBACK_SECRET`: callback secret value
-- `PIPELINE_SECRET_HEADER_NAME`: callback header name
+- `CELERY_BROKER_URL`
+- `PIPELINE_CALLBACK_URL`
+- `PIPELINE_CALLBACK_SECRET`
+- `PIPELINE_SECRET_HEADER_NAME`
 - `R2_ENDPOINT_URL`
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
 - `R2_BUCKET_NAME`
-- `SPACY_MODEL`
-- `SEMANTIC_MODEL_NAME`
-- `SEMANTIC_MAX_CHARS`
-- `SCORING_WEIGHT_TEXT_SIMILARITY`
-- `SCORING_WEIGHT_SEMANTIC_SIMILARITY`
-- `SCORING_WEIGHT_SKILL_MATCH`
-- `SCORING_WEIGHT_EXPERIENCE_FIT`
-- `CELERY_WORKER_POOL`
-- `CELERY_WORKER_CONCURRENCY`
+- `PIPELINE_TAXONOMY_DIR`
+- `PIPELINE_CHROMA_DB_PATH`
+- `EMBEDDING_MODEL_NAME`
+- `GLINER_MODEL_NAME`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL_NAME`
+- `ENABLE_GEMINI_SEGMENTATION`
+- `ENABLE_SEMANTIC_TAXONOMY_MAPPING`
+- scoring weights such as `SCORING_WEIGHT_HARD_SKILLS`, `SCORING_WEIGHT_CONSTRAINTS`, and related bucket weights
 
-## Runtime and Deployment Notes
+## Runtime Notes
 
 - local helper runtime is `docker-compose.yml`, which starts `rabbitmq` and `pipeline-worker`
-- the worker can also be started directly with `bun run pipeline` from the repo root or `bun run dev` in `services/pipeline/`
+- the worker can also be started directly with `bun run pipeline`
 - `services/pipeline/Dockerfile` builds a Python 3.12 image and runs Celery against `profiling.jobs`
 - current Celery settings use late ack, worker-lost rejection, `prefetch=1`, and no result backend
-- current defaults prefer `solo` pool, including on Windows
-
-These runtime choices are operationally important today but still replaceable.
 
 ## Current Limitations
 
-- extraction is extension-based and only handles `.pdf`, `.docx`, and `.txt`
-- there is no OCR path for scanned-image PDFs
-- parsing is English-centric and depends on the configured spaCy model and heuristics
+- extraction is extension-based and handles `.pdf`, `.docx`, and `.txt`
+- scanned-image PDFs still need an OCR path
+- Gemini segmentation is optional and disabled by default
+- taxonomy mapping uses local processed taxonomy assets and deterministic fallbacks when semantic models are unavailable
 - there are no progress callbacks; only terminal `completion` or `error`
 - callback authentication is a shared secret header, not signed requests or mTLS
-- the worker processes files sequentially inside one task
-- lexical TF-IDF scoring is computed from the job description and one resume at a time in the current implementation
-- if all files fail, the session becomes `failed`; if some files succeed, the worker reports `completion` and the session becomes `completed`
-- partial results in an `error` callback are persisted today, but that behavior should still be treated as current implementation detail rather than a broad product promise
 
 ## Source Files to Check When Updating This Doc
 
@@ -382,7 +245,8 @@ These runtime choices are operationally important today but still replaceable.
 - `services/pipeline/celeryconfig.py`
 - `services/pipeline/stages/`
 - `services/pipeline/utils/`
+- `research/README.md`
 
 ## Change Rule
 
-If the queue payload, callback payloads, auth header behavior, session state model, or run-aware persistence changes, update this file in the same change.
+If the queue payload, callback payloads, auth header behavior, session state model, run-aware persistence, or artifact semantics change, update this file in the same change.

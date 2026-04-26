@@ -4,7 +4,6 @@
   "scripts": {
     "down": "cd pipeline && bun run down",
     "sync": "cd pipeline && bun run sync",
-    "spacy": "cd pipeline && bun run spacy",
     "dev": "cd pipeline && bun run dev",
     "start": "bun dev"
   }
