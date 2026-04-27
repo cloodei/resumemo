@@ -1,7 +1,6 @@
 import { randomUUIDv7 } from "bun"
 import {
 	pgTable,
-	pgSchema,
 	text,
 	timestamp,
 	boolean,
@@ -14,12 +13,6 @@ import {
 	jsonb,
 	uniqueIndex,
 } from "drizzle-orm/pg-core"
-import type {
-	ScreeningCandidateProfile,
-	ScreeningJobDescriptionArtifact,
-	ScreeningResumeArtifact,
-	ScreeningScoreArtifact,
-} from "./screening-artifacts"
 
 export const user = pgTable("user", {
 	id: uuid("id")
@@ -119,21 +112,30 @@ export const resumeFile = pgTable("resume_file", {
 	index().on(table.userId),
 ])
 
-export const profilingSessionFile = pgTable("profiling_session_file", {
-	id: bigserial("id", { mode: "number" }).primaryKey(),
-	sessionId: uuid("session_id")
+export const jobDescriptionTemplate = pgTable("job_description_template", {
+	id: uuid("id")
+		.$defaultFn(randomUUIDv7)
+		.primaryKey(),
+	userId: uuid("user_id")
 		.notNull()
-		.references(() => profilingSession.id, { onDelete: "cascade" }),
-	fileId: bigint("file_id", { mode: "number" })
-		.notNull()
-		.references(() => resumeFile.id, { onDelete: "cascade" }),
+		.references(() => user.id, { onDelete: "cascade" }),
+	name: varchar("name", { length: 255 }).notNull(),
+	jobTitle: varchar("job_title", { length: 255 }),
+	rawText: text("raw_text").notNull(),
+	contentHash: varchar("content_hash", { length: 64 }).notNull(),
+	useCount: bigint("use_count", { mode: "number" }).notNull().default(0),
+	lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.defaultNow()
 		.notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true })
+		.defaultNow()
+		.$onUpdate(() => new Date())
+		.notNull(),
 }, (table) => [
-	index().on(table.sessionId),
-	index().on(table.fileId),
-	uniqueIndex("profiling_session_file_session_file_unique").on(table.sessionId, table.fileId),
+	index().on(table.userId),
+	index().on(table.lastUsedAt),
+	uniqueIndex("jd_user_contenthash_unique").on(table.userId, table.contentHash),
 ])
 
 export const sessionStatusEnum = ["processing", "retrying", "completed", "failed"] as const
@@ -145,8 +147,10 @@ export const profilingSession = pgTable("profiling_session", {
 	userId: uuid("user_id")
 		.notNull()
 		.references(() => user.id, { onDelete: "cascade" }),
+	jobDescriptionTemplateId: uuid("job_description_template_id")
+		.notNull()
+		.references(() => jobDescriptionTemplate.id, { onDelete: "restrict" }),
 	name: varchar("name", { length: 255 }).notNull(),
-	jobDescription: text("job_description").notNull(),
 	jobTitle: varchar("job_title", { length: 255 }),
 	status: varchar("status", { length: 32, enum: sessionStatusEnum }).notNull().default("processing"),
 	totalFiles: bigint("total_files", { mode: "number" }).notNull().default(0),
@@ -162,7 +166,25 @@ export const profilingSession = pgTable("profiling_session", {
 		.notNull(),
 }, (table) => [
 	index().on(table.userId),
+	index().on(table.jobDescriptionTemplateId),
 	index().on(table.status),
+])
+
+export const profilingSessionFile = pgTable("profiling_session_file", {
+	id: bigserial("id", { mode: "number" }).primaryKey(),
+	sessionId: uuid("session_id")
+		.notNull()
+		.references(() => profilingSession.id, { onDelete: "cascade" }),
+	fileId: bigint("file_id", { mode: "number" })
+		.notNull()
+		.references(() => resumeFile.id, { onDelete: "cascade" }),
+	createdAt: timestamp("created_at", { withTimezone: true })
+		.defaultNow()
+		.notNull(),
+}, (table) => [
+	index().on(table.sessionId),
+	index().on(table.fileId),
+	uniqueIndex("psf_session_file_unique").on(table.sessionId, table.fileId),
 ])
 
 export const candidateResult = pgTable("candidate_result", {
@@ -190,122 +212,5 @@ export const candidateResult = pgTable("candidate_result", {
 		.notNull(),
 }, (table) => [
 	index().on(table.sessionId, table.runId),
-	uniqueIndex("candidate_result_run_file_unique").on(table.runId, table.fileId),
+	uniqueIndex("cr_run_file_unique").on(table.runId, table.fileId),
 ])
-
-export const screeningDb = pgSchema("screening")
-export const screeningJobDescriptionSourceEnum = ["inline", "template"] as const
-export const screeningSessionStatusEnum = ["processing", "retrying", "completed", "failed"] as const
-
-export const screeningJobDescription = screeningDb.table("job_description", {
-	id: uuid("id")
-		.$defaultFn(randomUUIDv7)
-		.primaryKey(),
-	userId: uuid("user_id")
-		.notNull()
-		.references(() => user.id, { onDelete: "cascade" }),
-	name: varchar("name", { length: 255 }).notNull(),
-	jobTitle: varchar("job_title", { length: 255 }),
-	rawText: text("raw_text").notNull(),
-	source: varchar("source", { length: 32, enum: screeningJobDescriptionSourceEnum }).notNull().default("inline"),
-	latestArtifact: jsonb("latest_artifact").$type<ScreeningJobDescriptionArtifact | null>(),
-	lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.defaultNow()
-		.notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true })
-		.defaultNow()
-		.$onUpdate(() => new Date())
-		.notNull(),
-}, (table) => [
-	index().on(table.userId),
-	index().on(table.lastUsedAt),
-])
-
-export const screeningSession = screeningDb.table("session", {
-	id: uuid("id")
-		.$defaultFn(randomUUIDv7)
-		.primaryKey(),
-	userId: uuid("user_id")
-		.notNull()
-		.references(() => user.id, { onDelete: "cascade" }),
-	jobDescriptionId: uuid("job_description_id")
-		.notNull()
-		.references(() => screeningJobDescription.id, { onDelete: "restrict" }),
-	name: varchar("name", { length: 255 }).notNull(),
-	jobTitleSnapshot: varchar("job_title_snapshot", { length: 255 }),
-	status: varchar("status", { length: 32, enum: screeningSessionStatusEnum }).notNull().default("processing"),
-	totalFiles: bigint("total_files", { mode: "number" }).notNull().default(0),
-	activeRunId: uuid("active_run_id"),
-	errorMessage: text("error_message"),
-	jobDescriptionArtifact: jsonb("job_description_artifact").$type<ScreeningJobDescriptionArtifact | null>(),
-	lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.defaultNow()
-		.notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true })
-		.defaultNow()
-		.$onUpdate(() => new Date())
-		.notNull(),
-}, (table) => [
-	index().on(table.userId),
-	index().on(table.jobDescriptionId),
-	index().on(table.status),
-])
-
-export const screeningSessionFile = screeningDb.table("session_file", {
-	id: bigserial("id", { mode: "number" }).primaryKey(),
-	sessionId: uuid("session_id")
-		.notNull()
-		.references(() => screeningSession.id, { onDelete: "cascade" }),
-	fileId: bigint("file_id", { mode: "number" })
-		.notNull()
-		.references(() => resumeFile.id, { onDelete: "cascade" }),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.defaultNow()
-		.notNull(),
-}, (table) => [
-	index().on(table.sessionId),
-	index().on(table.fileId),
-	uniqueIndex("screening_session_file_session_file_unique").on(table.sessionId, table.fileId),
-])
-
-export const screeningCandidate = screeningDb.table("candidate", {
-	id: uuid("id")
-		.$defaultFn(randomUUIDv7)
-		.primaryKey(),
-	sessionId: uuid("session_id")
-		.notNull()
-		.references(() => screeningSession.id, { onDelete: "cascade" }),
-	fileId: bigint("file_id", { mode: "number" })
-		.notNull()
-		.references(() => resumeFile.id, { onDelete: "cascade" }),
-	runId: uuid("run_id").notNull(),
-	candidateName: varchar("candidate_name", { length: 255 }),
-	candidateEmail: varchar("candidate_email", { length: 320 }),
-	candidatePhone: varchar("candidate_phone", { length: 32 }),
-	rawText: text("raw_text").notNull(),
-	resumeArtifact: jsonb("resume_artifact").$type<ScreeningResumeArtifact | null>(),
-	candidateProfile: jsonb("candidate_profile").$type<ScreeningCandidateProfile>().notNull(),
-	scoreArtifact: jsonb("score_artifact").$type<ScreeningScoreArtifact>().notNull(),
-	overallScore: numeric("overall_score", { precision: 5, scale: 2 }).notNull(),
-	baseScore: numeric("base_score", { precision: 5, scale: 2 }).notNull(),
-	bonusScore: numeric("bonus_score", { precision: 5, scale: 2 }).notNull(),
-	summary: text("summary").notNull(),
-	skillsMatched: jsonb("skills_matched").$type<string[]>().notNull().default([]),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.defaultNow()
-		.notNull(),
-}, (table) => [
-	index().on(table.sessionId, table.runId),
-	uniqueIndex("screening_candidate_run_file_unique").on(table.runId, table.fileId),
-])
-
-export const profilingV3JobDescriptionSourceEnum = screeningJobDescriptionSourceEnum
-export const sessionStatusV3Enum = screeningSessionStatusEnum
-export const profilingJobDescriptionV3 = screeningJobDescription
-export const profilingSessionV3 = screeningSession
-export const profilingSessionFileV3 = screeningSessionFile
-export const candidateResultV3 = screeningCandidate
-
-export * from "./screening-artifacts"

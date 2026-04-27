@@ -17,6 +17,7 @@ Current backend implementation notes:
 - `api/src/routes/` stays thin and delegates HTTP behavior to usecases in `api/src/usecases/`.
 - `api/src/repositories/` is the raw data-access layer and should not return HTTP-oriented wrapper states.
 - The mounted product API is the `/api/v2` profiling flow plus `/api/internal/pipeline/callback`.
+- JD template routes under `/api/v2/sessions/job-description-templates` support frequently reused role briefs without duplicating JD text on every session.
 - There is no mounted `/api/v3` screening path in this checkout.
 
 ## Operational Docs

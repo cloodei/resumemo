@@ -5,17 +5,65 @@ import * as schema from "@resumemo/core/schemas"
 
 
 export const selectSessionsByUserIdStatement = db
-  .select()
+  .select({
+    id: schema.profilingSession.id,
+    userId: schema.profilingSession.userId,
+    jobDescriptionTemplateId: schema.profilingSession.jobDescriptionTemplateId,
+    name: schema.profilingSession.name,
+    jobDescription: schema.jobDescriptionTemplate.rawText,
+    jobTitle: schema.profilingSession.jobTitle,
+    status: schema.profilingSession.status,
+    totalFiles: schema.profilingSession.totalFiles,
+    activeRunId: schema.profilingSession.activeRunId,
+    errorMessage: schema.profilingSession.errorMessage,
+    lastCompletedAt: schema.profilingSession.lastCompletedAt,
+    createdAt: schema.profilingSession.createdAt,
+    updatedAt: schema.profilingSession.updatedAt,
+  })
   .from(schema.profilingSession)
+  .innerJoin(schema.jobDescriptionTemplate, eq(schema.profilingSession.jobDescriptionTemplateId, schema.jobDescriptionTemplate.id))
   .where(eq(schema.profilingSession.userId, sql.placeholder("userId")))
   .orderBy(desc(schema.profilingSession.createdAt))
   .prepare("session_select_by_user_id")
 
 export const selectSessionByIdStatement = db
-  .select()
+  .select({
+    id: schema.profilingSession.id,
+    userId: schema.profilingSession.userId,
+    jobDescriptionTemplateId: schema.profilingSession.jobDescriptionTemplateId,
+    name: schema.profilingSession.name,
+    jobDescription: schema.jobDescriptionTemplate.rawText,
+    jobTitle: schema.profilingSession.jobTitle,
+    status: schema.profilingSession.status,
+    totalFiles: schema.profilingSession.totalFiles,
+    activeRunId: schema.profilingSession.activeRunId,
+    errorMessage: schema.profilingSession.errorMessage,
+    lastCompletedAt: schema.profilingSession.lastCompletedAt,
+    createdAt: schema.profilingSession.createdAt,
+    updatedAt: schema.profilingSession.updatedAt,
+  })
   .from(schema.profilingSession)
+  .innerJoin(schema.jobDescriptionTemplate, eq(schema.profilingSession.jobDescriptionTemplateId, schema.jobDescriptionTemplate.id))
   .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
   .prepare("session_select_by_id")
+
+export const selectJobDescriptionTemplatesByUserIdStatement = db
+  .select({
+    id: schema.jobDescriptionTemplate.id,
+    userId: schema.jobDescriptionTemplate.userId,
+    name: schema.jobDescriptionTemplate.name,
+    jobTitle: schema.jobDescriptionTemplate.jobTitle,
+    rawText: schema.jobDescriptionTemplate.rawText,
+    contentHash: schema.jobDescriptionTemplate.contentHash,
+    useCount: schema.jobDescriptionTemplate.useCount,
+    lastUsedAt: schema.jobDescriptionTemplate.lastUsedAt,
+    createdAt: schema.jobDescriptionTemplate.createdAt,
+    updatedAt: schema.jobDescriptionTemplate.updatedAt,
+  })
+  .from(schema.jobDescriptionTemplate)
+  .where(eq(schema.jobDescriptionTemplate.userId, sql.placeholder("userId")))
+  .orderBy(desc(schema.jobDescriptionTemplate.useCount), desc(schema.jobDescriptionTemplate.lastUsedAt))
+  .prepare("job_description_templates_select_by_user_id")
 
 export const selectSessionResultsByScoreDescStatement = db
   .select({
@@ -117,7 +165,7 @@ export const updateSessionRetryStateStatement = db
   .set({
     name: schema.profilingSession.name,
     jobTitle: schema.profilingSession.jobTitle,
-    jobDescription: schema.profilingSession.jobDescription,
+    jobDescriptionTemplateId: schema.profilingSession.jobDescriptionTemplateId,
     status: schema.profilingSession.status,
     activeRunId: schema.profilingSession.activeRunId,
     errorMessage: schema.profilingSession.errorMessage,

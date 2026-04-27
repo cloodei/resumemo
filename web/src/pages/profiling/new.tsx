@@ -2,6 +2,7 @@ import { toast } from "sonner"
 import { motion } from "motion/react"
 import { useForm } from "react-hook-form"
 import { useNavigate } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
 import { CheckCircle2, Loader2, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
@@ -18,6 +19,7 @@ import { NewSessionFileQueue } from "@/features/profiling/new-session-file-queue
 import { NewSessionHero } from "@/features/profiling/new-session-hero"
 import { NewSessionRoleForm } from "@/features/profiling/new-session-role-form"
 import { NewSessionUploadPanel } from "@/features/profiling/new-session-upload-panel"
+import { fetchJobDescriptionTemplates } from "@/features/profiling/api/job-description-templates"
 import { newSessionSteps } from "@/features/profiling/new-session-utils"
 import {
 	type FileStatus,
@@ -68,19 +70,41 @@ export default function NewProfilingPage() {
 		register,
 		handleSubmit,
 		watch,
+		setValue,
 		formState: { errors },
 	} = useForm<SessionFormData>({
 		defaultValues: {
 			sessionName: storedFormData.sessionName,
 			jobTitle: storedFormData.jobTitle,
 			jobDescription: storedFormData.jobDescription,
+			jobDescriptionTemplateId: storedFormData.jobDescriptionTemplateId,
 		},
+	})
+
+	const { data: jobDescriptionTemplates = [] } = useQuery({
+		queryKey: ["job-description-templates"],
+		queryFn: fetchJobDescriptionTemplates,
+		staleTime: 60_000,
 	})
 
 	const watchedFields = watch()
 	useEffect(() => {
 		setFormData(watchedFields)
-	}, [watchedFields.jobTitle, watchedFields.jobDescription, watchedFields.sessionName])
+	}, [setFormData, watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId, watchedFields.jobTitle, watchedFields.sessionName])
+
+	useEffect(() => {
+		if (!watchedFields.jobDescriptionTemplateId)
+			return
+
+		const selectedTemplate = jobDescriptionTemplates.find(template => template.id === watchedFields.jobDescriptionTemplateId)
+		if (!selectedTemplate)
+			return
+
+		if (watchedFields.jobDescription.trim() !== selectedTemplate.rawText.trim()) {
+			setValue("jobDescriptionTemplateId", undefined, { shouldDirty: true })
+			setFormData({ jobDescriptionTemplateId: undefined })
+		}
+	}, [jobDescriptionTemplates, setFormData, setValue, watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId])
 
 	const failedFiles = useMemo(() => files.filter(file => file.status === "failed"), [files])
 	const doneFiles = useMemo(() => files.filter(file => file.status === "done"), [files])
@@ -220,6 +244,7 @@ export default function NewProfilingPage() {
 			name: formData.sessionName.trim(),
 			jobDescription: formData.jobDescription.trim(),
 			jobTitle: formData.jobTitle.trim() || undefined,
+			jobDescriptionTemplateId: formData.jobDescriptionTemplateId,
 			files: filesToCreate,
 		}, {
 			fetch: { signal },
@@ -414,6 +439,19 @@ export default function NewProfilingPage() {
 				<NewSessionRoleForm
 					isBusy={isBusy}
 					errors={errors}
+					templates={jobDescriptionTemplates}
+					selectedTemplateId={watchedFields.jobDescriptionTemplateId}
+					onUseTemplate={(template) => {
+						setValue("jobTitle", template.jobTitle ?? "", { shouldDirty: true })
+						setValue("jobDescription", template.rawText, { shouldDirty: true, shouldValidate: true })
+						setValue("jobDescriptionTemplateId", template.id, { shouldDirty: true })
+						setFormData({
+							jobTitle: template.jobTitle ?? "",
+							jobDescription: template.rawText,
+							jobDescriptionTemplateId: template.id,
+						})
+						toast.success("JD template loaded. Edit it if this run needs changes.")
+					}}
 					register={register as never}
 				/>
 

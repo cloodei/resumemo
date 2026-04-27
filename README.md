@@ -7,6 +7,7 @@ Resumemo is a recruiter-facing resume screening app for running profiling sessio
 - The active product is the `/api/v2` profiling workflow: create a session, upload resumes, process in the background, review ranked candidates, retry, and export.
 - The AI pipeline in `services/pipeline/` is the official research-backed worker, based on the artifacts and taxonomy design in `research/`.
 - The worker preserves the current queue payload and callback contract. Python, Celery, and RabbitMQ are current runtime choices; the API-facing contract is the important boundary.
+- Job descriptions are normalized through reusable per-user JD templates. Sessions reference the saved JD text instead of storing the same brief repeatedly.
 - There is no mounted `/api/v3` screening route in this checkout. Older v3/screening notes should be treated as historical unless live code is added later.
 
 ## Repository Overview
@@ -17,7 +18,6 @@ resumemo/
 |- api/                  Elysia API on Bun
 |- core/                 shared schemas, types, and constants
 |- services/pipeline/    official research-backed AI worker
-|- research/             AI research inputs, taxonomy assets, notebooks, and references
 |- deploy/               deployment scripts and nginx config
 |- docs/                 current docs, operational notes, and plans
 |- docker-compose.yml    local RabbitMQ + pipeline worker helper
@@ -75,6 +75,7 @@ Workspace notes:
 - Recruiter dashboard at `/dashboard`
 - Profiling session list, filtering, and search at `/profiling`
 - New profiling session flow at `/profiling/new` with presigned uploads
+- Frequently used JD selection in the new-session flow, backed by deduplicated JD templates
 - Profiling result view at `/profiling/:id`
 - Session retry flows for rerun, clone, and replace variants
 - Session exports from the API in `csv` and `json` formats
@@ -83,7 +84,6 @@ Workspace notes:
 ## Docs Map
 
 - `docs/README.md` - documentation index and document roles
-- `AGENTS.md` - contributor and coding agent guide for this repo
 - `docs/architecture-structure.md` - current architecture snapshot and subsystem boundaries
 - `docs/system-guidelines.md` - product behavior and workflow notes
 - `docs/codebase-operations.md` - operations guide, env touchpoints, and deployment references
@@ -92,9 +92,10 @@ Workspace notes:
 
 ## Backend Shape
 
-- Session recruiter routes under `api/src/routes/session.ts` delegate to usecases in `api/src/usecases/session/`.
+- Session recruiter routes under `api/src/routes/session.ts` delegate to usecases in `api/src/usecases/session/`, including JD template listing and creation.
 - The internal worker callback route in `api/src/routes/pipeline.ts` delegates to `api/src/usecases/pipeline/`.
 - Repositories in `api/src/repositories/` are data-access focused; reads return raw data or `null`, while command-style writes return useful data, `true`, `false`, or successful void behavior.
+- The current data model keeps profiling sessions, resume files, candidate results, and `job_description_template`; historical screening-schema tables are not part of the live schema.
 - Shared request schemas for route validation can live alongside relevant usecase modules so routes and usecases stay aligned.
 
 ## Unstable Areas

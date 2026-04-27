@@ -80,7 +80,7 @@ export function NewSessionUploadPanel({
 						<p className="flex items-center gap-2 text-foreground">
 							<CheckCircle2 className="size-4 text-emerald-500" />
 							{filesCount} file{filesCount !== 1 ? "s" : ""} added
-							{doneFilesCount > 0 && ` • ${doneFilesCount} uploaded`}
+							{doneFilesCount > 0 && ` - ${doneFilesCount} uploaded`}
 						</p>
 						{failedFilesCount > 0 && (
 							<p className="mt-1 text-xs text-destructive">

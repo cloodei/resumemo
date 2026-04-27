@@ -23,6 +23,7 @@ The active pipeline surface is the `/api/v2` profiling flow:
 - callback run awareness: callbacks only apply when payload `run_id` matches the session's active run
 - session status model: `processing`, `retrying`, `completed`, `failed`
 - result persistence: candidate results are stored against the active run; stale callbacks are ignored
+- JD persistence: API sessions reference `job_description_template`; the queue still receives the current JD text as `job_description`
 
 There is no mounted `/api/v3` screening pipeline in this checkout.
 
@@ -46,6 +47,8 @@ The API publishes a Celery-compatible task for `pipeline.process_session` on `pr
 ```
 
 The queue transport is currently Celery wire format created in `api/src/lib/queue.ts`, but the payload above is the meaningful worker contract.
+
+The API may source `job_description` from a newly entered JD or a reused JD template. Reusing an unchanged JD does not duplicate the text in `profiling_session`; editing the JD creates or reuses a different template by content hash and still triggers a fresh scoring run.
 
 ## Callback Auth
 

@@ -119,6 +119,15 @@ The worker stores artifact data through the existing callback fields:
 
 The API persists these values in the existing `candidate_result` table for the active run.
 
+## Database Notes
+
+The active profiling data model is intentionally small:
+
+- `job_description_template` stores each distinct per-user JD text once, with `use_count` and `last_used_at` for frequent-template selection.
+- `profiling_session` references `job_description_template` through `job_description_template_id`; the public API still returns `jobDescription` by joining to the template row.
+- `candidate_result` stores candidate DNA in `parsed_profile` and score artifacts in `score_breakdown`.
+- Historical screening-schema tables are removed by the cleanup migration and should not be treated as live product data.
+
 ## Deployment References
 
 - `docker-compose.prod.yml`

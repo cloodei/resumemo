@@ -9,12 +9,12 @@ import {
 let _counter = 0
 
 /**
- * Client-side file status — purely for UI state.
+ * Client-side file status, purely for UI state.
  *
- * Lifecycle (v2 — no hashing/dedup):
- *   ready → uploading → done | failed
+ * Lifecycle:
+ *   ready -> uploading -> done | failed
  *
- * Files are immediately "ready" on add — no async fingerprinting step.
+ * Files are immediately "ready" on add. There is no async fingerprinting step.
  */
 export type FileStatus = "ready" | "uploading" | "done" | "failed"
 
@@ -32,14 +32,14 @@ export type UploadFile = {
 }
 
 /**
- * Upload phase — overall orchestration state.
+ * Upload phase for the overall orchestration state.
  *
-	 * idle           → user is adding files / filling form
-	 * uploading      → presign + PUT requests in flight
-	 * creating       → files uploaded, session creation POST in flight
-	 * upload_error   → at least one file upload failed
-	 * create_error   → uploads finished but session creation failed
-	 * done           → session created, navigating away
+ * idle         -> user is adding files and filling the form
+ * uploading    -> presign and PUT requests are in flight
+ * creating     -> files uploaded, session creation POST in flight
+ * upload_error -> at least one file upload failed
+ * create_error -> uploads finished but session creation failed
+ * done         -> session created, navigating away
  */
 export type UploadPhase = "idle" | "uploading" | "creating" | "upload_error" | "create_error" | "done"
 
@@ -47,6 +47,7 @@ export type SessionFormData = {
 	sessionName: string
 	jobTitle: string
 	jobDescription: string
+	jobDescriptionTemplateId?: string
 }
 
 const EMPTY_FORM: SessionFormData = {
@@ -55,13 +56,12 @@ const EMPTY_FORM: SessionFormData = {
 	jobDescription: "",
 } as const
 
-interface UploadStore {
+type UploadStore = {
 	files: UploadFile[]
 	phase: UploadPhase
 	formData: SessionFormData
 	createErrorMessage?: string
 	createErrorDetails?: string
-
 	actions: {
 		addFiles: (newFiles: File[]) => void
 		removeFile: (id: number) => void
@@ -114,21 +114,33 @@ const uploadStore = create<UploadStore>()(
 				removeFile: (id: number) => {
 					const files = get().files.filter(f => f.id !== id)
 					set({ files })
-					if (files.length === 0) set({ phase: "idle" })
+					if (files.length === 0)
+						set({ phase: "idle" })
 				},
 
 				clearAll: () => {
-					set({ files: [], phase: "idle", formData: { ...EMPTY_FORM }, createErrorMessage: undefined, createErrorDetails: undefined })
+					set({
+						files: [],
+						phase: "idle",
+						formData: { ...EMPTY_FORM },
+						createErrorMessage: undefined,
+						createErrorDetails: undefined,
+					})
 				},
 
 				clearFiles: () => {
-					set({ files: [], phase: "idle", createErrorMessage: undefined, createErrorDetails: undefined })
+					set({
+						files: [],
+						phase: "idle",
+						createErrorMessage: undefined,
+						createErrorDetails: undefined,
+					})
 				},
 
 				updateFileById: (id: number, updates: Partial<UploadFile>) => {
 					set({
-						files: get().files.map(f =>
-							f.id === id ? { ...f, ...updates } : f,
+						files: get().files.map(file =>
+							file.id === id ? { ...file, ...updates } : file,
 						),
 					})
 				},
@@ -163,29 +175,28 @@ const uploadStore = create<UploadStore>()(
 				createErrorMessage: state.createErrorMessage,
 				createErrorDetails: state.createErrorDetails,
 				// Persist file metadata for display continuity, but File blobs
-				// are not serializable — rehydration handles this.
-				files: state.files.map(f => ({
-					id: f.id,
-					originalName: f.originalName,
-					size: f.size,
-					mimeType: f.mimeType,
-					status: f.status,
-					storageKey: f.storageKey,
-					progress: f.progress,
-					errorMessage: f.errorMessage,
+				// are not serializable; rehydration handles this.
+				files: state.files.map(file => ({
+					id: file.id,
+					originalName: file.originalName,
+					size: file.size,
+					mimeType: file.mimeType,
+					status: file.status,
+					storageKey: file.storageKey,
+					progress: file.progress,
+					errorMessage: file.errorMessage,
 				})),
 			}),
 			onRehydrateStorage: () => (state) => {
-				if (!state) return
+				if (!state)
+					return
 
-				// File blobs can't survive serialization. On rehydrate:
+				// File blobs cannot survive serialization. On rehydrate:
 				// - "done" phase: session was created successfully, clear everything.
 				// - "uploading"/"creating" phase: upload was interrupted, mark as upload_error.
-				//   Files have no blobs so they can't be retried — clear them.
-				// - "idle" phase: keep form data (it's just strings), but clear files
-				//   since the File objects are gone.
-				// - error phases: same as idle — form data survives, files don't.
-
+				//   Files have no blobs so they cannot be retried; clear them.
+				// - "idle" phase: keep form data, but clear files since the File objects are gone.
+				// - error phases: same as idle; form data survives, files do not.
 				if (state.phase === "done") {
 					state.files = []
 					state.phase = "idle"
@@ -195,11 +206,9 @@ const uploadStore = create<UploadStore>()(
 					return
 				}
 
-				if (state.phase === "uploading" || state.phase === "creating") {
+				if (state.phase === "uploading" || state.phase === "creating")
 					state.phase = "upload_error"
-				}
 
-				// Files without blobs are useless — clear them but keep form data
 				state.files = []
 				state.phase = "idle"
 				state.createErrorMessage = undefined

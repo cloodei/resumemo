@@ -34,6 +34,7 @@ It is not yet a broad hiring operations suite. Avoid describing unbuilt admin to
 ### 1. Start a profiling session
 
 - The recruiter enters a session name, optional job title, and a required job description.
+- The recruiter can load a frequently used JD template; if they change the JD text, the new text is scored as a distinct brief and saved by content hash.
 - The recruiter uploads resume files through the browser.
 - Current upload rules come from shared code in `core/`:
   - supported formats: PDF, DOCX, TXT

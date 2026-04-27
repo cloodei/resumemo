@@ -52,7 +52,7 @@ export function NewSessionFileQueue({
 						<CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/50 pb-4 dark:border-border/30">
 							<div>
 								<CardTitle className="text-lg font-semibold bg-linear-to-br from-foreground to-foreground/70 bg-clip-text">File queue</CardTitle>
-							<CardDescription className="mt-1 text-sm">{files.length} file{files.length !== 1 ? "s" : ""} • {pendingUploadCount} still need upload • {doneFilesCount} uploaded</CardDescription>
+							<CardDescription className="mt-1 text-sm">{files.length} file{files.length !== 1 ? "s" : ""} - {pendingUploadCount} still need upload - {doneFilesCount} uploaded</CardDescription>
 							</div>
 							<div className="flex items-center gap-2">
 								{isBusy && <Badge variant="secondary" className="gap-1 text-xs"><Loader2 className="size-3 animate-spin" /> Working</Badge>}

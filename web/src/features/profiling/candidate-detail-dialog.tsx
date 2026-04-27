@@ -21,6 +21,8 @@ import {
 
 import { SummaryTile } from "./summary-tile"
 import {
+	getCandidateEmail,
+	getCandidatePhone,
 	getCertifications,
 	getDisplayCandidateName,
 	getEducationLines,
@@ -58,6 +60,8 @@ function CandidateDetailContent({ sessionId, resultId }: { sessionId: string; re
 		queryKey: ["profiling-session", sessionId, "result", resultId],
 		queryFn: () => fetchCandidateResultDetail({ sessionId, resultId }),
 	})
+	const candidateEmail = getCandidateEmail(selectedResult)
+	const candidatePhone = getCandidatePhone(selectedResult)
 
 	return (
 		<div className="space-y-6 text-sm">
@@ -108,8 +112,8 @@ function CandidateDetailContent({ sessionId, resultId }: { sessionId: string; re
 					<div className="mt-3 space-y-2 text-sm text-muted-foreground">
 						<p className="flex items-center gap-2 text-foreground"><UserRound className="size-4 text-primary" />{getDisplayCandidateName(selectedResult)}</p>
 						<p className="text-xs">Resume file: {selectedResult.originalName}</p>
-						{selectedResult.candidateEmail && <p className="flex items-center gap-2"><Mail className="size-4" />{selectedResult.candidateEmail}</p>}
-						{selectedResult.candidatePhone && <p className="flex items-center gap-2"><Phone className="size-4" />{selectedResult.candidatePhone}</p>}
+						{candidateEmail && <p className="flex items-center gap-2"><Mail className="size-4" />{candidateEmail}</p>}
+						{candidatePhone && <p className="flex items-center gap-2"><Phone className="size-4" />{candidatePhone}</p>}
 					</div>
 				</div>
 
@@ -140,7 +144,7 @@ function CandidateDetailContent({ sessionId, resultId }: { sessionId: string; re
 						{getRecentRoles(selectedResult).length > 0 ? getRecentRoles(selectedResult).map((role, index: number) => (
 							<div key={`${role.title}-${role.company}-${index}`} className="rounded-lg bg-muted/30 p-3">
 								<p className="font-medium text-foreground">{role.title || "Role not extracted"}</p>
-								<p className="text-xs text-muted-foreground">{[role.company, role.start_date, role.end_date].filter(Boolean).join(" • ") || "Dates not available"}</p>
+								<p className="text-xs text-muted-foreground">{[role.company, role.start_date, role.end_date].filter(Boolean).join(" - ") || "Dates not available"}</p>
 								{role.description && <p className="mt-2 text-xs leading-relaxed text-muted-foreground line-clamp-3">{role.description}</p>}
 							</div>
 						)) : <span className="text-sm text-muted-foreground">No work history could be structured from this resume.</span>}

@@ -45,11 +45,11 @@ export async function exportSessionUsecase(input: {
 		const csvRows = filteredResults.map((result, index) => [
 			String(index + 1),
 			escapeCsv(buildDisplayName(result.candidateName, result.originalName, result.parsedProfile)),
-			escapeCsv(result.candidateEmail ?? ""),
-			escapeCsv(result.candidatePhone ?? ""),
+			escapeCsv(getProfileContact(result.candidateEmail, result.parsedProfile, "email")),
+			escapeCsv(getProfileContact(result.candidatePhone, result.parsedProfile, "phone")),
 			String(result.overallScore),
 			escapeCsv(stripMarkup(result.summary)),
-			escapeCsv(Array.isArray(result.skillsMatched) ? result.skillsMatched.join("; ") : ""),
+			escapeCsv(getTopSkills(result.skillsMatched, result.parsedProfile)),
 			escapeCsv(getExperienceLabel(result.parsedProfile)),
 			escapeCsv(result.originalName),
 		].join(","))
@@ -83,19 +83,70 @@ function escapeCsv(value: string) {
 }
 
 function buildDisplayName(candidateName: string | null, originalName: string, parsedProfile: unknown) {
-	const confidence = Number((parsedProfile as { name_confidence?: number } | null)?.name_confidence ?? 0)
+	const confidence = Number((parsedProfile as { name_confidence?: number } | null)?.name_confidence ?? 1)
 	if (candidateName && confidence >= 0.5)
 		return candidateName
+
+	const profile = typeof parsedProfile === "object" && parsedProfile !== null
+		? parsedProfile as { information?: { name?: unknown } }
+		: null
+	if (typeof profile?.information?.name === "string" && profile.information.name)
+		return profile.information.name
 
 	return originalName
 }
 
 function getExperienceLabel(parsedProfile: unknown) {
-	const years = (parsedProfile as { total_experience_years?: number } | null)?.total_experience_years
+	const profile = typeof parsedProfile === "object" && parsedProfile !== null
+		? parsedProfile as { information?: { years_of_experience?: unknown }; total_experience_years?: unknown }
+		: null
+	const years = profile?.information?.years_of_experience ?? profile?.total_experience_years
 	if (typeof years !== "number")
 		return ""
 
 	return `${years} year${years === 1 ? "" : "s"}`
+}
+
+function getTopSkills(skillsMatched: unknown, parsedProfile: unknown) {
+	if (Array.isArray(skillsMatched) && skillsMatched.length > 0)
+		return skillsMatched.filter((skill): skill is string => typeof skill === "string").join("; ")
+
+	const profile = typeof parsedProfile === "object" && parsedProfile !== null
+		? parsedProfile as { hard_skills?: { direct_mention?: unknown }; skills?: unknown }
+		: null
+	const directMentions = profile?.hard_skills?.direct_mention
+	if (Array.isArray(directMentions)) {
+		return directMentions
+			.map((entry) => {
+				if (typeof entry === "string")
+					return entry
+				if (typeof entry !== "object" || entry === null)
+					return null
+
+				const record = entry as { canonical_name?: unknown; skill?: unknown }
+				return typeof record.canonical_name === "string"
+					? record.canonical_name
+					: typeof record.skill === "string" ? record.skill : null
+			})
+			.filter((skill): skill is string => Boolean(skill))
+			.slice(0, 8)
+			.join("; ")
+	}
+
+	return Array.isArray(profile?.skills)
+		? profile.skills.filter((skill): skill is string => typeof skill === "string").slice(0, 8).join("; ")
+		: ""
+}
+
+function getProfileContact(value: string | null, parsedProfile: unknown, key: "email" | "phone") {
+	if (value)
+		return value
+
+	const profile = typeof parsedProfile === "object" && parsedProfile !== null
+		? parsedProfile as { information?: Record<string, unknown> }
+		: null
+	const profileValue = profile?.information?.[key]
+	return typeof profileValue === "string" ? profileValue : ""
 }
 
 function stripMarkup(value: string) {

@@ -38,14 +38,53 @@ function getParsedProfile(candidate: { parsedProfile?: unknown }) {
 	return asRecord(candidate.parsedProfile)
 }
 
+function getNestedRecord(value: Record<string, unknown> | null, key: string) {
+	return asRecord(value?.[key])
+}
+
+function getProfileInformation(candidate: { parsedProfile?: unknown }) {
+	return getNestedRecord(getParsedProfile(candidate), "information")
+}
+
+function getScoreArtifact(value: unknown) {
+	const scoreBreakdown = asRecord(value)
+	return asRecord(scoreBreakdown?.score_artifact) ?? scoreBreakdown
+}
+
 function getSkillsMatched(candidate: CandidateResult) {
 	return getStringArray(candidate.skillsMatched)
 }
 
+function getNamedSkillEntries(value: unknown) {
+	if (!Array.isArray(value))
+		return []
+
+	return value
+		.map((entry) => {
+			const record = asRecord(entry)
+			return getString(record?.canonical_name) ?? getString(record?.skill) ?? getString(entry)
+		})
+		.filter((skill): skill is string => Boolean(skill))
+}
+
+function getDirectMentionSkills(candidate: { parsedProfile?: unknown }) {
+	const hardSkills = getNestedRecord(getParsedProfile(candidate), "hard_skills")
+	return getNamedSkillEntries(hardSkills?.direct_mention)
+}
+
 function getEducationEntries(detail: CandidateResultDetail) {
 	const education = getParsedProfile(detail)?.education
-	if (!Array.isArray(education))
-		return []
+	if (!Array.isArray(education)) {
+		const record = asRecord(education)
+		if (!record)
+			return []
+
+		return [{
+			degree: getString(record.degree),
+			institution: getString(record.institution),
+			year: getNumber(record.year),
+		}]
+	}
 
 	return education
 		.map((entry) => {
@@ -102,11 +141,23 @@ export const retryModeCopy = {
 }
 
 export function getDisplayCandidateName(candidate: CandidateResult) {
-	const confidence = Number(getParsedProfile(candidate)?.name_confidence ?? 0)
+	const confidence = Number(getParsedProfile(candidate)?.name_confidence ?? 1)
 	if (candidate.candidateName && confidence >= 0.5)
 		return candidate.candidateName
 
+	const profileName = getString(getProfileInformation(candidate)?.name)
+	if (profileName)
+		return profileName
+
 	return candidate.originalName
+}
+
+export function getCandidateEmail(candidate: { candidateEmail?: string | null; parsedProfile?: unknown }) {
+	return candidate.candidateEmail ?? getString(getProfileInformation(candidate)?.email)
+}
+
+export function getCandidatePhone(candidate: { candidatePhone?: string | null; parsedProfile?: unknown }) {
+	return candidate.candidatePhone ?? getString(getProfileInformation(candidate)?.phone)
 }
 
 export function needsManualReview(candidate: CandidateResult) {
@@ -125,7 +176,8 @@ export function getManualReviewLabel(candidate: CandidateResult) {
 }
 
 export function getExperienceLabel(candidate: { parsedProfile?: unknown }) {
-	const years = getNumber(getParsedProfile(candidate)?.total_experience_years)
+	const years = getNumber(getProfileInformation(candidate)?.years_of_experience)
+		?? getNumber(getParsedProfile(candidate)?.total_experience_years)
 	if (years === null)
 		return null
 
@@ -137,20 +189,38 @@ export function getPrimarySkills(candidate: CandidateResult) {
 	if (matched.length > 0)
 		return matched.slice(0, 5)
 
+	const directMentions = getDirectMentionSkills(candidate)
+	if (directMentions.length > 0)
+		return directMentions.slice(0, 5)
+
 	return getStringArray(getParsedProfile(candidate)?.skills).slice(0, 5)
 }
 
 export function getMissingSkills(detail: CandidateResultDetail) {
-	const scoreBreakdown = asRecord(detail.scoreBreakdown)
-	const skillMatch = asRecord(scoreBreakdown?.skill_match)
+	const scoreArtifact = getScoreArtifact(detail.scoreBreakdown)
+	const missingSkills = getStringArray(scoreArtifact?.missing_skills)
+	if (missingSkills.length > 0)
+		return missingSkills
+
+	const skillMatch = asRecord(scoreArtifact?.skill_match)
 	const details = asRecord(skillMatch?.details)
 	return getStringArray(details?.missing)
 }
 
 export function getRecentRoles(detail: CandidateResultDetail) {
 	const workHistory = getParsedProfile(detail)?.work_history
-	if (!Array.isArray(workHistory))
-		return []
+	if (!Array.isArray(workHistory)) {
+		const title = getString(getProfileInformation(detail)?.job_title_original)
+		return title
+			? [{
+				title,
+				company: null,
+				start_date: null,
+				end_date: null,
+				description: null,
+			}]
+			: []
+	}
 
 	return workHistory
 		.map((entry) => {
@@ -172,11 +242,16 @@ export function getRecentRoles(detail: CandidateResultDetail) {
 
 export function getEducationLines(detail: CandidateResultDetail) {
 	return getEducationEntries(detail)
-		.map((entry) => [entry.degree, entry.institution, entry.year].filter(Boolean).join(" � "))
+		.map((entry) => [entry.degree, entry.institution, entry.year].filter(Boolean).join(" - "))
 		.filter(Boolean)
 }
 
 export function getCertifications(detail: CandidateResultDetail) {
+	const hardSkills = getNestedRecord(getParsedProfile(detail), "hard_skills")
+	const certifications = getNamedSkillEntries(hardSkills?.certifications)
+	if (certifications.length > 0)
+		return certifications
+
 	return getStringArray(getParsedProfile(detail)?.certifications)
 }
 

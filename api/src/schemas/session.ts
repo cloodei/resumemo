@@ -5,7 +5,7 @@ import { MAX_FILES_PER_SESSION } from "@resumemo/core/constants/file-uploads"
 export const presignSessionUploadsBodySchema = t.Object({
 	files: t.Array(
 		t.Object({
-			clientId: t.Number(),
+			clientId: t.Number({ minimum: 0 }),
 			fileName: t.String({ minLength: 1, maxLength: 512 }),
 			mimeType: t.String({ minLength: 1, maxLength: 128 }),
 			size: t.Number({ minimum: 1 }),
@@ -18,6 +18,7 @@ export const createSessionBodySchema = t.Object({
 	name: t.String({ minLength: 1, maxLength: 255 }),
 	jobDescription: t.String({ minLength: 1, maxLength: 5000 }),
 	jobTitle: t.Optional(t.String({ maxLength: 255 })),
+	jobDescriptionTemplateId: t.Optional(t.String({ minLength: 1 })),
 	files: t.Array(
 		t.Object({
 			storageKey: t.String({ minLength: 1 }),
@@ -27,6 +28,12 @@ export const createSessionBodySchema = t.Object({
 		}),
 		{ minItems: 1, maxItems: MAX_FILES_PER_SESSION },
 	),
+})
+
+export const createJobDescriptionTemplateBodySchema = t.Object({
+	name: t.String({ minLength: 1, maxLength: 255 }),
+	jobTitle: t.Optional(t.String({ maxLength: 255 })),
+	jobDescription: t.String({ minLength: 1, maxLength: 5000 }),
 })
 
 export const retrySessionBodySchema = t.Object({
@@ -60,6 +67,7 @@ export const sessionFileAccessQuerySchema = t.Object({
 
 export type PresignSessionUploadsBody = typeof presignSessionUploadsBodySchema.static
 export type CreateSessionBody = typeof createSessionBodySchema.static
+export type CreateJobDescriptionTemplateBody = typeof createJobDescriptionTemplateBodySchema.static
 export type RetrySessionBody = typeof retrySessionBodySchema.static
 export type SessionResultsQuery = typeof sessionResultsQuerySchema.static
 export type SessionExportQuery = typeof sessionExportQuerySchema.static

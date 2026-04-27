@@ -49,7 +49,7 @@ export function SessionHeader({
 					</Button>
 					<h1 className="head-text-md text-foreground">{session.name}</h1>
 				</div>
-				<p className="ml-10 text-sm text-muted-foreground">Session ID {session.id.substring(0, 8)} • {session.jobTitle || "Custom role brief"}</p>
+				<p className="ml-10 text-sm text-muted-foreground">Session ID {session.id.substring(0, 8)} - {session.jobTitle || "Custom role brief"}</p>
 				<p className="ml-10 max-w-4xl text-sm text-muted-foreground line-clamp-2">{session.jobDescription}</p>
 			</div>
 
