@@ -18,17 +18,6 @@ export const newSessionSteps = [
 	},
 ] as const
 
-export const jobDescriptionTemplates = [
-	{
-		title: "Senior Frontend Engineer",
-		summary: "React, TypeScript, accessibility, testing, and design systems.",
-	},
-	{
-		title: "AI Research Scientist",
-		summary: "Model evaluation, experimentation, deployment readiness, and cross-functional communication.",
-	},
-] as const
-
 export const phaseLabel = {
 	idle: "",
 	uploading: "Uploading resumes...",

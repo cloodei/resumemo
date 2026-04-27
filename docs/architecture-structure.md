@@ -47,6 +47,8 @@ resumemo/
 - Route handlers in `api/src/routes/` are thin adapters.
 - HTTP-aware orchestration and error mapping live in `api/src/usecases/`, currently centered on `api/src/usecases/session/` and `api/src/usecases/pipeline/`.
 - Repository reads in `api/src/repositories/` return raw data or `null`; command-style writes return useful data, `true`, `false`, or successful void behavior.
+- JD templates are a first-class API-owned persistence object. Profiling sessions reference a `job_description_template` row, and repeated use of the same JD text reuses the same per-user template instead of duplicating the full text on every session.
+- Historical screening-schema tables are removed from the live data model; the current product tables are public profiling/session/file/result tables plus auth and JD template tables.
 
 Important note: `api/src/routes/files.ts` and `api/src/routes/system.ts` exist, but they are not mounted by `api/src/index.ts` today.
 
@@ -130,8 +132,8 @@ It does not define RabbitMQ. The broker is expected to be provided through envir
 1. Recruiter signs in and opens the new profiling flow.
 2. The web app asks the API for presigned upload URLs.
 3. The browser uploads resume files directly to object storage.
-4. The web app calls `/api/v2/sessions/create` with session metadata and uploaded file references.
-5. The API stores session state and publishes a `profiling.jobs` message.
+4. The web app calls `/api/v2/sessions/create` with session metadata, the current JD text, an optional selected JD template ID, and uploaded file references.
+5. The API normalizes the JD text into `job_description_template`, stores session state by template reference, and publishes a `profiling.jobs` message with the current JD text.
 6. The worker builds JD, candidate DNA, and score artifacts for the active run.
 7. The worker sends completion or error data to `/api/internal/pipeline/callback`.
 8. The API stores current-run results and exposes them through session detail, results, and export endpoints.
@@ -143,6 +145,8 @@ The active recruiter workflow centers on `/api/v2/sessions`:
 
 - `POST /presign`
 - `POST /create`
+- `GET /job-description-templates`
+- `POST /job-description-templates`
 - `POST /:id/retry`
 - `GET /`
 - `GET /:id`

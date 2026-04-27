@@ -44,6 +44,36 @@ export const sessionRoutes = new Elysia({ prefix: "/api/v2/sessions" })
 		},
 	)
 
+	.get(
+		"/job-description-templates",
+		async ({ user, status }) => {
+			const result = await sessionUsecases.listJobDescriptionTemplatesUsecase({ userId: user.id })
+			if (!result.ok)
+				return status(result.error.httpStatus, result.error.body)
+
+			return result.data
+		},
+		{ auth: true },
+	)
+
+	.post(
+		"/job-description-templates",
+		async ({ user, body, status }) => {
+			const result = await sessionUsecases.createJobDescriptionTemplateUsecase({
+				userId: user.id,
+				body,
+			})
+			if (!result.ok)
+				return status(result.error.httpStatus, result.error.body)
+
+			return result.data
+		},
+		{
+			auth: true,
+			body: sessionSchema.createJobDescriptionTemplateBodySchema,
+		},
+	)
+
 	.post(
 		"/:id/retry",
 		async ({ user, params, body, status }) => {

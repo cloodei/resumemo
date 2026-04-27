@@ -1,14 +1,10 @@
 import { randomUUIDv7 } from "bun"
 
-import {
-	cleanupUploadedKeys,
-	verifyUploads,
-} from "~/lib/storage"
-import { publishPipelineJob } from "~/lib/queue"
 import { sessionRepository } from "~/repositories/session-repository"
-
+import { publishPipelineJob } from "~/lib/queue"
 import type { CreateSessionBody } from "~/schemas/session"
 import { usecaseFailure, usecaseSuccess } from "../result"
+import { cleanupUploadedKeys, verifyUploads } from "~/lib/storage"
 
 const CREATE_SESSION_FAILED_MESSAGE = "We couldn't start processing. Please try again."
 
@@ -16,7 +12,17 @@ export async function createSessionUsecase(input: {
 	userId: string
 	body: CreateSessionBody
 }) {
-	const { name, jobDescription, jobTitle, files } = input.body
+	const name = input.body.name.trim()
+	const jobDescription = input.body.jobDescription.trim()
+	const jobTitle = input.body.jobTitle?.trim() || undefined
+	const { files } = input.body
+
+	if (!name || !jobDescription) {
+		return usecaseFailure(400, {
+			status: "error",
+			message: "Session name and job description are required",
+		})
+	}
 
 	if (files.length === 0) {
 		return usecaseFailure(400, {
@@ -69,7 +75,6 @@ export async function createSessionUsecase(input: {
 		}
 
 		sessionId = created.session.id
-
 		try {
 			await publishPipelineJob({
 				session_id: sessionId,

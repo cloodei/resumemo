@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 
 import * as schema from "@resumemo/core/schemas"
 
 import { db } from "~/lib/db"
+import { computeMD5 } from "~/lib/hash"
 import { repositoryCache, sessionRepositoryCacheKeys, type CacheKey } from "~/lib/repository-cache"
 import * as sessionQueries from "~/sql/session"
 import {
@@ -60,6 +61,54 @@ export type SessionResultUpsertInput = {
 	score_breakdown: Record<string, unknown>
 	summary: string
 	skills_matched: string[]
+}
+
+function normalizeJobDescriptionText(value: string) {
+	return value.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").trim()
+}
+
+function buildTemplateName(input: { name: string; jobTitle: string | null }) {
+	return (input.jobTitle?.trim() || input.name.trim() || "Untitled role brief").slice(0, 255)
+}
+
+async function getOrCreateJobDescriptionTemplate(input: {
+	userId: string
+	name: string
+	jobTitle: string | null
+	jobDescription: string
+}) {
+	const rawText = normalizeJobDescriptionText(input.jobDescription)
+	const now = new Date()
+	const contentHash = computeMD5(rawText)
+	const [template] = await db
+		.insert(schema.jobDescriptionTemplate)
+		.values({
+			userId: input.userId,
+			name: buildTemplateName(input),
+			jobTitle: input.jobTitle,
+			rawText,
+			contentHash,
+			useCount: 1,
+			lastUsedAt: now,
+		})
+		.onConflictDoUpdate({
+			target: [schema.jobDescriptionTemplate.userId, schema.jobDescriptionTemplate.contentHash],
+			set: {
+				name: buildTemplateName(input),
+				jobTitle: input.jobTitle,
+				useCount: sql`${schema.jobDescriptionTemplate.useCount} + 1`,
+				lastUsedAt: now,
+				updatedAt: now,
+			},
+		})
+		.returning()
+
+	return template
+}
+
+async function loadSessionSnapshot(sessionId: string) {
+	const [session] = await sessionQueries.selectSessionByIdStatement.execute({ sessionId })
+	return session ?? null
 }
 
 async function getCachedProjection<T>(key: CacheKey<T>, loader: () => Promise<T | null>) {
@@ -172,6 +221,19 @@ async function getSessionFilesData(sessionId: string) {
 }
 
 export const sessionRepository = {
+	async listJobDescriptionTemplates(userId: string) {
+		return await sessionQueries.selectJobDescriptionTemplatesByUserIdStatement.execute({ userId })
+	},
+
+	async createJobDescriptionTemplate(input: {
+		userId: string
+		name: string
+		jobTitle: string | null
+		jobDescription: string
+	}) {
+		return await getOrCreateJobDescriptionTemplate(input)
+	},
+
 	async getSessionById(sessionId: string) {
 		return await getCachedProjection(sessionRepositoryCacheKeys.entity(sessionId), async () => {
 			const [session] = await sessionQueries.selectSessionByIdStatement.execute({ sessionId })
@@ -237,8 +299,9 @@ export const sessionRepository = {
 	},
 
 	async createSession(input: CreateSessionInput) {
-		let sessionSnapshot: SessionListItem | undefined
+		let sessionSnapshot: { id: string } | undefined
 		let createdFiles: SessionCreatedFileRecord[] = []
+		const template = await getOrCreateJobDescriptionTemplate(input)
 
 		try {
 			await db.transaction(async (tx) => {
@@ -246,8 +309,8 @@ export const sessionRepository = {
 					tx.insert(schema.profilingSession)
 						.values({
 							userId: input.userId,
+							jobDescriptionTemplateId: template.id,
 							name: input.name,
-							jobDescription: input.jobDescription,
 							jobTitle: input.jobTitle,
 							status: "processing",
 							activeRunId: input.runId,
@@ -291,8 +354,12 @@ export const sessionRepository = {
 		if (!sessionSnapshot)
 			return false
 
+		const hydratedSession = await loadSessionSnapshot(sessionSnapshot.id)
+		if (!hydratedSession)
+			return false
+
 		primeSessionCaches({
-			session: sessionSnapshot,
+			session: hydratedSession,
 			files: createdFiles.map(file => ({
 				fileId: file.fileId,
 				storageKey: file.storageKey,
@@ -304,20 +371,24 @@ export const sessionRepository = {
 		})
 
 		return {
-			session: sessionSnapshot,
+			session: hydratedSession,
 			files: createdFiles,
 			totalConfirmed: createdFiles.length,
 		}
 	},
 
 	async updateSessionFailure(sessionId: string, message: string) {
-		const [session] = await sessionQueries.updateSessionFailureStatement.execute({
+		const [updatedSession] = await sessionQueries.updateSessionFailureStatement.execute({
 			sessionId,
 			status: "failed",
 			errorMessage: message,
 			lastCompletedAt: null,
 		})
 
+		if (!updatedSession)
+			return false
+
+		const session = await loadSessionSnapshot(updatedSession.id)
 		if (!session)
 			return false
 
@@ -331,16 +402,18 @@ export const sessionRepository = {
 	},
 
 	async persistRetrySession(input: RetryMutationInput) {
+		const template = await getOrCreateJobDescriptionTemplate(input)
+
 		if (input.mode === "clone_current" || input.mode === "clone_with_updates") {
-			let sessionSnapshot: SessionListItem | undefined
+			let sessionSnapshot: { id: string } | undefined
 
 			try {
 				await db.transaction(async (tx) => {
 					const [createdSession] = await tx.insert(schema.profilingSession)
 						.values({
 							userId: input.userId,
+							jobDescriptionTemplateId: template.id,
 							name: input.name,
-							jobDescription: input.jobDescription,
 							jobTitle: input.jobTitle,
 							status: "processing",
 							activeRunId: input.runId,
@@ -367,8 +440,12 @@ export const sessionRepository = {
 			if (!sessionSnapshot)
 				return false
 
+			const hydratedSession = await loadSessionSnapshot(sessionSnapshot.id)
+			if (!hydratedSession)
+				return false
+
 			primeSessionCaches({
-				session: sessionSnapshot,
+				session: hydratedSession,
 				files: input.files.map(file => ({
 					fileId: file.fileId,
 					storageKey: file.storageKey,
@@ -380,7 +457,7 @@ export const sessionRepository = {
 			})
 
 			return {
-				targetSessionId: sessionSnapshot.id,
+				targetSessionId: hydratedSession.id,
 				status: "processing" as const,
 			}
 		}
@@ -389,7 +466,7 @@ export const sessionRepository = {
 			sessionId: input.sessionId,
 			name: input.name,
 			jobTitle: input.jobTitle,
-			jobDescription: input.jobDescription,
+			jobDescriptionTemplateId: template.id,
 			status: "retrying",
 			activeRunId: input.runId,
 			errorMessage: null,
@@ -400,8 +477,12 @@ export const sessionRepository = {
 		if (!session)
 			return false
 
+		const hydratedSession = await loadSessionSnapshot(session.id)
+		if (!hydratedSession)
+			return false
+
 		patchSessionState({
-			session,
+			session: hydratedSession,
 			files: input.files.map(file => ({
 				fileId: file.fileId,
 				storageKey: file.storageKey,
@@ -413,7 +494,7 @@ export const sessionRepository = {
 		})
 
 		return {
-			targetSessionId: session.id,
+			targetSessionId: hydratedSession.id,
 			status: "retrying" as const,
 		}
 	},
@@ -423,7 +504,7 @@ export const sessionRepository = {
 		runId: string
 		results: SessionResultUpsertInput[]
 	}) {
-		let session: SessionListItem | null = null
+		let updatedSessionId: string | null = null
 		let insertedResults: CandidateResultRow[] = []
 
 		try {
@@ -466,7 +547,7 @@ export const sessionRepository = {
 						: [],
 				])
 
-				session = updatedSessions[0] ?? null
+				updatedSessionId = updatedSessions[0]?.id ?? null
 				insertedResults = inserted
 			})
 		}
@@ -474,6 +555,10 @@ export const sessionRepository = {
 			return false
 		}
 
+		if (!updatedSessionId)
+			return false
+
+		const session = await loadSessionSnapshot(updatedSessionId)
 		if (!session)
 			return false
 
@@ -527,7 +612,7 @@ export const sessionRepository = {
 		error: string
 		partialResults: SessionResultUpsertInput[]
 	}) {
-		let session: SessionListItem | null = null
+		let updatedSessionId: string | null = null
 		let insertedResults: CandidateResultRow[] = []
 
 		try {
@@ -570,7 +655,7 @@ export const sessionRepository = {
 						: [],
 				])
 
-				session = updatedSessions[0] ?? null
+				updatedSessionId = updatedSessions[0]?.id ?? null
 				insertedResults = inserted
 			})
 		}
@@ -578,6 +663,10 @@ export const sessionRepository = {
 			return false
 		}
 
+		if (!updatedSessionId)
+			return false
+
+		const session = await loadSessionSnapshot(updatedSessionId)
 		if (!session)
 			return false
 

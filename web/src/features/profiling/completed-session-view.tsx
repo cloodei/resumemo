@@ -10,6 +10,7 @@ import {
 	type RetryMode,
 	type CandidateResult,
 	type ProfilingSessionDetailData,
+	getCandidateEmail,
 	getDisplayCandidateName,
 	getExperienceLabel,
 	getManualReviewLabel,
@@ -120,26 +121,30 @@ export function CompletedSessionView({
 										<TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No results generated for this session.</TableCell>
 									</TableRow>
 								) : (
-									results.map((candidate, index) => (
-										<TableRow key={candidate.id} className="group cursor-pointer align-top transition-all hover:bg-muted/55" onClick={() => onSelectCandidate(candidate.id)}>
-											<TableCell><Badge variant="secondary" className="text-xs shadow-sm">#{index + 1}</Badge></TableCell>
-											<TableCell className="space-y-1">
-												<p className="font-semibold text-foreground transition-colors group-hover:text-primary">{getDisplayCandidateName(candidate)}</p>
-												<p className="text-xs text-muted-foreground">Match score {candidate.overallScore}/100{getExperienceLabel(candidate) ? ` • ${getExperienceLabel(candidate)}` : ""}</p>
-												<p className="text-xs text-muted-foreground" title={candidate.originalName}>Resume: {candidate.originalName}</p>
-												{candidate.candidateEmail && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Mail className="size-3" />{candidate.candidateEmail}</p>}
-												{needsManualReview(candidate) && <p className="text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>}
-											</TableCell>
-											<TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
-												<p className="line-clamp-2 leading-snug">{candidate.summary}</p>
-												<div className="mt-2 flex flex-wrap gap-1.5">
-													{getPrimarySkills(candidate).map((skill) => (
-														<span key={skill} className="rounded-sm bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{skill}</span>
-													))}
-												</div>
-											</TableCell>
-										</TableRow>
-									))
+									results.map((candidate, index) => {
+										const candidateEmail = getCandidateEmail(candidate)
+
+										return (
+											<TableRow key={candidate.id} className="group cursor-pointer align-top transition-all hover:bg-muted/55" onClick={() => onSelectCandidate(candidate.id)}>
+												<TableCell><Badge variant="secondary" className="text-xs shadow-sm">#{index + 1}</Badge></TableCell>
+												<TableCell className="space-y-1">
+													<p className="font-semibold text-foreground transition-colors group-hover:text-primary">{getDisplayCandidateName(candidate)}</p>
+													<p className="text-xs text-muted-foreground">Match score {candidate.overallScore}/100{getExperienceLabel(candidate) ? ` - ${getExperienceLabel(candidate)}` : ""}</p>
+													<p className="text-xs text-muted-foreground" title={candidate.originalName}>Resume: {candidate.originalName}</p>
+													{candidateEmail && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Mail className="size-3" />{candidateEmail}</p>}
+													{needsManualReview(candidate) && <p className="text-[11px] text-amber-600">{getManualReviewLabel(candidate)}</p>}
+												</TableCell>
+												<TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+													<p className="line-clamp-2 leading-snug">{candidate.summary}</p>
+													<div className="mt-2 flex flex-wrap gap-1.5">
+														{getPrimarySkills(candidate).map((skill) => (
+															<span key={skill} className="rounded-sm bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{skill}</span>
+														))}
+													</div>
+												</TableCell>
+											</TableRow>
+										)
+									})
 								)}
 							</TableBody>
 						</Table>
@@ -160,7 +165,7 @@ export function CompletedSessionView({
 							{results.slice(0, 3).map((candidate, index) => (
 								<div key={candidate.id} className="cursor-pointer rounded-lg bg-muted/30 p-4 shadow-x transition-all hover:-translate-y-0.5 dark:bg-muted/20" onClick={() => onSelectCandidate(candidate.id)}>
 									<p className="text-sm font-semibold text-foreground">{getDisplayCandidateName(candidate)}</p>
-									<p className="mt-1 text-xs">Match score {candidate.overallScore}/100 • Rank #{index + 1}</p>
+									<p className="mt-1 text-xs">Match score {candidate.overallScore}/100 - Rank #{index + 1}</p>
 									<p className="mt-3 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{candidate.summary}</p>
 									<Button size="sm" variant="ghost" className="mt-4 gap-2">View details<ArrowUpRight className="size-4" /></Button>
 								</div>
