@@ -90,7 +90,7 @@ export default function NewProfilingPage() {
 	const watchedFields = watch()
 	useEffect(() => {
 		setFormData(watchedFields)
-	}, [setFormData, watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId, watchedFields.jobTitle, watchedFields.sessionName])
+	}, [watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId, watchedFields.jobTitle, watchedFields.sessionName])
 
 	useEffect(() => {
 		if (!watchedFields.jobDescriptionTemplateId)
@@ -104,7 +104,7 @@ export default function NewProfilingPage() {
 			setValue("jobDescriptionTemplateId", undefined, { shouldDirty: true })
 			setFormData({ jobDescriptionTemplateId: undefined })
 		}
-	}, [jobDescriptionTemplates, setFormData, setValue, watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId])
+	}, [jobDescriptionTemplates, watchedFields.jobDescription, watchedFields.jobDescriptionTemplateId])
 
 	const failedFiles = useMemo(() => files.filter(file => file.status === "failed"), [files])
 	const doneFiles = useMemo(() => files.filter(file => file.status === "done"), [files])
@@ -232,14 +232,22 @@ export default function NewProfilingPage() {
 		toast.info("Stopped the current attempt. You can try again when you're ready.")
 	}
 
-	const startSessionCreation = async (formData: SessionFormData, filesToCreate: Array<{
+	const startSessionCreation = async (formData: SessionFormData, filesToCreate: {
 		storageKey: string
 		fileName: string
 		mimeType: string
 		size: number
-	}>, signal: AbortSignal) => {
+	}[], signal: AbortSignal) => {
 		setPhase("creating")
 
+		console.log("Creating session with data:", {
+			name: formData.sessionName.trim(),
+			jobDescription: formData.jobDescription.trim(),
+			jobTitle: formData.jobTitle.trim() || undefined,
+			jobDescriptionTemplateId: formData.jobDescriptionTemplateId,
+			files: filesToCreate,
+		})
+		console.log("Signal aborted before request:", signal.aborted)
 		const { data, error } = await api.api.v2.sessions.create.post({
 			name: formData.sessionName.trim(),
 			jobDescription: formData.jobDescription.trim(),
@@ -250,6 +258,7 @@ export default function NewProfilingPage() {
 			fetch: { signal },
 		})
 
+		console.log("Session creation response:", data)
 		if (signal.aborted)
 			return
 
@@ -389,6 +398,7 @@ export default function NewProfilingPage() {
 				}
 			})
 
+			// console.log("Starting session creation with files:", filesToCreate)
 			await startSessionCreation(formData, filesToCreate, controller.signal)
 		}
 		catch (error) {
