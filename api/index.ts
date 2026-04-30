@@ -6,7 +6,7 @@ const maxWorkers = Math.max(1, os.availableParallelism())
 const workerCount = Math.min(Math.max(1, apiEnv.server.workerCount || 1), maxWorkers)
 
 if (cluster.isPrimary)
-	for (let i = 0; i < workerCount; ++i)
+	for (let _ = 0; _ < workerCount; ++_)
 		cluster.fork()
 else
-	await import("src/index")
+	await import("./src/index")
