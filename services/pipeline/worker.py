@@ -1,4 +1,5 @@
 """Celery application for the official Resumemo AI pipeline."""
+# ruff: noqa: E402
 
 from __future__ import annotations
 

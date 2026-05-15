@@ -1,49 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react"
+import type { ReactNode } from "react"
+import { useEffect, useState } from "react"
 
 import { authClient, useSession } from "@/lib/auth"
-
-type User = {
-	id: string;
-	name: string;
-	email: string;
-	emailVerified: boolean;
-	image?: string | null | undefined;
-	createdAt: Date;
-	updatedAt: Date;
-}
-
-type Session = {
-	id: string;
-	createdAt: Date;
-	updatedAt: Date;
-	userId: string;
-	expiresAt: Date;
-	token: string;
-	ipAddress?: string | null | undefined;
-	userAgent?: string | null | undefined;
-}
-
-type AuthContextType = {
-	user: User | null
-	session: Session | null
-	isLoading: boolean
-	isAuthenticated: boolean
-	signOut: () => Promise<void>
-	refetch: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | null>(null)
-
-export function useAuth() {
-	const context = useContext(AuthContext)
-	if (!context) {
-		throw new Error("useAuth must be used within an AuthProvider")
-	}
-	return context
-}
+import { AuthContext } from "@/components/auth/auth-context"
 
 type AuthProviderProps = {
-	children: React.ReactNode
+	children: ReactNode
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -77,7 +39,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		}
 		document.addEventListener("visibilitychange", handleVisibilityChange)
 		return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
-	}, [])
+	}, [refetch])
 
 	return (
 		<AuthContext.Provider

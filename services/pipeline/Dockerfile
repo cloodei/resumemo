@@ -14,7 +14,6 @@ COPY services/pipeline/pyproject.toml services/pipeline/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY services/pipeline ./
-COPY research/data/taxonomy/taxonomy_processed ./data/taxonomy
 
 FROM base AS runtime
 

@@ -21,8 +21,14 @@ MUST_ZONE_PATTERN = re.compile(
     r"(requirements?|required|must[- ]?have|qualifications?|technical expertise|essential|responsibilities)",
     re.IGNORECASE,
 )
-WISH_ZONE_PATTERN = re.compile(r"(nice[- ]?to[- ]?have|preferred|desirable|plus|advantage|good[- ]?to[- ]?have)", re.IGNORECASE)
-STOP_ZONE_PATTERN = re.compile(r"(benefits|what we offer|about (?:us|company)|closing date|equal opportunity)", re.IGNORECASE)
+WISH_ZONE_PATTERN = re.compile(
+    r"(nice[- ]?to[- ]?have|preferred|desirable|plus|advantage|good[- ]?to[- ]?have)",
+    re.IGNORECASE,
+)
+STOP_ZONE_PATTERN = re.compile(
+    r"(benefits|what we offer|about (?:us|company)|closing date|equal opportunity)",
+    re.IGNORECASE,
+)
 
 
 def enrich_job_description(job_description: str, taxonomy: TaxonomyIndex | None = None) -> JobDescriptionArtifact:
@@ -91,9 +97,16 @@ def _split_priority_zones(text: str) -> tuple[str, str]:
     nice_lines: list[str] = []
 
     for line in lines:
+        wish_match = WISH_ZONE_PATTERN.search(line)
+        if wish_match and MUST_ZONE_PATTERN.search(line):
+            must_lines.append(line[:wish_match.start()])
+            nice_lines.append(line[wish_match.start():])
+            current = "nice"
+            continue
+
         if STOP_ZONE_PATTERN.search(line):
             current = "stop"
-        elif WISH_ZONE_PATTERN.search(line):
+        elif wish_match:
             current = "nice"
         elif MUST_ZONE_PATTERN.search(line):
             current = "must"

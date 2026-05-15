@@ -51,6 +51,27 @@ def test_interval_merging_for_overlapping_skill_experience():
     assert merged == [(2020 * 12, 2024 * 12), (2025 * 12, 2026 * 12)]
 
 
+def test_cv_skill_years_support_numeric_dates_and_declared_year_cap():
+    taxonomy = _taxonomy()
+
+    profile = extract_candidate_dna(
+        """
+        Jane Doe
+        jane@example.com
+        3 years of experience
+        Skills
+        React.js
+        Experience
+        Frontend Engineer 01/2020 - 03/2026
+        Built product interfaces with React.js.
+        """,
+        taxonomy=taxonomy,
+    )
+
+    react = next(item for item in profile.hard_skills["direct_mention"] if item["canonical_name"] == "React.js")
+    assert react["years"] == 3
+
+
 def test_composite_scoring_base_bonus_and_total():
     taxonomy = _taxonomy()
     jd = enrich_job_description("Requirements: 3 years Python and FastAPI. Nice to have Docker.", taxonomy=taxonomy)
@@ -124,6 +145,7 @@ def _taxonomy() -> TaxonomyIndex:
     return TaxonomyIndex([
         TaxonomyTerm("Python", "python", "Software.Backend.Python", "tech", ("Software", "Backend", "Python")),
         TaxonomyTerm("FastAPI", "fastapi", "Software.Backend.FastAPI", "tech", ("Software", "Backend", "FastAPI")),
+        TaxonomyTerm("React.js", "react.js", "Software.Frontend.React", "tech", ("Software", "Frontend", "React.js")),
         TaxonomyTerm("Django", "django", "Software.Backend.Django", "tech", ("Software", "Backend", "Django")),
         TaxonomyTerm("Docker", "docker", "Infra.DevOps.Docker", "tech", ("Infra", "DevOps", "Docker")),
         TaxonomyTerm(

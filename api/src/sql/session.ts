@@ -148,30 +148,3 @@ export const selectSessionFilesStatement = db
   .innerJoin(schema.resumeFile, eq(schema.profilingSessionFile.fileId, schema.resumeFile.id))
   .where(eq(schema.profilingSessionFile.sessionId, sql.placeholder("sessionId")))
   .prepare("session_select_files")
-
-export const updateSessionFailureStatement = db
-  .update(schema.profilingSession)
-  .set({
-    status: schema.profilingSession.status,
-    errorMessage: schema.profilingSession.errorMessage,
-    lastCompletedAt: schema.profilingSession.lastCompletedAt,
-  })
-  .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
-  .returning()
-  .prepare("session_update_failure")
-
-export const updateSessionRetryStateStatement = db
-  .update(schema.profilingSession)
-  .set({
-    name: schema.profilingSession.name,
-    jobTitle: schema.profilingSession.jobTitle,
-    jobDescriptionTemplateId: schema.profilingSession.jobDescriptionTemplateId,
-    status: schema.profilingSession.status,
-    activeRunId: schema.profilingSession.activeRunId,
-    errorMessage: schema.profilingSession.errorMessage,
-    lastCompletedAt: schema.profilingSession.lastCompletedAt,
-    totalFiles: schema.profilingSession.totalFiles,
-  })
-  .where(eq(schema.profilingSession.id, sql.placeholder("sessionId")))
-  .returning()
-  .prepare("session_update_retry_state")

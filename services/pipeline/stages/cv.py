@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import re
 import unicodedata
+from datetime import UTC, datetime
 from typing import Any
 
 from config import CV_ENTITY_THRESHOLD, CV_SKILLS_SECTION_THRESHOLD
 from models import CandidateDnaProfile, SkillEvidence, TaxonomyMatch
 from stages.entities import extract_entities
+from stages.segmentation import segment_resume_text
 from stages.taxonomy import TaxonomyIndex, get_taxonomy_index
 
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -21,10 +22,18 @@ SECTION_HEADERS = {
     "experience": re.compile(r"^(?:work experience|professional experience|experience|employment|work history)$", re.I),
     "education": re.compile(r"^(?:education|academic background|qualifications|certifications?)$", re.I),
 }
+MONTH_NAME_PATTERN = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
+YEAR_PATTERN = r"(?:19[7-9]\d|20[0-3]\d)"
+NUMERIC_MONTH_PATTERN = r"(?:0?[1-9]|1[0-2])"
+DATE_TOKEN_PATTERN = (
+    rf"(?:{MONTH_NAME_PATTERN}\s+{YEAR_PATTERN}|"
+    rf"{NUMERIC_MONTH_PATTERN}[/-]{YEAR_PATTERN}|"
+    rf"{YEAR_PATTERN}[/-]{NUMERIC_MONTH_PATTERN}|"
+    rf"{YEAR_PATTERN})"
+)
+DATE_SEPARATOR_PATTERN = r"(?:-|\u2013|\u2014|to)"
 DATE_RANGE_PATTERN = re.compile(
-    r"(?P<start>(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+)?(?P<start_year>19[7-9]\d|20[0-3]\d)"
-    r"\s*(?:-|–|—|to)\s*"
-    r"(?P<end>(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+)?(?:19[7-9]\d|20[0-3]\d)|present|current)",
+    rf"(?P<start>{DATE_TOKEN_PATTERN})\s*{DATE_SEPARATOR_PATTERN}\s*(?P<end>{DATE_TOKEN_PATTERN}|present|current)",
     re.I,
 )
 YEARS_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)", re.I)
@@ -49,10 +58,10 @@ def extract_candidate_dna(raw_text: str, taxonomy: TaxonomyIndex | None = None) 
     """Build a candidate DNA artifact from extracted resume text."""
     taxonomy = taxonomy or get_taxonomy_index()
     cleaned = clean_resume_text(raw_text)
-    sections = split_sections(cleaned)
-    info_text = "\n".join([*sections.get("information", []), *cleaned.splitlines()[:8]])
+    sectioned = segment_resume_text(cleaned)
+    sections = split_sections(sectioned)
     skill_zone_text = "\n".join(sections.get("skills", []))
-    experience_text = "\n".join(sections.get("experience", [])) or cleaned
+    experience_text = "\n".join(sections.get("experience", [])) or sectioned
     education_text = "\n".join(sections.get("education", []))
 
     tech_matches = _dedupe_matches([
@@ -62,15 +71,15 @@ def extract_candidate_dna(raw_text: str, taxonomy: TaxonomyIndex | None = None) 
         *_map_gliner_entities(taxonomy, experience_text, "tech", CV_ENTITY_THRESHOLD),
     ])
     soft_matches = _dedupe_matches([
-        *taxonomy.find_mentions(cleaned, "soft"),
-        *_map_gliner_entities(taxonomy, cleaned, "soft", CV_ENTITY_THRESHOLD),
+        *taxonomy.find_mentions(sectioned, "soft"),
+        *_map_gliner_entities(taxonomy, sectioned, "soft", CV_ENTITY_THRESHOLD),
     ])
-    skill_evidence = [_skill_evidence(match, experience_text, cleaned) for match in tech_matches]
+    skill_evidence = [_skill_evidence(match, experience_text, sectioned) for match in tech_matches]
 
-    total_years = _extract_declared_years(cleaned) or _total_experience_from_text(experience_text)
-    name = _extract_name(cleaned)
-    email = _extract_email(cleaned)
-    phone = _extract_phone(cleaned)
+    total_years = _extract_declared_years(sectioned) or _total_experience_from_text(experience_text)
+    name = _extract_name(sectioned)
+    email = _extract_email(sectioned)
+    phone = _extract_phone(sectioned)
 
     warnings = []
     if not skill_evidence:
@@ -91,11 +100,11 @@ def extract_candidate_dna(raw_text: str, taxonomy: TaxonomyIndex | None = None) 
         },
         hard_skills={
             "direct_mention": [item.model_dump() for item in skill_evidence],
-            "certifications": _extract_certifications(education_text or cleaned),
+            "certifications": _extract_certifications(education_text or sectioned),
         },
         soft_skills=[_soft_skill_payload(match) for match in soft_matches],
         education={
-            "degree": _extract_degree(education_text or cleaned),
+            "degree": _extract_degree(education_text or sectioned),
             "raw": education_text[:1000],
         },
         raw_entities=[
@@ -155,9 +164,9 @@ def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
 def _skill_evidence(match: TaxonomyMatch, experience_text: str, full_text: str) -> SkillEvidence:
     intervals = _skill_intervals(match.canonical_name, experience_text)
     years = _interval_years(intervals)
-    if years == 0:
-        declared = _extract_declared_years(full_text)
-        years = min(declared or 0, years)
+    declared = _extract_declared_years(full_text)
+    if declared is not None and years > declared:
+        years = declared
 
     return SkillEvidence(
         skill=match.source_text,
@@ -174,15 +183,19 @@ def _skill_evidence(match: TaxonomyMatch, experience_text: str, full_text: str) 
 
 def _skill_intervals(skill: str, experience_text: str) -> list[tuple[int, int]]:
     intervals: list[tuple[int, int]] = []
-    skill_pattern = re.compile(r"\b" + re.escape(skill).replace(r"\ ", r"\s+") + r"\b", re.I)
+    skill_pattern = _term_pattern(skill)
 
     for block in _experience_blocks(experience_text):
         if not skill_pattern.search(block):
             continue
         for match in DATE_RANGE_PATTERN.finditer(block):
-            start = _month_index(match.group("start_year"), match.group("start") or "")
+            start = _month_index_from_text(match.group("start"))
             end_raw = match.group("end")
-            end = _current_month_index() if end_raw.lower() in {"present", "current"} else _month_index_from_text(end_raw)
+            end = (
+                _current_month_index()
+                if end_raw.lower() in {"present", "current"}
+                else _month_index_from_text(end_raw)
+            )
             if start and end and end > start:
                 intervals.append((start, end))
 
@@ -190,7 +203,8 @@ def _skill_intervals(skill: str, experience_text: str) -> list[tuple[int, int]]:
 
 
 def _experience_blocks(text: str) -> list[str]:
-    chunks = re.split(r"\n(?=.*(?:19[7-9]\d|20[0-3]\d).*(?:-|–|—|to).*(?:19[7-9]\d|20[0-3]\d|present|current))", text, flags=re.I)
+    date_range_line = rf"\n(?=.*{YEAR_PATTERN}.*{DATE_SEPARATOR_PATTERN}.*(?:{YEAR_PATTERN}|present|current))"
+    chunks = re.split(date_range_line, text, flags=re.I)
     return [chunk.strip() for chunk in chunks if chunk.strip()] or [text]
 
 
@@ -202,7 +216,7 @@ def _interval_years(intervals: list[tuple[int, int]]) -> float:
 def _total_experience_from_text(text: str) -> float | None:
     intervals = []
     for match in DATE_RANGE_PATTERN.finditer(text):
-        start = _month_index(match.group("start_year"), match.group("start") or "")
+        start = _month_index_from_text(match.group("start"))
         end_raw = match.group("end")
         end = _current_month_index() if end_raw.lower() in {"present", "current"} else _month_index_from_text(end_raw)
         if start and end and end > start:
@@ -226,6 +240,11 @@ def _month_index_from_text(value: str) -> int | None:
     year = re.search(r"(19[7-9]\d|20[0-3]\d)", value)
     if not year:
         return None
+    numeric_month = re.search(r"\b(0?[1-9]|1[0-2])\s*[/-]\s*(?:19[7-9]\d|20[0-3]\d)\b", value)
+    if not numeric_month:
+        numeric_month = re.search(r"\b(?:19[7-9]\d|20[0-3]\d)\s*[/-]\s*(0?[1-9]|1[0-2])\b", value)
+    if numeric_month:
+        return int(year.group(1)) * 12 + int(numeric_month.group(1))
     return _month_index(year.group(1), value)
 
 
@@ -258,7 +277,7 @@ def _extract_name(text: str) -> str | None:
         if not candidate or "@" in candidate or any(char.isdigit() for char in candidate):
             continue
         if len(candidate.split()) in {2, 3, 4} and len(candidate) <= 80:
-            if not SECTION_HEADERS.get(candidate.lower()):
+            if not any(pattern.match(candidate.strip(":")) for pattern in SECTION_HEADERS.values()):
                 return candidate
     return None
 
@@ -312,7 +331,7 @@ def _map_gliner_entities(
 def _zones_for_skill(skill: str, text: str) -> list[str]:
     sections = split_sections(text)
     zones = []
-    pattern = re.compile(r"\b" + re.escape(skill).replace(r"\ ", r"\s+") + r"\b", re.I)
+    pattern = _term_pattern(skill)
     for name, lines in sections.items():
         if pattern.search("\n".join(lines)):
             zones.append(name)
@@ -320,7 +339,7 @@ def _zones_for_skill(skill: str, text: str) -> list[str]:
 
 
 def _evidence_lines(skill: str, text: str) -> list[str]:
-    pattern = re.compile(r"\b" + re.escape(skill).replace(r"\ ", r"\s+") + r"\b", re.I)
+    pattern = _term_pattern(skill)
     evidence = []
     for line in text.splitlines():
         cleaned = line.strip()
@@ -363,3 +382,8 @@ def _trace_payload(match: TaxonomyMatch) -> dict[str, Any]:
         "confidence": match.confidence,
         "match_method": match.match_method,
     }
+
+
+def _term_pattern(value: str) -> re.Pattern[str]:
+    escaped = re.escape(value).replace(r"\ ", r"\s+")
+    return re.compile(r"(?<![A-Za-z0-9+#])" + escaped + r"(?![A-Za-z0-9+#])", re.I)

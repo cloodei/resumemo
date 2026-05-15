@@ -32,6 +32,7 @@ Current backend implementation notes:
 
 - `research/` contains notebooks, data, processed taxonomy assets, papers, and algorithm notes.
 - Production code must live in `services/pipeline/`; research files are references and fixtures unless explicitly copied into runtime assets.
+- Worker runtime taxonomy and ChromaDB assets are copied into `services/pipeline/data/` so deploys do not rely on ignored `research/` files.
 
 ## Historical Docs
 

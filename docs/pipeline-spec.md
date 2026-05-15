@@ -121,7 +121,7 @@ The worker in `services/pipeline/worker.py` runs:
 5. Deterministic summary generation from the artifacts.
 6. Completion or error callback to the API.
 
-The research design comes from `research/project/` and processed taxonomy assets under `research/data/taxonomy/taxonomy_processed/`.
+The research design comes from `research/project/`. Runtime taxonomy and ChromaDB assets are packaged under `services/pipeline/data/` so the worker does not depend on ignored `research/` files at deploy time.
 
 ## Artifact Summaries
 
@@ -228,7 +228,7 @@ Worker-side env:
 
 - extraction is extension-based and handles `.pdf`, `.docx`, and `.txt`
 - scanned-image PDFs still need an OCR path
-- Gemini segmentation is optional and disabled by default
+- Gemini segmentation is optional, disabled by default, and used before deterministic CV parsing when enabled
 - taxonomy mapping uses local processed taxonomy assets and deterministic fallbacks when semantic models are unavailable
 - there are no progress callbacks; only terminal `completion` or `error`
 - callback authentication is a shared secret header, not signed requests or mTLS
