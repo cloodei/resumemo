@@ -4,22 +4,29 @@ import { useSuspenseQuery } from "@tanstack/react-query"
 import { QueryErrorBoundary } from "@/components/feedback/query-error-boundary"
 import { RouteErrorFallback } from "@/components/feedback/route-error-fallback"
 import { ProfilingSessionsSkeleton } from "@/components/feedback/route-skeletons"
-import { DashboardHeader } from "@/components/features/dashboard/dashboard-header"
-import { DashboardMetrics } from "@/components/features/dashboard/dashboard-metrics"
-import { DashboardRecentSessions } from "@/components/features/dashboard/dashboard-recent-sessions"
+import { DashboardHeader } from "@/features/dashboard/dashboard-header"
+import { DashboardMetrics } from "@/features/dashboard/dashboard-metrics"
+import { DashboardRecentSessions } from "@/features/dashboard/dashboard-recent-sessions"
 import {
 	buildDashboardMetrics,
 	buildDashboardRecentSessions,
 	detectAuthProvider,
 	getProviderBadge,
-} from "@/components/features/dashboard/dashboard-utils"
-import { DashboardWorkflowNotes } from "@/components/features/dashboard/dashboard-workflow-notes"
+} from "@/features/dashboard/utils"
+import { DashboardWorkflowNotes } from "@/features/dashboard/dashboard-workflow-notes"
+import { fetchProfilingSessions } from "@/features/profiling/api/profiling-sessions"
 import { useSession } from "@/lib/auth"
-import { profilingSessionsQueryOptions } from "@/lib/profiling-queries"
 
 function DashboardContent() {
 	const { data: session, isPending } = useSession()
-	const { data: sessions } = useSuspenseQuery(profilingSessionsQueryOptions())
+	const { data: sessions } = useSuspenseQuery({
+		queryKey: ["profiling-sessions"],
+		queryFn: fetchProfilingSessions,
+		refetchInterval: (query) => {
+			const sessions = query.state.data ?? []
+			return sessions.some(item => item.status === "processing" || item.status === "retrying") ? 8000 : false
+		},
+	})
 	const user = session?.user
 	const authProvider = detectAuthProvider(user)
 	const providerBadge = getProviderBadge(authProvider)

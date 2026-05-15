@@ -5,43 +5,46 @@
  * Uses amqplib with a persistent connection and channel.
  */
 
-import { randomUUIDv7 } from "bun";
-import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib";
-import { QUEUE_NAME, PIPELINE_TASK_NAME, QUEUE_ORIGIN } from "~/config/constants";
-import { apiEnv } from "~/config/env";
+import { randomUUIDv7 } from "bun"
+import amqplib, { type Connection, type ChannelModel, type Channel } from "amqplib"
 
-const url = apiEnv.queue.brokerUrl;
+import { apiEnv } from "~/config/env"
+import {
+	PIPELINE_TASK_NAME,
+	QUEUE_NAME,
+	QUEUE_ORIGIN,
+} from "~/config/constants"
 
-export let channel: Channel | null = null;
-export let connection: Connection | null = null;
-export let channelModel: ChannelModel | null = null;
+const url = apiEnv.queue.brokerUrl
+
+export let channel: Channel | null = null
+export let connection: Connection | null = null
+export let channelModel: ChannelModel | null = null
 
 function resetConnectionState() {
-	channelModel = null;
-	channel = null;
-	connection = null;
+	channelModel = null
+	channel = null
+	connection = null
 }
 
 async function getChannel() {
 	if (channel)
 		return channel;
 
-	channelModel = await amqplib.connect(url);
-	channel = await channelModel.createChannel();
-	connection = channelModel.connection;
-
-	await channel.assertQueue(QUEUE_NAME, { durable: true });
+	channelModel = await amqplib.connect(url)
+	channel = await channelModel.createChannel()
+	connection = channelModel.connection
 
 	connection.on("error", (err) => {
-		resetConnectionState();
-		console.error("[RabbitMQ] Broker connection error:", err.message);
-	});
+		resetConnectionState()
+		console.error("[RabbitMQ] Broker connection error:", err.message)
+	})
 
 	connection.on("close", () => {
-		resetConnectionState();
-	});
+		resetConnectionState()
+	})
 
-	return channel;
+	return channel
 }
 
 export type PipelineJobPayload = {
@@ -55,12 +58,14 @@ export type PipelineJobPayload = {
 	}[];
 };
 
-async function publishCeleryTask({ taskName, args }: {
+async function publishCeleryTask({ queueName, taskName, args }: {
+	queueName: string;
 	taskName: string;
 	args: unknown[];
 }) {
-	const ch = await getChannel();
-	const taskId = randomUUIDv7();
+	const ch = await getChannel()
+	const taskId = randomUUIDv7()
+	await ch.assertQueue(queueName, { durable: true })
 
 	const body = JSON.stringify([
 		args,
@@ -71,10 +76,10 @@ async function publishCeleryTask({ taskName, args }: {
 			chain: null,
 			chord: null,
 		},
-	]);
+	])
 
 	const sent = ch.sendToQueue(
-		QUEUE_NAME,
+		queueName,
 		Buffer.from(body),
 		{
 			persistent: true,
@@ -100,12 +105,12 @@ async function publishCeleryTask({ taskName, args }: {
 				origin: QUEUE_ORIGIN,
 			},
 		},
-	);
+	)
 
 	if (!sent)
-		throw new Error("Failed to publish task: channel buffer full");
+		throw new Error("Failed to publish task: channel buffer full")
 
-	return taskId;
+	return taskId
 }
 
 /**
@@ -116,9 +121,10 @@ async function publishCeleryTask({ taskName, args }: {
  */
 export async function publishPipelineJob(payload: PipelineJobPayload) {
 	return publishCeleryTask({
+		queueName: QUEUE_NAME,
 		taskName: PIPELINE_TASK_NAME,
 		args: [payload],
-	});
+	})
 }
 
 /**
@@ -127,12 +133,12 @@ export async function publishPipelineJob(payload: PipelineJobPayload) {
 export async function closeRabbitMQ() {
 	try {
 		if (channel)
-			await channel.close();
+			await channel.close()
 		if (channelModel)
-			await channelModel.close();
+			await channelModel.close()
 	}
 	catch {
 		// Best-effort cleanup
 	}
-	resetConnectionState();
+	resetConnectionState()
 }

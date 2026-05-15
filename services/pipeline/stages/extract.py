@@ -1,5 +1,7 @@
 """Stage 1: Text extraction from PDF, DOCX, and TXT files."""
+
 from __future__ import annotations
+
 import logging
 from io import BytesIO
 from pathlib import Path

@@ -1,9 +1,10 @@
 import { LogOut } from "lucide-react"
+import type { ReactElement } from "react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
-import { useAuth } from "@/components/auth/auth-provider"
+import { useAuth } from "@/components/auth/auth-context"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -17,7 +18,7 @@ import {
 import { getErrorMessage } from "@/lib/errors"
 
 type SignOutDialogProps = {
-	trigger: React.ReactElement
+	trigger: ReactElement
 }
 
 export function SignOutDialog({ trigger }: SignOutDialogProps) {

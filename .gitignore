@@ -31,6 +31,9 @@ Thumbs.db
 # /docs
 一impl
 /docs/plans
+AGENTS.md
 
 *.pem
 *.key
+
+/research

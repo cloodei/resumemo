@@ -9,24 +9,6 @@ import { usecaseFailure, usecaseSuccess } from "../result"
 const RETRY_SESSION_FAILED_MESSAGE = "We couldn't restart processing. Please try again."
 const RETRY_CLONE_FAILED_MESSAGE = "We couldn't start the new copied session. Please try again."
 
-// type RetrySessionSuccess = {
-// 	status: "retrying" | "processing"
-// 	sessionId: string
-// 	runId: string
-// 	totalConfirmed: number
-// 	action: RetrySessionBody["mode"]
-// 	targetSessionId: string
-// }
-
-// type RetrySessionError = {
-// 	status: "error"
-// 	message: string
-// 	details?: string
-// 	retryable?: boolean
-// 	targetSessionId?: string | null
-// 	failures?: unknown
-// }
-
 export async function retrySessionUsecase(input: {
 	userId: string
 	sessionId: string
@@ -136,9 +118,7 @@ export async function retrySessionUsecase(input: {
 
 			case "clone_current":
 			case "clone_with_updates": {
-				const jobDescription = input.body.mode === "clone_current"
-					? existingSession.jobDescription
-					: nextJobDescription
+				const jobDescription = input.body.mode === "clone_current" ? existingSession.jobDescription : nextJobDescription
 				const mutation = await sessionRepository.persistRetrySession({
 					mode: input.body.mode,
 					userId: input.userId,

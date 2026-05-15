@@ -17,6 +17,3 @@
 **/*.tgz
 **/*.log
 **/*.bun
-
-# Benchmark generated test data
-src/benchmark/data/

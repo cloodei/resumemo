@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { ArrowRight, BadgeCheck, BookOpen, BrainCircuit, ChevronRight, Layers, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AppFooter } from "@/components/layout/app-footer";
+import { AppFooter } from "@/features/layout/app-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const fadeUp = {
@@ -194,7 +194,7 @@ export function LandingPage() {
             <motion.div initial="hidden" animate="visible" variants={stagger} className="grid gap-4">
               <motion.div
                 variants={fadeUp}
-                className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6"
+                className="relative overflow-hidden rounded-4xl border border-white/10 bg-white/5 p-6"
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_50%)]" />
                 <div className="relative flex items-center justify-between text-xs text-white/60">
@@ -265,7 +265,7 @@ export function LandingPage() {
               </motion.div>
 
               <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                <motion.div variants={fadeUp} className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+                <motion.div variants={fadeUp} className="rounded-4xl border border-white/10 bg-white/5 p-6">
                   <div className="flex items-center justify-between text-xs text-white/60">
                     <span>Studio board</span>
                     <span className="rounded-full bg-white/10 px-3 py-1">Live</span>
@@ -314,7 +314,7 @@ export function LandingPage() {
                   </div>
                 </motion.div>
 
-                <motion.div variants={fadeUp} className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+                <motion.div variants={fadeUp} className="rounded-4xl border border-white/10 bg-white/5 p-6">
                   <p className="text-xs uppercase tracking-[0.3em] text-white/60">Inside the stack</p>
                   <h3 className="mt-3 text-2xl font-semibold text-white">Curation meets explainability.</h3>
                   <p className="mt-3 text-sm text-slate-400">
@@ -433,7 +433,7 @@ export function LandingPage() {
                   <motion.div
                     key={item.step}
                     variants={fadeUp}
-                    className="relative rounded-[24px] border border-white/10 bg-white/5 p-5"
+                    className="relative rounded-3xl border border-white/10 bg-white/5 p-5"
                   >
                     <span className="text-xs uppercase tracking-[0.3em] text-white/60">{item.step}</span>
                     <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>

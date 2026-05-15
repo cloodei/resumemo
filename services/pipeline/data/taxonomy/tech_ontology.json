@@ -1,0 +1,97 @@
+{
+  "Software_Development": {
+    "Frontend": {
+      "Core": ["HTML", "HTML5", "CSS", "CSS3", "JavaScript", "JS", "TypeScript", "TS", "WebAssembly", "WASM"],
+      "Frameworks_Libraries": ["React.js", "Angular", "AngularJS", "Vue.js", "Next.js", "Nuxt.js", "Svelte", "SvelteKit", "Redux", "Bootstrap", "Tailwind CSS", "Material UI", "MUI", "Ant Design", "jQuery", "RxJS", "Vuex"],
+      "Build_Tools": ["Webpack", "Babel", "Vite", "Gulp", "Grunt", "npm", "Yarn", "pnpm"]
+    },
+    "Backend": {
+      "Java_Ecosystem": ["Java", "J2EE", "JDK", "Spring", "Spring Boot", "Spring MVC", "Spring Security", "Hibernate", "JPA", "Struts", "JSF", "Maven", "Gradle", "Apache Tomcat", "WebLogic", "JBoss"],
+      "JavaScript_Ecosystem": ["Node.js", "Express.js", "NestJS", "Fastify", "Deno", "Meteor", "PM2"],
+      "Python_Ecosystem": ["Python", "Django", "Flask", "FastAPI", "Tornado", "Celery", "SQLAlchemy"],
+      "C_Sharp_DotNet": ["C#", ".NET", ".NET Core", "ASP.NET", "Entity Framework", "WCF", "WPF", "LINQ", "IIS"],
+      "Other_Languages": ["Go", "Golang", "Rust", "Ruby", "Ruby on Rails", "PHP", "Laravel", "Symfony", "C++", "C", "Scala", "Kotlin", "Swift", "Objective-C", "Perl", "Bash", "Shell Scripting", "Solidity"]
+    },
+    "Mobile_Development": {
+      "Native": ["Swift", "Objective-C", "iOS SDK", "Kotlin", "Java", "Android SDK"],
+      "Cross_Platform": ["Flutter", "React Native", "Dart", "Xamarin", "Ionic", "Cordova", "PhoneGap"]
+    },
+    "Architecture_and_APIs": {
+      "Concepts": ["REST", "RESTful API", "SOAP", "GraphQL", "gRPC", "WebSockets", "Microservices", "Monolith", "SOA", "Service Oriented Architecture", "MVC", "Serverless", "Event-Driven Architecture", "Domain-Driven Design", "DDD"],
+      "Tools": ["Postman", "Swagger", "OpenAPI", "SoapUI", "Apollo", "Axios"]
+    }
+  },
+  "Data_and_AI": {
+    "Databases_RDBMS": ["MySQL", "PostgreSQL", "Oracle DB", "Oracle 11g", "Oracle 12c", "SQL Server", "MSSQL", "IBM DB2", "MariaDB", "SQLite", "Sybase", "PL/SQL", "T-SQL"],
+    "Databases_NoSQL": ["MongoDB", "Cassandra", "Couchbase", "Redis", "DynamoDB", "Neo4j", "Elasticsearch", "CouchDB", "Firestore"],
+    "Big_Data": ["Hadoop", "Spark", "Apache Kafka", "HDFS", "Hive", "Pig", "HBase", "Zookeeper", "Flink", "MapReduce"],
+    "Data_Engineering_ETL": ["Informatica", "Informatica PowerCenter", "Apache Airflow", "Talend", "SSIS", "SSAS", "SSRS", "Snowflake", "Databricks", "Amazon Redshift", "Google BigQuery", "Pentaho"],
+    "Machine_Learning_AI": ["TensorFlow", "PyTorch", "Scikit-Learn", "Keras", "OpenCV", "NLTK", "Spacy", "Hugging Face", "LLM", "Generative AI", "Computer Vision", "NLP", "Pandas", "NumPy", "Matplotlib", "Seaborn", "XGBoost", "MLflow", "LangChain"]
+  },
+  "Infrastructure_and_DevOps": {
+    "Cloud_Computing": {
+      "AWS": ["AWS", "Amazon Web Services", "EC2", "S3", "RDS", "AWS Lambda", "CloudFront", "CloudWatch", "VPC", "ECS", "EKS", "IAM", "SNS", "SQS", "DynamoDB"],
+      "Azure": ["Azure", "Microsoft Azure", "Azure DevOps", "Azure Functions", "Azure Blob", "AKS", "Azure AD"],
+      "GCP": ["GCP", "Google Cloud Platform", "Compute Engine", "App Engine", "GKE", "Firebase"]
+    },
+    "Containerization_Orchestration": ["Docker", "Kubernetes", "K8s", "Docker Swarm", "Mesos", "Marathon", "OpenShift", "Helm", "Pivotal Cloud Foundry", "PCF"],
+    "CI_CD": ["Jenkins", "GitLab CI", "GitHub Actions", "Travis CI", "CircleCI", "Bamboo", "Bitbucket Pipelines", "TeamCity", "SonarQube", "ArgoCD"],
+    "Infrastructure_As_Code": ["Terraform", "Ansible", "Chef", "Puppet", "CloudFormation", "Pulumi"],
+    "Version_Control": ["Git", "GitHub", "GitLab", "Bitbucket", "SVN", "CVS", "TFS", "Perforce"]
+  },
+  "Cybersecurity_and_Information_Security": {
+    "Concepts": ["Penetration Testing", "Vulnerability Assessment", "Ethical Hacking", "Cryptography", "IAM", "Identity and Access Management", "SIEM", "Zero Trust", "Malware Analysis", "Incident Response", "Threat Hunting"],
+    "Tools": ["Wireshark", "Metasploit", "Burp Suite", "Nmap", "Nessus", "Splunk", "CrowdStrike", "Kali Linux", "Snort", "Okta", "Auth0"],
+    "Frameworks_and_Compliance": ["ISO 27001", "NIST", "CIS Controls", "GDPR", "HIPAA", "PCI DSS", "OWASP", "SOC 2"]
+  },
+  "Game_Development_and_AR_VR": {
+    "Engines": ["Unity", "Unreal Engine", "Godot", "CryEngine", "Cocos2d"],
+    "AR_VR_Technologies": ["ARKit", "ARCore", "WebXR", "Oculus SDK", "SteamVR", "Mixed Reality Toolkit", "Vuforia"],
+    "Graphics_and_Languages": ["C#", "C++", "Lua", "HLSL", "GLSL", "OpenGL", "Vulkan", "DirectX"]
+  },
+  "Blockchain_and_Web3": {
+    "Platforms": ["Ethereum", "Bitcoin", "Solana", "Polkadot", "Binance Smart Chain", "Avalanche", "Polygon", "Hyperledger Fabric"],
+    "Technologies_and_Languages": ["Solidity", "Rust", "Web3.js", "Ethers.js", "Smart Contracts", "DeFi", "NFT", "DApps", "IPFS", "Hardhat", "Truffle"]
+  },
+  "UI_UX_Design": {
+    "Tools": ["Figma", "Sketch", "Adobe XD", "InVision", "Zeplin", "Framer", "Balsamiq", "Axure RP", "Miro"],
+    "Concepts": ["Wireframing", "Prototyping", "User Research", "Usability Testing", "Interaction Design", "Visual Design", "Design Systems", "Information Architecture"]
+  },
+  "IoT_and_Embedded_Systems": {
+    "Hardware_Platforms": ["Raspberry Pi", "Arduino", "ESP32", "ESP8266", "ARM Cortex", "Microcontrollers", "PCB Design"],
+    "Protocols": ["MQTT", "CoAP", "AMQP", "Zigbee", "LoRaWAN", "Bluetooth Low Energy", "BLE", "RFID", "NFC", "I2C", "SPI"],
+    "Operating_Systems": ["FreeRTOS", "Zephyr", "Embedded Linux", "VxWorks", "QNX", "Yocto"]
+  },
+  "Networking_and_Telecommunications": {
+    "Concepts": ["TCP/IP", "DNS", "DHCP", "VPN", "BGP", "OSPF", "MPLS", "VLAN", "SD-WAN", "5G", "LTE", "Fiber Optics", "Submarine Cables"],
+    "Vendors_and_Equipment": ["Cisco", "Juniper", "Aruba", "Palo Alto", "Fortinet", "F5", "Huawei", "Ericsson", "Nokia"]
+  },
+  "QA_and_Testing": {
+    "Testing_Frameworks": ["JUnit", "TestNG", "Selenium", "Cypress", "Appium", "Playwright", "Jest", "Mocha", "Chai", "Jasmine", "Karma", "Cucumber", "Mockito", "PowerMockito", "PyTest", "Rspec"],
+    "Testing_Types": ["TDD", "BDD", "ATDD", "Unit Testing", "Integration Testing", "E2E Testing", "Black-box Testing", "White-box Testing", "Regression Testing", "UAT", "API Testing"],
+    "Performance_Tools": ["JMeter", "LoadRunner", "Gatling"]
+  },
+  "Project_Management_and_Business_Analysis": {
+    "Methodologies": ["Agile", "Scrum", "Kanban", "Waterfall", "SAFe", "Scaled Agile Framework", "Lean", "Six Sigma", "SDLC", "RUP", "XP", "DSDM", "Scrum of Scrums"],
+    "Tracking_Tools": ["JIRA", "Confluence", "Rally", "Trello", "Asana", "HP ALM", "HP Quality Center", "MS Project", "Microsoft Project", "SharePoint", "ServiceNow", "Team Foundation Server", "TFS", "ClickUp", "Monday.com"],
+    "BA_Design_Tools": ["UML", "BPMN", "MS Visio", "Lucidchart", "Draw.io", "Axure", "Balsamiq", "Figma", "Rational Rose", "Erwin"]
+  },
+  "Enterprise_Software_and_CRM": {
+    "Salesforce": ["Salesforce", "Salesforce CRM", "Apex", "Visualforce", "SOQL", "SOSL", "Salesforce Lightning", "Data Loader"],
+    "SAP": ["SAP", "SAP ERP", "SAP HANA", "SAP S/4HANA", "SAP ECC", "SAP FI/CO", "SAP MM", "SAP SD", "SAP CRM"],
+    "Other_Systems": ["Oracle EBS", "NetSuite", "Dynamics 365", "HubSpot", "Zendesk", "Duck Creek", "Guidewire", "ServiceNow"]
+  },
+  "Computer_Science_Fundamentals": {
+    "Programming_Paradigms": ["OOP", "Object-Oriented Programming", "Functional Programming", "FP", "Procedural Programming"],
+    "Algorithms_and_Data_Structures": ["Algorithms", "Data Structures", "Sorting", "Searching", "Graph Algorithms", "Dynamic Programming", "Trees", "Hash Tables", "Linked Lists"],
+    "Software_Design_and_Architecture": ["Design Patterns", "SOLID", "DRY", "KISS", "YAGNI", "System Design", "MVC", "MVVM", "Clean Architecture"],
+    "Core_Concepts": ["Networking", "Operating Systems", "OS", "Concurrency", "Multithreading", "DBMS"]
+  },
+  "Certifications_and_Standards": {
+    "Cloud_and_DevOps": ["AWS Certified Solutions Architect", "AWS Certified Developer", "Azure Fundamentals", "Google Cloud Professional", "CKA", "CKAD", "Terraform Associate", "AWS Certified Cloud Practitioner"],
+    "Project_Management_and_Agile": ["PMP", "Project Management Professional", "Scrum Master", "CSM", "PSM", "SAFe Agilist", "PRINCE2", "ITIL", "CBAP"],
+    "Security_and_Networking": ["CISSP", "CEH", "CompTIA Security+", "Cisco CCNA", "CCNP", "CISM", "CISA"],
+    "Data_and_AI": ["Google Data Engineer", "AWS Data Analytics", "Microsoft Certified Data Analyst"],
+    "Language_Certifications": ["IELTS", "TOEIC", "TOEFL", "CELPIP", "JLPT", "N1", "N2", "N3", "HSK", "TOPIK", "CEFR", "B1", "B2", "C1", "C2", "DELF", "DALF"]
+  }
+}
