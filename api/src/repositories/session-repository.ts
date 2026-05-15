@@ -305,36 +305,35 @@ export const sessionRepository = {
 
 		try {
 			await db.transaction(async (tx) => {
-				const [[createdSession], created] = await Promise.all([
-					tx.insert(schema.profilingSession)
-						.values({
-							userId: input.userId,
-							jobDescriptionTemplateId: template.id,
-							name: input.name,
-							jobTitle: input.jobTitle,
-							status: "processing",
-							activeRunId: input.runId,
-							totalFiles: input.files.length,
-							errorMessage: null,
-							lastCompletedAt: null,
-						})
-						.returning(),
-					tx.insert(schema.resumeFile)
-						.values(input.files.map(file => ({
-							userId: input.userId,
-							originalName: file.fileName,
-							mimeType: file.mimeType,
-							size: BigInt(file.size),
-							storageKey: file.storageKey,
-						})))
-						.returning({
-							fileId: schema.resumeFile.id,
-							storageKey: schema.resumeFile.storageKey,
-							originalName: schema.resumeFile.originalName,
-							mimeType: schema.resumeFile.mimeType,
-							size: schema.resumeFile.size,
-						}),
-				])
+				const [createdSession] = await tx.insert(schema.profilingSession)
+					.values({
+						userId: input.userId,
+						jobDescriptionTemplateId: template.id,
+						name: input.name,
+						jobTitle: input.jobTitle,
+						status: "processing",
+						activeRunId: input.runId,
+						totalFiles: input.files.length,
+						errorMessage: null,
+						lastCompletedAt: null,
+					})
+					.returning()
+
+				const created = await tx.insert(schema.resumeFile)
+					.values(input.files.map(file => ({
+						userId: input.userId,
+						originalName: file.fileName,
+						mimeType: file.mimeType,
+						size: BigInt(file.size),
+						storageKey: file.storageKey,
+					})))
+					.returning({
+						fileId: schema.resumeFile.id,
+						storageKey: schema.resumeFile.storageKey,
+						originalName: schema.resumeFile.originalName,
+						mimeType: schema.resumeFile.mimeType,
+						size: schema.resumeFile.size,
+					})
 
 				createdFiles = created
 				await tx.insert(schema.profilingSessionFile).values(
@@ -378,12 +377,15 @@ export const sessionRepository = {
 	},
 
 	async updateSessionFailure(sessionId: string, message: string) {
-		const [updatedSession] = await sessionQueries.updateSessionFailureStatement.execute({
-			sessionId,
-			status: "failed",
-			errorMessage: message,
-			lastCompletedAt: null,
-		})
+		const [updatedSession] = await db
+			.update(schema.profilingSession)
+			.set({
+				status: "failed",
+				errorMessage: message,
+				lastCompletedAt: null,
+			})
+			.where(eq(schema.profilingSession.id, sessionId))
+			.returning()
 
 		if (!updatedSession)
 			return false
@@ -462,17 +464,20 @@ export const sessionRepository = {
 			}
 		}
 
-		const [session] = await sessionQueries.updateSessionRetryStateStatement.execute({
-			sessionId: input.sessionId,
-			name: input.name,
-			jobTitle: input.jobTitle,
-			jobDescriptionTemplateId: template.id,
-			status: "retrying",
-			activeRunId: input.runId,
-			errorMessage: null,
-			lastCompletedAt: null,
-			totalFiles: input.files.length,
-		})
+		const [session] = await db
+			.update(schema.profilingSession)
+			.set({
+				name: input.name,
+				jobTitle: input.jobTitle,
+				jobDescriptionTemplateId: template.id,
+				status: "retrying",
+				activeRunId: input.runId,
+				errorMessage: null,
+				lastCompletedAt: null,
+				totalFiles: input.files.length,
+			})
+			.where(eq(schema.profilingSession.id, input.sessionId))
+			.returning()
 
 		if (!session)
 			return false

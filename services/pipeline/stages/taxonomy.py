@@ -14,6 +14,7 @@ from typing import Any
 from config import (
     EMBEDDING_MODEL_NAME,
     ENABLE_SEMANTIC_TAXONOMY_MAPPING,
+    PIPELINE_CHROMA_DB_PATH,
     PIPELINE_TAXONOMY_DIR,
     TAXONOMY_DISTANCE_THRESHOLD,
 )
@@ -46,11 +47,13 @@ class TaxonomyIndex:
         self._by_normalized: dict[str, TaxonomyTerm] = {}
         for term in terms:
             self._by_normalized.setdefault(term.normalized, term)
+        self._chroma_client = None
+        self._chroma_unavailable = False
         self._semantic_model = None
         self._term_embeddings = None
 
     @classmethod
-    def from_directory(cls, taxonomy_dir: Path = PIPELINE_TAXONOMY_DIR) -> "TaxonomyIndex":
+    def from_directory(cls, taxonomy_dir: Path = PIPELINE_TAXONOMY_DIR) -> TaxonomyIndex:
         terms: list[TaxonomyTerm] = []
         terms.extend(_load_taxonomy_file(taxonomy_dir / "tech_ontology.json", "tech"))
         terms.extend(_load_taxonomy_file(taxonomy_dir / "soft_skills_ontology.json", "soft"))
@@ -138,6 +141,10 @@ class TaxonomyIndex:
         if not ENABLE_SEMANTIC_TAXONOMY_MAPPING:
             return None
 
+        chroma = self._best_chroma_match(text, taxonomy_type)
+        if chroma:
+            return chroma
+
         try:
             model = self._get_semantic_model()
             terms = [term for term in self.terms if taxonomy_type is None or term.taxonomy_type == taxonomy_type]
@@ -155,12 +162,68 @@ class TaxonomyIndex:
             logger.debug("Semantic taxonomy mapping unavailable", extra={"error": str(error)})
             return None
 
+    def _best_chroma_match(self, text: str, taxonomy_type: str | None) -> tuple[TaxonomyTerm, float] | None:
+        if self._chroma_unavailable or not PIPELINE_CHROMA_DB_PATH.exists():
+            return None
+
+        collection_names = (
+            ["tech_ontology", "soft_skills_ontology"]
+            if taxonomy_type is None
+            else [_collection_name_for_type(taxonomy_type)]
+        )
+        best: tuple[TaxonomyTerm, float] | None = None
+
+        try:
+            client = self._get_chroma_client()
+            for collection_name in collection_names:
+                if not collection_name:
+                    continue
+                collection = client.get_collection(collection_name)
+                result = collection.query(query_texts=[text], n_results=1)
+                ids = result.get("ids") or [[]]
+                documents = result.get("documents") or [[]]
+                metadatas = result.get("metadatas") or [[]]
+                distances = result.get("distances") or [[]]
+                if not ids[0] or not documents[0] or not distances[0]:
+                    continue
+
+                distance = float(distances[0][0])
+                if distance > TAXONOMY_DISTANCE_THRESHOLD:
+                    continue
+
+                document = str(documents[0][0])
+                metadata = metadatas[0][0] or {}
+                path = _metadata_path(metadata, document)
+                term = TaxonomyTerm(
+                    text=document,
+                    normalized=normalize_term(document),
+                    taxonomy_id=str(ids[0][0]),
+                    taxonomy_type="soft" if collection_name == "soft_skills_ontology" else "tech",
+                    path=tuple(path),
+                )
+                confidence = max(0.0, min(1.0, 1 - distance))
+                if best is None or confidence > best[1]:
+                    best = (term, confidence)
+        except Exception as error:
+            self._chroma_unavailable = True
+            logger.debug("Chroma taxonomy mapping unavailable", extra={"error": str(error)})
+            return None
+
+        return best
+
     def _get_semantic_model(self):
         if self._semantic_model is None:
             from sentence_transformers import SentenceTransformer
 
             self._semantic_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         return self._semantic_model
+
+    def _get_chroma_client(self):
+        if self._chroma_client is None:
+            import chromadb
+
+            self._chroma_client = chromadb.PersistentClient(path=str(PIPELINE_CHROMA_DB_PATH))
+        return self._chroma_client
 
     def _get_term_embeddings(self, model: Any, terms: list[TaxonomyTerm]):
         # Cache only the all-term case; filtered calls are small enough to compute on demand.
@@ -233,6 +296,21 @@ def _unmapped_match(text: str) -> TaxonomyMatch:
         confidence=0,
         match_method="unmapped",
     )
+
+
+def _collection_name_for_type(taxonomy_type: str) -> str | None:
+    if taxonomy_type == "tech":
+        return "tech_ontology"
+    if taxonomy_type == "soft":
+        return "soft_skills_ontology"
+    return None
+
+
+def _metadata_path(metadata: dict[str, Any], leaf: str) -> list[str]:
+    raw_path = metadata.get("path")
+    if isinstance(raw_path, str) and raw_path:
+        return [*raw_path.split("."), leaf]
+    return [leaf]
 
 
 @lru_cache(maxsize=1)

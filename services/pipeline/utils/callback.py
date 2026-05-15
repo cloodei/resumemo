@@ -28,14 +28,26 @@ def _post_callback(payload: JobPayload, body: dict):
 
     for attempt in range(CALLBACK_RETRY_ATTEMPTS):
         try:
+            logger.info(f"Sending callback: {body.get('type')} | Attempt {attempt + 1}")
             with httpx.Client(timeout=30) as client:
                 response = client.post(PIPELINE_CALLBACK_URL, json=body, headers=headers)
+                logger.info(f"Callback response status: {response.status_code}")
                 response.raise_for_status()
 
             return
 
         except (httpx.HTTPError, httpx.TimeoutException) as error:
             last_error = error
+            logger.warning(
+                "Pipeline callback attempt failed",
+                extra={
+                    "session_id": payload.session_id,
+                    "run_id": payload.run_id,
+                    "type": body.get("type"),
+                    "attempt": attempt + 1,
+                    "error": str(error),
+                },
+            )
             if attempt < CALLBACK_RETRY_ATTEMPTS - 1:
                 delay = CALLBACK_RETRY_BACKOFF[attempt]
                 time.sleep(delay)

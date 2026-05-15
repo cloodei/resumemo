@@ -32,7 +32,6 @@ def score_candidate(
 ) -> ScoreArtifact:
     """Score one candidate with the research composite scoring formula."""
     required_years = _number_or_zero(job_artifact.hard_constraints.get("min_experience_years"))
-    candidate_years = _number_or_zero(candidate_profile.total_experience_years)
     required_skills = _required_skill_buckets(job_artifact)
     candidate_skills = _candidate_skill_map(candidate_profile)
 
@@ -152,7 +151,10 @@ def _candidate_hard_score(
     return score, sorted(set(matched), key=str.lower), sorted(set(missing), key=str.lower)
 
 
-def _find_candidate_skill(requirement: dict[str, Any], candidate_skills: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def _find_candidate_skill(
+    requirement: dict[str, Any],
+    candidate_skills: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
     for key in (_skill_key(requirement.get("taxonomy_id")), _skill_key(requirement.get("skill"))):
         if key and key in candidate_skills:
             return candidate_skills[key]
@@ -206,7 +208,10 @@ def _surplus_bonus(
     return bonus, sorted(surplus, key=str.lower)
 
 
-def _soft_skill_bonus(job_artifact: JobDescriptionArtifact, candidate_profile: CandidateDnaProfile) -> tuple[float, list[str]]:
+def _soft_skill_bonus(
+    job_artifact: JobDescriptionArtifact,
+    candidate_profile: CandidateDnaProfile,
+) -> tuple[float, list[str]]:
     required = {_skill_key(item.get("taxonomy_id") or item.get("skill")) for item in job_artifact.soft_skills}
     candidate = {
         _skill_key(item.get("taxonomy_id") or item.get("skill")): item
@@ -220,7 +225,10 @@ def _soft_skill_bonus(job_artifact: JobDescriptionArtifact, candidate_profile: C
     return len(matches) * SCORING_BONUS_SOFT_SKILL, sorted(matches, key=str.lower)
 
 
-def _certification_bonus(job_artifact: JobDescriptionArtifact, candidate_profile: CandidateDnaProfile) -> tuple[float, list[str]]:
+def _certification_bonus(
+    job_artifact: JobDescriptionArtifact,
+    candidate_profile: CandidateDnaProfile,
+) -> tuple[float, list[str]]:
     required = {
         str(item).lower()
         for item in job_artifact.hard_skills.get("must_have", {}).get("certifications", [])

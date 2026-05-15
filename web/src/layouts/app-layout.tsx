@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { useAuth } from "@/components/auth/auth-provider"
+import { useAuth } from "@/components/auth/auth-context"
 import { AppHeader } from "@/features/layout/app-header"
 import { AppSidebar } from "@/features/layout/app-sidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"

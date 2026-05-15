@@ -30,6 +30,7 @@ Current runtime shape:
 - `api` handles auth, upload presigning, session creation, retry flows, results, exports, queue publishing, and the internal pipeline callback.
 - `core` holds shared TypeScript contracts used by `web` and `api`.
 - `services/pipeline` consumes queue jobs, reads files from object storage, builds JD/candidate/score artifacts, and calls back into the API.
+- Runtime taxonomy and ChromaDB assets for the worker are packaged under `services/pipeline/data/`; `research/` remains the source reference.
 
 ## Quick Start
 

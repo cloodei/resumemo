@@ -27,7 +27,6 @@ services:
       CELERY_BROKER_URL: amqp://resumemo:resumemo@rabbitmq:5672//
     volumes:
       - ./services/pipeline:/app
-      - ./research/data/taxonomy/taxonomy_processed:/app/data/taxonomy:ro
     command: >
       celery -A worker worker
       --loglevel=info

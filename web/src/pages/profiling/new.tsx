@@ -240,14 +240,6 @@ export default function NewProfilingPage() {
 	}[], signal: AbortSignal) => {
 		setPhase("creating")
 
-		console.log("Creating session with data:", {
-			name: formData.sessionName.trim(),
-			jobDescription: formData.jobDescription.trim(),
-			jobTitle: formData.jobTitle.trim() || undefined,
-			jobDescriptionTemplateId: formData.jobDescriptionTemplateId,
-			files: filesToCreate,
-		})
-		console.log("Signal aborted before request:", signal.aborted)
 		const { data, error } = await api.api.v2.sessions.create.post({
 			name: formData.sessionName.trim(),
 			jobDescription: formData.jobDescription.trim(),
@@ -258,7 +250,6 @@ export default function NewProfilingPage() {
 			fetch: { signal },
 		})
 
-		console.log("Session creation response:", data)
 		if (signal.aborted)
 			return
 
@@ -398,7 +389,6 @@ export default function NewProfilingPage() {
 				}
 			})
 
-			// console.log("Starting session creation with files:", filesToCreate)
 			await startSessionCreation(formData, filesToCreate, controller.signal)
 		}
 		catch (error) {

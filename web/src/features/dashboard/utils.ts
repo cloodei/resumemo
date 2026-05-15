@@ -56,7 +56,7 @@ function formatSessionDate(date: string | Date) {
 
 export function buildDashboardMetrics(sessions: ProfilingSession[]): DashboardMetric[] {
 	const totalSessions = sessions.length
-	let activeSessions: ProfilingSession[] = [],
+	const activeSessions: ProfilingSession[] = [],
 		queuedSessions: ProfilingSession[] = [],
 		retryingSessions: ProfilingSession[] = [],
 		completedSessions: ProfilingSession[] = [],

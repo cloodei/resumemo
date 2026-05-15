@@ -1,7 +1,7 @@
 import { ArrowLeft, Compass, Home, Search } from "lucide-react"
 import { Link } from "react-router-dom"
 
-import { useAuth } from "@/components/auth/auth-provider"
+import { useAuth } from "@/components/auth/auth-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

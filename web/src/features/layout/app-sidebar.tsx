@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 
 import { Logo } from "@/components/brand/logo"
-import { useAuth } from "@/components/auth/auth-provider"
+import { useAuth } from "@/components/auth/auth-context"
 import { ThemeToggler } from "@/components/brand/theme-toggle"
 import { SignOutDialog } from "@/components/auth/signout-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"

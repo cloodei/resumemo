@@ -62,7 +62,7 @@ docker compose up -d rabbitmq pipeline-worker
 
 The API and web app still run separately unless you start them yourself. If your API is running locally, make sure the worker callback URL points somewhere the worker can reach.
 
-The local compose worker mounts `research/data/taxonomy/taxonomy_processed` into `/app/data/taxonomy` so it uses the same processed taxonomy assets as the source tree.
+The local compose worker mounts `services/pipeline` into `/app`, including packaged runtime taxonomy and ChromaDB assets under `services/pipeline/data/`.
 
 ## API Environment Touchpoints
 
@@ -100,8 +100,8 @@ The worker needs broker, callback, object storage, and AI pipeline settings:
 
 Defaults:
 
-- `PIPELINE_TAXONOMY_DIR` defaults to `research/data/taxonomy/taxonomy_processed` in the source tree and `/app/data/taxonomy` in the Docker image.
-- `PIPELINE_CHROMA_DB_PATH` defaults to `research/data/chroma_db`.
+- `PIPELINE_TAXONOMY_DIR` defaults to `services/pipeline/data/taxonomy` when packaged assets exist, with `research/data/taxonomy/taxonomy_processed` as a local fallback.
+- `PIPELINE_CHROMA_DB_PATH` defaults to `services/pipeline/data/chroma_db` when packaged assets exist, with `research/data/chroma_db` as a local fallback.
 - `EMBEDDING_MODEL_NAME` defaults to `sentence-transformers/all-MiniLM-L6-v2`.
 - `GLINER_MODEL_NAME` defaults to `urchade/gliner_multi-v2.1`.
 - Gemini segmentation is optional and disabled by default.
