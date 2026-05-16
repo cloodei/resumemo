@@ -74,6 +74,10 @@ type UploadStore = {
 	}
 }
 
+function canMutateFiles(phase: UploadPhase) {
+	return phase !== "uploading" && phase !== "creating"
+}
+
 const uploadStore = create<UploadStore>()(
 	persist(
 		(set, get) => ({
@@ -85,6 +89,9 @@ const uploadStore = create<UploadStore>()(
 
 			actions: {
 				addFiles: (newFiles: File[]) => {
+					if (!canMutateFiles(get().phase))
+						return
+
 					const currentFiles = get().files
 
 					if (currentFiles.length + newFiles.length > MAX_FILES_PER_SESSION)
@@ -112,6 +119,9 @@ const uploadStore = create<UploadStore>()(
 				},
 
 				removeFile: (id: number) => {
+					if (!canMutateFiles(get().phase))
+						return
+
 					const files = get().files.filter(f => f.id !== id)
 					set({ files })
 					if (files.length === 0)
@@ -129,6 +139,9 @@ const uploadStore = create<UploadStore>()(
 				},
 
 				clearFiles: () => {
+					if (!canMutateFiles(get().phase))
+						return
+
 					set({
 						files: [],
 						phase: "idle",

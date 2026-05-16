@@ -3,6 +3,7 @@ import type {
 	SessionSort,
 	SessionFileView,
 	SessionListItem,
+	JobDescriptionTemplate,
 	SessionResultSummary,
 	SessionResultDetail,
 } from "~/types";
@@ -126,6 +127,10 @@ export const sessionRepositoryCacheKeys = {
 
 	list: (userId: string) => createCacheKey<SessionListItem[]>(
 		`session:list:${userId}`
+	),
+
+	jobDescriptionTemplates: (userId: string) => createCacheKey<JobDescriptionTemplate[]>(
+		`session:job-description-templates:${userId}`
 	),
 
 	resultsData: (sessionId: string, sort: SessionSort, activeRunId: string | null) => createCacheKey<SessionResultSummary[]>(

@@ -15,12 +15,22 @@ import {
 } from "@/lib/constants"
 import { getEdenErrorMessage, getErrorMessage } from "@/lib/errors"
 import { formatFileSize } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import { NewSessionFileQueue } from "@/features/profiling/new-session-file-queue"
 import { NewSessionHero } from "@/features/profiling/new-session-hero"
 import { NewSessionRoleForm } from "@/features/profiling/new-session-role-form"
 import { NewSessionUploadPanel } from "@/features/profiling/new-session-upload-panel"
 import { fetchJobDescriptionTemplates } from "@/features/profiling/api/job-description-templates"
 import { newSessionSteps } from "@/features/profiling/new-session-utils"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog"
 import {
 	type FileStatus,
 	type SessionFormData,
@@ -63,6 +73,7 @@ export default function NewProfilingPage() {
 	} = useUploadActions()
 
 	const [isDragging, setIsDragging] = useState(false)
+	const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
 	const abortRef = useRef<AbortController | null>(null)
 	const xhrRefs = useRef<XMLHttpRequest[]>([])
 
@@ -111,6 +122,11 @@ export default function NewProfilingPage() {
 	const pendingUploadFiles = useMemo(() => files.filter(file => file.status === "ready" || file.status === "failed"), [files])
 	const isBusy = phase === "uploading" || phase === "creating"
 	const canSubmit = files.length > 0 && !isBusy
+
+	useEffect(() => {
+		if (!isBusy)
+			setIsCancelDialogOpen(false)
+	}, [isBusy])
 
 	const handleAddFiles = useCallback((newFiles: File[]) => {
 		if (isBusy)
@@ -229,6 +245,7 @@ export default function NewProfilingPage() {
 		resetUploadingFilesToReady()
 		setCreateError(undefined)
 		setPhase(doneFiles.length > 0 ? "create_error" : "idle")
+		setIsCancelDialogOpen(false)
 		toast.info("Stopped the current attempt. You can try again when you're ready.")
 	}
 
@@ -493,7 +510,7 @@ export default function NewProfilingPage() {
 				formatFileSize={formatFileSize}
 				onRemoveFile={removeFile}
 				onClearFiles={clearFiles}
-				onCancel={handleCancel}
+				onCancel={() => setIsCancelDialogOpen(true)}
 				onRetry={handleSubmit(onSubmit)}
 				onStartOver={() => {
 					clearAll()
@@ -502,6 +519,23 @@ export default function NewProfilingPage() {
 				onRemoveFailedFiles={() => failedFiles.forEach(file => removeFile(file.id))}
 				fileStatusIcon={fileStatusIcon}
 			/>
+
+			<Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Stop this upload attempt?</DialogTitle>
+						<DialogDescription>
+							This stops the active upload or session creation attempt. Uploaded files stay in the queue so you can retry after the attempt is stopped.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="outline">Keep working</Button>
+						</DialogClose>
+						<Button variant="destructive" onClick={handleCancel}>Stop attempt</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	)
 }
