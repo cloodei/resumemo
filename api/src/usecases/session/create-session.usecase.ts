@@ -87,7 +87,8 @@ export async function createSessionUsecase(input: {
 				})),
 			})
 		}
-		catch {
+		catch (error) {
+			console.error("Error occurred while publishing pipeline job:", error)
 			await sessionRepository.updateSessionFailure(sessionId, CREATE_SESSION_FAILED_MESSAGE)
 
 			return usecaseFailure(500, {
@@ -106,7 +107,8 @@ export async function createSessionUsecase(input: {
 			totalConfirmed: files.length,
 		})
 	}
-	catch {
+	catch (error) {
+		console.error("Error occurred while creating session:", error)
 		return usecaseFailure(500, {
 			status: "error",
 			message: "We couldn't start processing.",

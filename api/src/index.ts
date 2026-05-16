@@ -29,9 +29,9 @@ const app = new Elysia({ precompile: true, name: "API" })
 			allowedHeaders: [...CORS_BASE_ALLOWED_HEADERS, apiEnv.pipeline.secretHeaderName],
 		}),
 	)
+	.use(pipelineCallbackRoutes)
 	.use(authMiddleware)
 	.use(sessionRoutes)
-	.use(pipelineCallbackRoutes)
 	// .listen({ hostname: "0.0.0.0", port: 8080 });
 	.listen({ port: 8080 });
 
