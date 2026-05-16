@@ -7,6 +7,7 @@ import { computeMD5 } from "~/lib/hash"
 import { repositoryCache, sessionRepositoryCacheKeys, type CacheKey } from "~/lib/repository-cache"
 import * as sessionQueries from "~/sql/session"
 import {
+	type JobDescriptionTemplate,
 	type SessionFileView,
 	type SessionListItem,
 	type SessionResultSummary,
@@ -71,6 +72,41 @@ function buildTemplateName(input: { name: string; jobTitle: string | null }) {
 	return (input.jobTitle?.trim() || input.name.trim() || "Untitled role brief").slice(0, 255)
 }
 
+function compareJobDescriptionTemplates(left: JobDescriptionTemplate, right: JobDescriptionTemplate) {
+	const useCountDelta = right.useCount - left.useCount
+	if (useCountDelta !== 0)
+		return useCountDelta
+
+	return (right.lastUsedAt?.getTime() ?? 0) - (left.lastUsedAt?.getTime() ?? 0)
+}
+
+async function refreshJobDescriptionTemplateCaches(userId: string) {
+	const templates = await sessionQueries.selectJobDescriptionTemplatesByUserIdStatement.execute({ userId })
+	repositoryCache.set(sessionRepositoryCacheKeys.jobDescriptionTemplates(userId), templates)
+	return templates
+}
+
+function primeJobDescriptionTemplateCache(template: JobDescriptionTemplate) {
+	repositoryCache.update(
+		sessionRepositoryCacheKeys.jobDescriptionTemplates(template.userId),
+		current => {
+			let found = false
+			const next = current.map((item) => {
+				if (item.id !== template.id)
+					return item
+
+				found = true
+				return template
+			})
+
+			if (!found)
+				next.push(template)
+
+			return next.sort(compareJobDescriptionTemplates)
+		},
+	)
+}
+
 async function getOrCreateJobDescriptionTemplate(input: {
 	userId: string
 	name: string
@@ -102,6 +138,14 @@ async function getOrCreateJobDescriptionTemplate(input: {
 			},
 		})
 		.returning()
+
+	try {
+		const templates = await refreshJobDescriptionTemplateCaches(input.userId)
+		return templates.find(item => item.id === template.id) ?? template
+	}
+	catch {
+		primeJobDescriptionTemplateCache(template)
+	}
 
 	return template
 }
@@ -222,7 +266,10 @@ async function getSessionFilesData(sessionId: string) {
 
 export const sessionRepository = {
 	async listJobDescriptionTemplates(userId: string) {
-		return await sessionQueries.selectJobDescriptionTemplatesByUserIdStatement.execute({ userId })
+		return await repositoryCache.getOrLoad(
+			sessionRepositoryCacheKeys.jobDescriptionTemplates(userId),
+			async () => await sessionQueries.selectJobDescriptionTemplatesByUserIdStatement.execute({ userId }),
+		)
 	},
 
 	async createJobDescriptionTemplate(input: {

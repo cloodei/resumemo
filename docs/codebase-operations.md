@@ -138,6 +138,8 @@ The active profiling data model is intentionally small:
 
 Production compose currently includes `nginx`, `api`, and `pipeline`. RabbitMQ is expected through environment configuration.
 
+Server CD in `.github/workflows/cd-server.yml` is intentionally locked while development is active. The manual EC2 path is `deploy/ec2/deploy.sh`; it pulls `api`, `pipeline`, and `nginx`, then recreates the production compose stack.
+
 ## Maintenance Notes
 
 - Keep runtime command docs aligned with `package.json`.

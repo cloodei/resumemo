@@ -89,6 +89,7 @@ Workspace notes:
 - `docs/system-guidelines.md` - product behavior and workflow notes
 - `docs/codebase-operations.md` - operations guide, env touchpoints, and deployment references
 - `docs/pipeline-spec.md` - current pipeline contract and official artifact model
+- `deploy/ec2/README.md` - locked-CD server deployment runbook and EC2 checklist
 - `research/README.md` - map of research references that support the production pipeline
 
 ## Backend Shape
@@ -102,5 +103,5 @@ Workspace notes:
 ## Unstable Areas
 
 - The official pipeline is now artifact-based, but model choices, taxonomy assets, and optional segmentation backends can still evolve.
-- Deployment is split across `deploy/`, `docker-compose.prod.yml`, GHCR images, and web Wrangler scripts.
+- Deployment is split across `deploy/`, `docker-compose.prod.yml`, GHCR images, and web Wrangler scripts; server CD is currently locked, with manual EC2 deploy notes in `deploy/ec2/README.md`.
 - The product surface is narrower than the long-term vision; prefer current routes and live code over older aspirational docs.

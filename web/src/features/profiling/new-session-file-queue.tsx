@@ -73,7 +73,7 @@ export function NewSessionFileQueue({
 											</div>
 											<div className="flex shrink-0 items-center gap-1">
 												{fileStatusIcon(file.status)}
-												<Button variant="ghost" size="icon" className="size-7 hover:bg-destructive/10 hover:text-destructive" onClick={() => onRemoveFile(file.id)} disabled={file.status === "uploading"}>
+												<Button variant="ghost" size="icon" className="size-7 hover:bg-destructive/10 hover:text-destructive" onClick={() => onRemoveFile(file.id)} disabled={isBusy}>
 													<X className="size-4" />
 												</Button>
 											</div>
