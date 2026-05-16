@@ -437,6 +437,28 @@ html {
   }
 }
 
+@keyframes landing-grid-drift {
+  0%,
+  100% {
+    background-position: 0 0, 0 0;
+    filter: brightness(0.92);
+  }
+  50% {
+    background-position: 42px 18px, -28px 36px;
+    filter: brightness(1.18);
+  }
+}
+
+.landing-grid-drift {
+  animation: landing-grid-drift 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-grid-drift {
+    animation: none;
+  }
+}
+
 @keyframes fadein-blur {
   from {
     opacity: 0;

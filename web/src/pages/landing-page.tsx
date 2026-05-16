@@ -144,10 +144,15 @@ const STUDIO_FEATURES = [
 export default function LandingPage() {
 	return (
 		<div className="min-h-screen bg-[#060608] text-white selection:bg-[#C95D42] selection:text-white">
-			{/* Fixed structural texture — grid + noise */}
+			{/* Fixed structural texture - broken grid, scan traces, and noise */}
 			<div className="pointer-events-none fixed inset-0 z-0">
-				<div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-size-[72px_72px]" />
-				<div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(rgba(255,255,255,0.3)_1px,transparent_1px)] bg-size-[24px_24px]" />
+				<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-12%,rgba(125,211,252,0.16),transparent_36%),radial-gradient(ellipse_at_16%_18%,rgba(201,93,66,0.13),transparent_32%),radial-gradient(ellipse_at_80%_62%,rgba(244,192,109,0.08),transparent_34%),linear-gradient(180deg,#050507_0%,#08080b_42%,#050507_100%)]" />
+				<div className="landing-grid-drift absolute inset-x-[-18%] top-[-8%] h-[48vh] -rotate-2 opacity-[0.24] mask-[radial-gradient(ellipse_at_center,black_0%,black_38%,transparent_76%)] bg-[linear-gradient(to_right,rgba(125,211,252,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.16)_1px,transparent_1px)] bg-size-[88px_52px]" />
+				<div className="landing-grid-drift absolute left-[-10%] top-[22%] h-[44vh] w-[72vw] rotate-[4deg] opacity-[0.14] [animation-delay:-6s] mask-[linear-gradient(90deg,transparent_0%,black_18%,black_72%,transparent_100%)] bg-[linear-gradient(to_right,rgba(244,192,109,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[46px_78px]" />
+				<div className="landing-grid-drift absolute right-[-14%] top-[58%] h-[50vh] w-[80vw] rotate-[-5deg] opacity-[0.18] [animation-delay:-11s] mask-[radial-gradient(ellipse_at_center,black_0%,black_34%,transparent_72%)] bg-[linear-gradient(to_right,rgba(201,93,66,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[120px_64px]" />
+				<div className="absolute inset-0 opacity-[0.08] mask-[linear-gradient(180deg,black,transparent_22%,black_42%,transparent_70%,black)] bg-[linear-gradient(115deg,transparent_0%,transparent_46%,rgba(125,211,252,0.18)_47%,transparent_48%,transparent_100%)] bg-size-[420px_280px]" />
+				<div className="absolute inset-0 opacity-[0.075] bg-[radial-gradient(rgba(255,255,255,0.3)_1px,transparent_1px)] bg-size-[26px_26px]" />
+				<div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,8,0.14)_0%,rgba(6,6,8,0.72)_30%,rgba(6,6,8,0.2)_55%,rgba(6,6,8,0.82)_100%)]" />
 				<div className="absolute inset-0 opacity-[0.025] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2EpIi8+PC9zdmc+')]" />
 			</div>
 
@@ -247,7 +252,7 @@ export default function LandingPage() {
 						{/* Speed stat */}
 						<motion.div
 							variants={scaleIn}
-							className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#C95D42]/30"
+							className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#C95D42]/30"
 						>
 							<div className="absolute inset-0 bg-linear-to-br from-[#C95D42]/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 							<div className="relative">
@@ -262,7 +267,7 @@ export default function LandingPage() {
 						{/* File formats */}
 						<motion.div
 							variants={scaleIn}
-							className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#f4c06d]/30"
+							className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#f4c06d]/30"
 						>
 							<div className="absolute inset-0 bg-linear-to-br from-[#f4c06d]/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 							<div className="relative">
@@ -284,7 +289,7 @@ export default function LandingPage() {
 						{/* Per session */}
 						<motion.div
 							variants={scaleIn}
-							className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#7dd3fc]/30"
+							className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-[#7dd3fc]/30"
 						>
 							<div className="absolute inset-0 bg-linear-to-br from-[#7dd3fc]/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 							<div className="relative">
@@ -297,7 +302,7 @@ export default function LandingPage() {
 						{/* Export */}
 						<motion.div
 							variants={scaleIn}
-							className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-[#C95D42]/8 p-5 backdrop-blur-sm transition-colors hover:border-[#C95D42]/30"
+							className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#C95D42]/8 p-5 backdrop-blur-sm transition-colors hover:border-[#C95D42]/30"
 						>
 							<div className="absolute inset-0 bg-linear-to-br from-[#C95D42]/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 							<div className="relative flex h-full flex-col justify-between">
@@ -407,7 +412,7 @@ export default function LandingPage() {
 							{/* Left — Studio board (legacy-inspired editor card) */}
 							<motion.div
 								variants={scaleIn}
-								className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6"
+								className="relative overflow-hidden rounded-4xl border border-white/10 bg-white/5 p-6"
 							>
 								<div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_50%)]" />
 								<div className="relative">
@@ -469,7 +474,7 @@ export default function LandingPage() {
 
 							{/* Right — Description + Stats */}
 							<motion.div variants={scaleIn} className="flex flex-col gap-5">
-								<div className="rounded-[32px] border border-white/10 bg-white/5 p-6 lg:p-8">
+								<div className="rounded-4xl border border-white/10 bg-white/5 p-6 lg:p-8">
 									<p className="text-xs uppercase tracking-[0.3em] text-white/60">Why it matters</p>
 									<h3 className="mt-3 text-2xl font-semibold text-white">
 										Built for recruiters who hate busywork.
@@ -507,12 +512,12 @@ export default function LandingPage() {
 
 								{/* Quick stats row */}
 								<div className="grid grid-cols-2 gap-3">
-									<div className="rounded-[24px] border border-white/10 bg-black/50 p-5">
+									<div className="rounded-3xl border border-white/10 bg-black/50 p-5">
 										<p className="text-xs uppercase tracking-[0.3em] text-white/60">Throughput</p>
 										<p className="mt-3 text-2xl font-semibold">30s</p>
 										<p className="text-xs text-white/40">per resume avg</p>
 									</div>
-									<div className="rounded-[24px] border border-white/10 bg-black/50 p-5">
+									<div className="rounded-3xl border border-white/10 bg-black/50 p-5">
 										<p className="text-xs uppercase tracking-[0.3em] text-white/60">Accuracy</p>
 										<p className="mt-3 text-2xl font-semibold">96%</p>
 										<p className="text-xs text-white/40">skill match rate</p>
@@ -546,7 +551,7 @@ export default function LandingPage() {
 						</motion.div>
 
 						{/* Figure-labeled grid — Linear-inspired */}
-						<div className="grid gap-px border border-white/8 rounded-[2px] md:grid-cols-2 lg:grid-cols-4 bg-white/5 overflow-hidden">
+						<div className="grid gap-px border border-white/8 rounded-xs md:grid-cols-2 lg:grid-cols-4 bg-white/5 overflow-hidden">
 							{CAPABILITIES.map(({ fig, title, description, svg }) => (
 								<motion.div
 									key={title}

@@ -9,17 +9,18 @@ import { CORS_BASE_ALLOWED_HEADERS, CORS_METHODS } from "./config/constants";
 
 const app = new Elysia({ precompile: true, name: "API" })
 	// .use(openapi())
-	.use(logixlysia({
-		config: {
-			showStartupMessage: true,
-			showContextTree: true,
-			contextDepth: 2,
-			startupMessageFormat: "banner",
-			timestamp: {
-				translateTime: 'yyyy-mm-dd HH:MM:ss.SSS'
-			}
-		}
-	}))
+	// .use(logixlysia({
+	// 	config: {
+	// 		showStartupMessage: true,
+	// 		showContextTree: true,
+	// 		contextDepth: 2,
+	// 		startupMessageFormat: "banner",
+	// 		timestamp: {
+	// 			translateTime: 'yyyy-mm-dd HH:MM:ss.SSS'
+	// 		}
+	// 	}
+	// }))
+	.get("/", () => apiEnv.jwt.secret)
 	.get("/health", () => ({ status: "ok" }))
 	.use(
 		cors({
