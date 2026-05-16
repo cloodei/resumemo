@@ -1,6 +1,5 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { logixlysia } from "logixlysia";
 
 import { apiEnv } from "./config/env";
 import { authMiddleware } from "./lib/auth";

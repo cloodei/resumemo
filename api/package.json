@@ -18,6 +18,7 @@
     "@resumemo/core": "*",
     "amqplib": "^0.10.9",
     "better-auth": "^1.6.9",
+    "drizzle-orm": "^0.45.1",
     "elysia": "^1.4.28",
     "logixlysia": "^6.3.1",
     "postgres": "^3.4.9"

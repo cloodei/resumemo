@@ -12,6 +12,7 @@
     "./constants/*": "./src/constants/*"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {
